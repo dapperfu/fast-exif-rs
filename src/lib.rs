@@ -3136,11 +3136,13 @@ impl MultiprocessingExifReader {
         let start_time = Instant::now();
         
         // Configure rayon thread pool if max_workers is specified
+        // Note: We can't reinitialize the global thread pool, so we'll use the default
+        // The rayon crate will automatically use all available CPU cores
         if let Some(max_workers) = self.max_workers {
-            rayon::ThreadPoolBuilder::new()
+            // Try to set the thread count, but don't fail if it's already initialized
+            let _ = rayon::ThreadPoolBuilder::new()
                 .num_threads(max_workers)
-                .build_global()
-                .map_err(|e| ExifError::InvalidExif(format!("Failed to create thread pool: {}", e)))?;
+                .build_global();
         }
 
         // Process files in parallel using rayon
