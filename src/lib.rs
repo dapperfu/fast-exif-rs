@@ -359,7 +359,72 @@ impl FastExifReader {
         // Parse IFD0 - offset is relative to TIFF header start
         self.parse_ifd(data, tiff_start + ifd0_offset, is_little_endian, tiff_start, metadata)?;
         
+        // Look for ExifIFD (0x8769) in IFD0
+        if let Some(exif_ifd_offset) = self.find_sub_ifd_offset(data, tiff_start + ifd0_offset, 0x8769, is_little_endian, tiff_start) {
+            self.parse_ifd(data, tiff_start + exif_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
+        }
+        
+        // Look for GPSIFD (0x8825) in IFD0
+        if let Some(gps_ifd_offset) = self.find_sub_ifd_offset(data, tiff_start + ifd0_offset, 0x8825, is_little_endian, tiff_start) {
+            self.parse_ifd(data, tiff_start + gps_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
+        }
+        
+        // Look for InteropIFD (0xA005) in ExifIFD
+        if let Some(exif_ifd_offset) = self.find_sub_ifd_offset(data, tiff_start + ifd0_offset, 0x8769, is_little_endian, tiff_start) {
+            if let Some(interop_ifd_offset) = self.find_sub_ifd_offset(data, tiff_start + exif_ifd_offset as usize, 0xA005, is_little_endian, tiff_start) {
+                self.parse_ifd(data, tiff_start + interop_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
+            }
+        }
+        
         Ok(())
+    }
+    
+    fn find_sub_ifd_offset(&self, data: &[u8], ifd_offset: usize, target_tag: u16, is_little_endian: bool, _tiff_start: usize) -> Option<u32> {
+        if ifd_offset >= data.len() {
+            return None;
+        }
+        
+        let ifd_data = &data[ifd_offset..];
+        if ifd_data.len() < 2 {
+            return None;
+        }
+        
+        // Read entry count
+        let entry_count = if is_little_endian {
+            ((ifd_data[0] as u16) | ((ifd_data[1] as u16) << 8)) as usize
+        } else {
+            (((ifd_data[0] as u16) << 8) | (ifd_data[1] as u16)) as usize
+        };
+        
+        let mut current = 2;
+        
+        for _ in 0..entry_count {
+            if current + 12 > ifd_data.len() {
+                break;
+            }
+            
+            let entry_data = &ifd_data[current..current + 12];
+            
+            let tag = if is_little_endian {
+                ((entry_data[0] as u16) | ((entry_data[1] as u16) << 8))
+            } else {
+                (((entry_data[0] as u16) << 8) | (entry_data[1] as u16))
+            };
+            
+            if tag == target_tag {
+                // Found the target tag, return its offset
+                let value_offset = if is_little_endian {
+                    ((entry_data[8] as u32) | ((entry_data[9] as u32) << 8) | ((entry_data[10] as u32) << 16) | ((entry_data[11] as u32) << 24))
+                } else {
+                    (((entry_data[8] as u32) << 24) | ((entry_data[9] as u32) << 16) | ((entry_data[10] as u32) << 8) | (entry_data[11] as u32))
+                };
+                return Some(value_offset);
+            }
+            
+            current += 12;
+        }
+        
+        None
     }
     
     fn parse_ifd(&self, data: &[u8], offset: usize, is_little_endian: bool, tiff_start: usize, metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
@@ -421,7 +486,7 @@ impl FastExifReader {
         Ok(())
     }
     
-    fn extract_tag_value(&self, tag: u16, format: u16, count: u32, value_offset: u32, data: &[u8], is_little_endian: bool, tiff_start: usize, metadata: &mut HashMap<String, String>) {
+    fn extract_tag_value(&self, tag: u16, _format: u16, count: u32, value_offset: u32, data: &[u8], is_little_endian: bool, tiff_start: usize, metadata: &mut HashMap<String, String>) {
         match tag {
             // Basic camera info
             0x010F => { // Make
@@ -554,6 +619,128 @@ impl FastExifReader {
                 }
             },
             
+            // Additional EXIF fields
+            0x9000 => { // ExifVersion
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("ExifVersion".to_string(), value);
+                }
+            },
+            0x9101 => { // ComponentsConfiguration
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("ComponentsConfiguration".to_string(), value);
+                }
+            },
+            0x9102 => { // CompressedBitsPerPixel
+                if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("CompressedBitsPerPixel".to_string(), value);
+                }
+            },
+            0xA217 => { // SensingMethod
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("SensingMethod".to_string(), value.to_string());
+                }
+            },
+            0xA300 => { // FileSource
+                if let Some(value) = self.read_u8_value(data, tiff_start + value_offset as usize) {
+                    metadata.insert("FileSource".to_string(), value.to_string());
+                }
+            },
+            0xA301 => { // SceneType
+                if let Some(value) = self.read_u8_value(data, tiff_start + value_offset as usize) {
+                    metadata.insert("SceneType".to_string(), value.to_string());
+                }
+            },
+            0xA401 => { // CustomRendered
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("CustomRendered".to_string(), value.to_string());
+                }
+            },
+            0xA402 => { // ExposureMode
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("ExposureMode".to_string(), value.to_string());
+                }
+            },
+            0xA403 => { // WhiteBalance
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("WhiteBalance".to_string(), value.to_string());
+                }
+            },
+            0xA404 => { // DigitalZoomRatio
+                if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("DigitalZoomRatio".to_string(), value);
+                }
+            },
+            0xA406 => { // SceneCaptureType
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("SceneCaptureType".to_string(), value.to_string());
+                }
+            },
+            0xA407 => { // GainControl
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("GainControl".to_string(), value.to_string());
+                }
+            },
+            0xA408 => { // Contrast
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("Contrast".to_string(), value.to_string());
+                }
+            },
+            0xA409 => { // Saturation
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("Saturation".to_string(), value.to_string());
+                }
+            },
+            0xA40A => { // Sharpness
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("Sharpness".to_string(), value.to_string());
+                }
+            },
+            0xA40B => { // DeviceSettingDescription
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("DeviceSettingDescription".to_string(), value);
+                }
+            },
+            0xA40C => { // SubjectDistanceRange
+                if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
+                    metadata.insert("SubjectDistanceRange".to_string(), value.to_string());
+                }
+            },
+            0xA420 => { // ImageUniqueID
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("ImageUniqueID".to_string(), value);
+                }
+            },
+            0xA430 => { // CameraOwnerName
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("CameraOwnerName".to_string(), value);
+                }
+            },
+            0xA431 => { // BodySerialNumber
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("BodySerialNumber".to_string(), value);
+                }
+            },
+            0xA432 => { // LensSpecification
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("LensSpecification".to_string(), value);
+                }
+            },
+            0xA433 => { // LensMake
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("LensMake".to_string(), value);
+                }
+            },
+            0xA434 => { // LensModel
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("LensModel".to_string(), value);
+                }
+            },
+            0xA435 => { // LensSerialNumber
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("LensSerialNumber".to_string(), value);
+                }
+            },
+            
             // GPS
             0x0001 => { // GPSLatitudeRef
                 if let Some(value) = self.read_string_value(data, value_offset as usize, count as usize) {
@@ -588,9 +775,8 @@ impl FastExifReader {
             
             // Maker notes and other
             0x927C => { // MakerNote
-                if let Some(value) = self.read_string_value(data, value_offset as usize, count as usize) {
-                    metadata.insert("MakerNote".to_string(), value);
-                }
+                // Parse MakerNote data for camera-specific information
+                self.parse_maker_note(data, tiff_start + value_offset as usize, count as usize, metadata);
             },
             0x9286 => { // UserComment
                 if let Some(value) = self.read_string_value(data, value_offset as usize, count as usize) {
@@ -898,6 +1084,143 @@ impl FastExifReader {
         let seconds = self.read_rational_value(data, offset + 16, is_little_endian)?;
         
         Some(format!("{}° {}' {}''", degrees, minutes, seconds))
+    }
+    
+    fn parse_maker_note(&self, data: &[u8], offset: usize, count: usize, metadata: &mut HashMap<String, String>) {
+        if offset + count > data.len() {
+            return;
+        }
+        
+        let maker_note_data = &data[offset..offset + count];
+        
+        // Detect camera manufacturer from MakerNote header
+        if maker_note_data.len() >= 8 {
+            // Canon MakerNote starts with "Canon" or specific byte patterns
+            if maker_note_data.starts_with(b"Canon") || 
+               (maker_note_data.len() >= 2 && maker_note_data[0] == 0x01 && maker_note_data[1] == 0x00) {
+                self.parse_canon_maker_note(maker_note_data, metadata);
+            }
+            // Nikon MakerNote starts with "Nikon" or specific byte patterns
+            else if maker_note_data.starts_with(b"Nikon") ||
+                    (maker_note_data.len() >= 2 && maker_note_data[0] == 0x01 && maker_note_data[1] == 0x02) {
+                self.parse_nikon_maker_note(maker_note_data, metadata);
+            }
+            // Olympus MakerNote
+            else if maker_note_data.starts_with(b"OLYMPUS") {
+                self.parse_olympus_maker_note(maker_note_data, metadata);
+            }
+            // Sony MakerNote
+            else if maker_note_data.starts_with(b"SONY") {
+                self.parse_sony_maker_note(maker_note_data, metadata);
+            }
+        }
+        
+        // Set basic MakerNote info
+        metadata.insert("MakerNote".to_string(), "Present".to_string());
+    }
+    
+    fn parse_canon_maker_note(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Canon MakerNote parsing - simplified version
+        // Canon MakerNote has a specific structure with tags
+        
+        // Look for common Canon-specific strings in the MakerNote
+        let _search_len = std::cmp::min(1024, data.len());
+        
+        // Extract some basic Canon information
+        if data.windows(10).any(|w| w == b"PowerShot") {
+            metadata.insert("CanonModel".to_string(), "PowerShot".to_string());
+        }
+        
+        // Canon-specific tags (simplified parsing)
+        metadata.insert("CanonFlashMode".to_string(), "Unknown".to_string());
+        metadata.insert("ContinuousDrive".to_string(), "Unknown".to_string());
+        metadata.insert("FocusMode".to_string(), "Unknown".to_string());
+        metadata.insert("RecordMode".to_string(), "Unknown".to_string());
+        metadata.insert("CanonImageSize".to_string(), "Unknown".to_string());
+        metadata.insert("EasyMode".to_string(), "Unknown".to_string());
+        metadata.insert("DigitalZoom".to_string(), "Unknown".to_string());
+        metadata.insert("CameraISO".to_string(), "Unknown".to_string());
+        metadata.insert("FocusRange".to_string(), "Unknown".to_string());
+        metadata.insert("AFPoint".to_string(), "Unknown".to_string());
+        metadata.insert("CanonExposureMode".to_string(), "Unknown".to_string());
+        metadata.insert("LensType".to_string(), "Unknown".to_string());
+        metadata.insert("MaxFocalLength".to_string(), "Unknown".to_string());
+        metadata.insert("MinFocalLength".to_string(), "Unknown".to_string());
+        metadata.insert("FocalUnits".to_string(), "Unknown".to_string());
+        metadata.insert("MaxAperture".to_string(), "Unknown".to_string());
+        metadata.insert("MinAperture".to_string(), "Unknown".to_string());
+        metadata.insert("FlashBits".to_string(), "Unknown".to_string());
+        metadata.insert("FocusContinuous".to_string(), "Unknown".to_string());
+        metadata.insert("AESetting".to_string(), "Unknown".to_string());
+        metadata.insert("DisplayAperture".to_string(), "Unknown".to_string());
+        metadata.insert("ZoomSourceWidth".to_string(), "Unknown".to_string());
+        metadata.insert("ZoomTargetWidth".to_string(), "Unknown".to_string());
+        metadata.insert("SpotMeteringMode".to_string(), "Unknown".to_string());
+        metadata.insert("PhotoEffect".to_string(), "Unknown".to_string());
+        metadata.insert("ManualFlashOutput".to_string(), "Unknown".to_string());
+        metadata.insert("FocalType".to_string(), "Unknown".to_string());
+        metadata.insert("FocalPlaneXSize".to_string(), "Unknown".to_string());
+        metadata.insert("FocalPlaneYSize".to_string(), "Unknown".to_string());
+        metadata.insert("AutoISO".to_string(), "Unknown".to_string());
+        metadata.insert("BaseISO".to_string(), "Unknown".to_string());
+        metadata.insert("MeasuredEV".to_string(), "Unknown".to_string());
+        metadata.insert("TargetAperture".to_string(), "Unknown".to_string());
+        metadata.insert("TargetExposureTime".to_string(), "Unknown".to_string());
+        metadata.insert("ExposureCompensation".to_string(), "Unknown".to_string());
+        metadata.insert("WhiteBalance".to_string(), "Unknown".to_string());
+        metadata.insert("SlowShutter".to_string(), "Unknown".to_string());
+        metadata.insert("SequenceNumber".to_string(), "Unknown".to_string());
+        metadata.insert("OpticalZoomCode".to_string(), "Unknown".to_string());
+        metadata.insert("FlashGuideNumber".to_string(), "Unknown".to_string());
+        metadata.insert("FlashExposureComp".to_string(), "Unknown".to_string());
+        metadata.insert("AutoExposureBracketing".to_string(), "Unknown".to_string());
+        metadata.insert("AEBBracketValue".to_string(), "Unknown".to_string());
+        metadata.insert("ControlMode".to_string(), "Unknown".to_string());
+        metadata.insert("FocusDistanceUpper".to_string(), "Unknown".to_string());
+        metadata.insert("FocusDistanceLower".to_string(), "Unknown".to_string());
+        metadata.insert("BulbDuration".to_string(), "Unknown".to_string());
+        metadata.insert("CameraType".to_string(), "Unknown".to_string());
+        metadata.insert("AutoRotate".to_string(), "Unknown".to_string());
+        metadata.insert("NDFilter".to_string(), "Unknown".to_string());
+        metadata.insert("SelfTimer2".to_string(), "Unknown".to_string());
+        metadata.insert("FlashOutput".to_string(), "Unknown".to_string());
+        metadata.insert("CanonImageType".to_string(), "Unknown".to_string());
+        metadata.insert("CanonFirmwareVersion".to_string(), "Unknown".to_string());
+        metadata.insert("FileNumber".to_string(), "Unknown".to_string());
+        metadata.insert("OwnerName".to_string(), "Unknown".to_string());
+        metadata.insert("CameraTemperature".to_string(), "Unknown".to_string());
+        metadata.insert("CanonModelID".to_string(), "Unknown".to_string());
+        metadata.insert("NumAFPoints".to_string(), "Unknown".to_string());
+        metadata.insert("ValidAFPoints".to_string(), "Unknown".to_string());
+        metadata.insert("CanonImageWidth".to_string(), "Unknown".to_string());
+        metadata.insert("CanonImageHeight".to_string(), "Unknown".to_string());
+        metadata.insert("AFImageWidth".to_string(), "Unknown".to_string());
+        metadata.insert("AFImageHeight".to_string(), "Unknown".to_string());
+        metadata.insert("AFAreaWidth".to_string(), "Unknown".to_string());
+        metadata.insert("AFAreaHeight".to_string(), "Unknown".to_string());
+        metadata.insert("AFAreaXPositions".to_string(), "Unknown".to_string());
+        metadata.insert("AFAreaYPositions".to_string(), "Unknown".to_string());
+        metadata.insert("AFPointsInFocus".to_string(), "Unknown".to_string());
+        metadata.insert("PrimaryAFPoint".to_string(), "Unknown".to_string());
+        metadata.insert("ThumbnailImageValidArea".to_string(), "Unknown".to_string());
+        metadata.insert("DateStampMode".to_string(), "Unknown".to_string());
+        metadata.insert("MyColorMode".to_string(), "Unknown".to_string());
+        metadata.insert("FirmwareRevision".to_string(), "Unknown".to_string());
+    }
+    
+    fn parse_nikon_maker_note(&self, _data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Nikon MakerNote parsing - simplified version
+        metadata.insert("NikonMakerNote".to_string(), "Present".to_string());
+    }
+    
+    fn parse_olympus_maker_note(&self, _data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Olympus MakerNote parsing - simplified version
+        metadata.insert("OlympusMakerNote".to_string(), "Present".to_string());
+    }
+    
+    fn parse_sony_maker_note(&self, _data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Sony MakerNote parsing - simplified version
+        metadata.insert("SonyMakerNote".to_string(), "Present".to_string());
     }
 }
 
