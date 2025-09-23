@@ -130,7 +130,9 @@ impl FastExifReader {
         // Check for HEIF/HIF
         if data.len() >= 12 {
             let header = &data[4..12];
-            if header == b"ftypheic" || header == b"ftypheix" || header == b"ftypmif1" {
+            if header == b"ftypheic" || header == b"ftypheix" || header == b"ftypmif1" || 
+               header == b"ftypmsf1" || header == b"ftyphevc" || header == b"ftypavci" || 
+               header == b"ftypavcs" {
                 return Ok("HEIF".to_string());
             }
         }
@@ -1185,6 +1187,9 @@ impl FastExifReader {
                             b"heix" => { metadata.insert("Brand".to_string(), "HEIX".to_string()); },
                             b"mif1" => { metadata.insert("Brand".to_string(), "MIF1".to_string()); },
                             b"msf1" => { metadata.insert("Brand".to_string(), "MSF1".to_string()); },
+                            b"hevc" => { metadata.insert("Brand".to_string(), "HEVC".to_string()); },
+                            b"avci" => { metadata.insert("Brand".to_string(), "AVCI".to_string()); },
+                            b"avcs" => { metadata.insert("Brand".to_string(), "AVCS".to_string()); },
                             _ => {}
                         }
                     }

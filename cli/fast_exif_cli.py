@@ -216,7 +216,7 @@ def _should_process_file(file_path: Path, extensions: tuple) -> bool:
     """Check if file should be processed based on extensions"""
     if not extensions:
         # Default extensions if none specified
-        default_extensions = {'.jpg', '.jpeg', '.cr2', '.nef', '.heic', '.heif', '.tiff', '.tif'}
+        default_extensions = {'.jpg', '.jpeg', '.cr2', '.nef', '.heic', '.heif', '.hif', '.tiff', '.tif'}
         return file_path.suffix.lower() in default_extensions
     
     return file_path.suffix.lower() in {ext.lower() for ext in extensions}
