@@ -324,22 +324,17 @@ impl FastExifReader {
         // Choose the best EXIF data based on content quality
         // Primary image EXIF should have more complete information
         
-        println!("DEBUG: Choosing best EXIF data from {} blocks", exif_data_list.len());
-        
         let mut best_exif = exif_data_list[0];
         let mut best_score = 0;
         
-        for (i, exif_data) in exif_data_list.iter().enumerate() {
+        for exif_data in exif_data_list {
             let score = self.score_exif_data(exif_data);
-            println!("DEBUG: EXIF block {} score: {}", i, score);
             if score > best_score {
                 best_score = score;
                 best_exif = exif_data;
-                println!("DEBUG: New best EXIF block: {} (score: {})", i, score);
             }
         }
         
-        println!("DEBUG: Selected EXIF block with score: {}", best_score);
         best_exif
     }
     
@@ -627,7 +622,9 @@ impl FastExifReader {
                     let score = self.score_exif_data(&data[i..]);
                     if score > best_score {
                         best_score = score;
-                        best_exif_data = Some(&data[i..]);
+                        // Limit EXIF data to reasonable size (64KB max)
+                        let exif_end = (i + 65536).min(data.len());
+                        best_exif_data = Some(&data[i..exif_end]);
                     }
                 }
             }
@@ -797,7 +794,14 @@ impl FastExifReader {
                 // Found EXIF identifier
                 let exif_start = pos + 4;
                 if exif_start < item_data.len() {
-                    return Some(&item_data[exif_start..]);
+                    // Find the TIFF header to determine the actual EXIF data size
+                    for i in exif_start..item_data.len().saturating_sub(8) {
+                        if &item_data[i..i+2] == b"II" || &item_data[i..i+2] == b"MM" {
+                            // Found TIFF header, extract reasonable amount of EXIF data
+                            let exif_end = (i + 65536).min(item_data.len()); // Limit to 64KB max
+                            return Some(&item_data[i..exif_end]);
+                        }
+                    }
                 }
             }
             pos += 1;
@@ -1335,6 +1339,11 @@ impl FastExifReader {
             (((data[tiff_start + 4] as u32) << 24) | ((data[tiff_start + 5] as u32) << 16) | ((data[tiff_start + 6] as u32) << 8) | (data[tiff_start + 7] as u32)) as usize
         };
         
+        // Validate IFD offset is within reasonable bounds
+        if ifd0_offset > data.len() || ifd0_offset < 8 {
+            return Err(ExifError::InvalidExif(format!("Invalid IFD offset: {}", ifd0_offset)));
+        }
+        
         // Parse IFD0 - offset is relative to TIFF header start
         self.parse_ifd(data, tiff_start + ifd0_offset, is_little_endian, tiff_start, metadata)?;
         
@@ -1423,6 +1432,11 @@ impl FastExifReader {
             (((ifd_data[0] as u16) << 8) | (ifd_data[1] as u16)) as usize
         };
         
+        // Validate entry count is reasonable (prevent reading corrupted data)
+        if entry_count > 1000 {
+            return Err(ExifError::InvalidExif(format!("Invalid IFD entry count: {}", entry_count)));
+        }
+        
         let mut current = 2;
         
         for _ in 0..entry_count {
@@ -1466,6 +1480,11 @@ impl FastExifReader {
     }
     
     fn extract_tag_value(&self, tag: u16, _format: u16, count: u32, value_offset: u32, data: &[u8], is_little_endian: bool, tiff_start: usize, metadata: &mut HashMap<String, String>) {
+        // Validate value offset is within reasonable bounds
+        let absolute_offset = tiff_start + value_offset as usize;
+        if absolute_offset >= data.len() {
+            return; // Skip invalid offset
+        }
         match tag {
             // Basic camera info
             0x010F => { // Make
