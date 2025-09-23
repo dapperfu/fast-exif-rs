@@ -56,7 +56,7 @@ features = ["pyo3/extension-module"]
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "fast_exif_reader/_version.py"
-versionfile_build = "fast_exif_reader/_version.py"
+versionfile_source = "python/fast_exif_reader/_version.py"
+versionfile_build = "python/fast_exif_reader/_version.py"
 tag_prefix = "v"
 parentdir_prefix = "fast-exif-reader-"
