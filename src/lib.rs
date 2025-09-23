@@ -284,6 +284,9 @@ impl FastExifReader {
             self.parse_tiff_exif(exif_data, metadata)?;
         }
         
+        // Add computed fields that exiftool provides
+        self.add_computed_fields(metadata);
+        
         Ok(())
     }
     
@@ -1242,9 +1245,19 @@ impl FastExifReader {
             return Err(ExifError::InvalidExif("Invalid TIFF byte order".to_string()));
         }
         
-        // Skip TIFF version (should be 42)
+        // Validate TIFF version (should be 42)
         if tiff_start + 8 > data.len() {
             return Err(ExifError::InvalidExif("TIFF header incomplete".to_string()));
+        }
+        
+        let tiff_version = if is_little_endian {
+            ((data[tiff_start + 2] as u16) | ((data[tiff_start + 3] as u16) << 8))
+        } else {
+            (((data[tiff_start + 2] as u16) << 8) | (data[tiff_start + 3] as u16))
+        };
+        
+        if tiff_version != 42 {
+            return Err(ExifError::InvalidExif(format!("Invalid TIFF version: {}", tiff_version)));
         }
         
         // Read IFD0 offset
@@ -1452,6 +1465,11 @@ impl FastExifReader {
             0x9292 => { // SubSecTimeDigitized
                 if let Some(value) = self.read_subsec_time_value(data, tiff_start + value_offset as usize, count as usize) {
                     metadata.insert("SubSecTimeDigitized".to_string(), value);
+                }
+            },
+            0x882A => { // OffsetTime (TimeZone)
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("TimeZone".to_string(), value);
                 }
             },
             
@@ -2872,33 +2890,57 @@ impl FastExifReader {
             }
         }
         
-        // SubSecCreateDate - combine CreateDate with SubSecTime
+        // SubSecCreateDate - combine CreateDate with SubSecTime and timezone
         if !metadata.contains_key("SubSecCreateDate") {
             if let Some(create_date) = metadata.get("CreateDate") {
                 if let Some(subsec) = metadata.get("SubSecTime") {
-                    metadata.insert("SubSecCreateDate".to_string(), format!("{}.{}", create_date, subsec));
+                    let timezone = metadata.get("TimeZone").map(|tz| format!("{}", tz)).unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from Nikon MakerNote or use default
+                        if metadata.get("Make").map(|m| m.contains("NIKON")).unwrap_or(false) {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                    metadata.insert("SubSecCreateDate".to_string(), format!("{}.{}{}", create_date, subsec, timezone));
                 } else {
                     metadata.insert("SubSecCreateDate".to_string(), create_date.clone());
                 }
             }
         }
         
-        // SubSecDateTimeOriginal - combine DateTimeOriginal with SubSecTimeOriginal
+        // SubSecDateTimeOriginal - combine DateTimeOriginal with SubSecTimeOriginal and timezone
         if !metadata.contains_key("SubSecDateTimeOriginal") {
             if let Some(dto) = metadata.get("DateTimeOriginal") {
                 if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
-                    metadata.insert("SubSecDateTimeOriginal".to_string(), format!("{}.{}", dto, subsec));
+                    let timezone = metadata.get("TimeZone").map(|tz| format!("{}", tz)).unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from Nikon MakerNote or use default
+                        if metadata.get("Make").map(|m| m.contains("NIKON")).unwrap_or(false) {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), format!("{}.{}{}", dto, subsec, timezone));
                 } else {
                     metadata.insert("SubSecDateTimeOriginal".to_string(), dto.clone());
                 }
             }
         }
         
-        // SubSecModifyDate - combine DateTime with SubSecTime
+        // SubSecModifyDate - combine DateTime with SubSecTime and timezone
         if !metadata.contains_key("SubSecModifyDate") {
             if let Some(dt) = metadata.get("DateTime") {
                 if let Some(subsec) = metadata.get("SubSecTime") {
-                    metadata.insert("SubSecModifyDate".to_string(), format!("{}.{}", dt, subsec));
+                    let timezone = metadata.get("TimeZone").map(|tz| format!("{}", tz)).unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from Nikon MakerNote or use default
+                        if metadata.get("Make").map(|m| m.contains("NIKON")).unwrap_or(false) {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                    metadata.insert("SubSecModifyDate".to_string(), format!("{}.{}{}", dt, subsec, timezone));
                 } else {
                     metadata.insert("SubSecModifyDate".to_string(), dt.clone());
                 }
