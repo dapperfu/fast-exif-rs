@@ -4,42 +4,65 @@ Fast EXIF Reader - Optimized for Canon 70D and Nikon Z50 II
 A high-performance EXIF metadata reader built in Rust with Python bindings.
 Optimized for Canon 70D and Nikon Z50 II cameras in RAW, HIF, and JPEG formats.
 
+This module provides both Python and Rust multiprocessing implementations:
+
+Python Multiprocessing:
+- Uses ProcessPoolExecutor for parallel processing
+- Good for small to medium file counts
+- Familiar Python API and error handling
+
+Rust Multiprocessing:
+- Uses Rayon for data parallelism
+- Optimized for large file counts and high throughput
+- Better memory efficiency and thread safety
+
 Example:
     >>> from fast_exif_reader import FastExifReader
     >>> reader = FastExifReader()
     >>> metadata = reader.read_file("image.jpg")
     >>> print(metadata["Make"])
     Canon
+    
+    # Python multiprocessing
+    >>> from fast_exif_reader import python_extract_exif_batch
+    >>> results = python_extract_exif_batch(file_paths, max_workers=4)
+    
+    # Rust multiprocessing  
+    >>> from fast_exif_reader import rust_process_files_parallel
+    >>> results = rust_process_files_parallel(file_paths, max_workers=4)
 """
 
 # Import from the compiled Rust module
 try:
     from .fast_exif_reader import (
         FastExifReader,
-        MultiprocessingExifReader,
-        process_files_parallel,
-        process_directory_parallel
+        MultiprocessingExifReader as RustMultiprocessingExifReader,
+        process_files_parallel as rust_process_files_parallel,
+        process_directory_parallel as rust_process_directory_parallel
     )
+    RUST_AVAILABLE = True
 except ImportError:
-    # Fallback to Python implementation if Rust module not available
-    from .multiprocessing import (
-        MultiprocessingExifReader,
-        extract_exif_batch,
-        extract_exif_from_directory,
-        read_multiple_files,
-        read_directory
-    )
+    RUST_AVAILABLE = False
     FastExifReader = None
-    process_files_parallel = None
-    process_directory_parallel = None
+    RustMultiprocessingExifReader = None
+    rust_process_files_parallel = None
+    rust_process_directory_parallel = None
 
-# Also import Python multiprocessing functions for comparison
+# Import Python multiprocessing functions
 from .multiprocessing import (
+    MultiprocessingExifReader as PythonMultiprocessingExifReader,
     extract_exif_batch as python_extract_exif_batch,
     extract_exif_from_directory as python_extract_exif_from_directory,
-    read_multiple_files,
+    read_multiple_files as python_read_multiple_files,
     read_directory as python_read_directory
 )
+
+# Convenience aliases for backward compatibility
+MultiprocessingExifReader = PythonMultiprocessingExifReader
+extract_exif_batch = python_extract_exif_batch
+extract_exif_from_directory = python_extract_exif_from_directory
+read_multiple_files = python_read_multiple_files
+read_directory = python_read_directory
 
 __version__ = "0.1.0"
 __author__ = "Your Name"
@@ -47,17 +70,30 @@ __email__ = "your.email@example.com"
 __license__ = "MIT"
 
 __all__ = [
+    # Core functionality
     "FastExifReader",
-    "MultiprocessingExifReader", 
-    "process_files_parallel",
-    "process_directory_parallel",
-    "extract_exif_batch",
+    
+    # Python multiprocessing (default/backward compatible)
+    "MultiprocessingExifReader",
+    "extract_exif_batch", 
     "extract_exif_from_directory",
     "read_multiple_files",
     "read_directory",
+    
+    # Explicit Python multiprocessing
+    "PythonMultiprocessingExifReader",
     "python_extract_exif_batch",
-    "python_extract_exif_from_directory",
-    "python_read_directory"
+    "python_extract_exif_from_directory", 
+    "python_read_multiple_files",
+    "python_read_directory",
+    
+    # Rust multiprocessing (if available)
+    "RustMultiprocessingExifReader",
+    "rust_process_files_parallel",
+    "rust_process_directory_parallel",
+    
+    # Utility
+    "RUST_AVAILABLE"
 ]
 
 # Version info
