@@ -6,6 +6,7 @@ This is a fallback setup script for environments that don't support pyproject.to
 
 from setuptools import setup, find_packages
 import os
+import versioneer
 
 # Read the README file
 def read_readme():
@@ -22,7 +23,8 @@ def read_requirements():
 
 setup(
     name="fast-exif-reader",
-    version="0.1.0",
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     author="Your Name",
     author_email="your.email@example.com",
     description="Fast EXIF reader optimized for Canon 70D and Nikon Z50 II",
