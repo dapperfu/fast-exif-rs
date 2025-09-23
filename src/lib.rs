@@ -543,24 +543,98 @@ impl FastExifReader {
     
     fn find_exif_anywhere_in_file<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // Look for EXIF data anywhere in the file
-        // This is a fallback method that searches for EXIF patterns
+        // This method searches for TIFF headers and validates they contain EXIF data
         
-        // Look for "Exif" identifier followed by TIFF header
+        // Look for TIFF headers and check if they contain EXIF data
         for i in 0..data.len().saturating_sub(8) {
-            if &data[i..i + 4] == b"Exif" {
-                // Found EXIF identifier, check if followed by TIFF header
-                let tiff_start = i + 4;
-                if tiff_start + 8 < data.len() {
-                    // Check for TIFF header (II or MM)
-                    if (data[tiff_start] == 0x49 && data[tiff_start + 1] == 0x49) ||
-                       (data[tiff_start] == 0x4D && data[tiff_start + 1] == 0x4D) {
-                        return Some(&data[tiff_start..]);
-                    }
+            if (data[i] == 0x49 && data[i + 1] == 0x49) || // II (little endian)
+               (data[i] == 0x4D && data[i + 1] == 0x4D) { // MM (big endian)
+                
+                // Found TIFF header, check if it contains EXIF data
+                if self.is_valid_exif_data(&data[i..]) {
+                    return Some(&data[i..]);
                 }
             }
         }
         
         None
+    }
+    
+    fn is_valid_exif_data(&self, data: &[u8]) -> bool {
+        // Check if TIFF data contains valid EXIF data
+        // EXIF data should have specific tags like DateTime, Make, Model, etc.
+        
+        if data.len() < 8 {
+            return false;
+        }
+        
+        // Check for TIFF header
+        let is_little_endian = data[0] == 0x49 && data[1] == 0x49;
+        let is_big_endian = data[0] == 0x4D && data[1] == 0x4D;
+        
+        if !is_little_endian && !is_big_endian {
+            return false;
+        }
+        
+        // Read IFD offset
+        let ifd_offset = if is_little_endian {
+            ((data[4] as u32) | ((data[5] as u32) << 8) | ((data[6] as u32) << 16) | ((data[7] as u32) << 24)) as usize
+        } else {
+            (((data[4] as u32) << 24) | ((data[5] as u32) << 16) | ((data[6] as u32) << 8) | (data[7] as u32)) as usize
+        };
+        
+        if ifd_offset >= data.len() {
+            return false;
+        }
+        
+        // Check if IFD offset points to valid data
+        if ifd_offset + 2 > data.len() {
+            return false;
+        }
+        
+        // Read number of directory entries
+        let num_entries = if is_little_endian {
+            (data[ifd_offset] as u16) | ((data[ifd_offset + 1] as u16) << 8)
+        } else {
+            ((data[ifd_offset] as u16) << 8) | (data[ifd_offset + 1] as u16)
+        };
+        
+        // Check for reasonable number of entries (EXIF typically has 10-50 entries)
+        if num_entries == 0 || num_entries > 100 {
+            return false;
+        }
+        
+        // Check if we have enough data for the directory entries
+        let entries_size = (num_entries as usize) * 12 + 2 + 4; // 12 bytes per entry + count + next IFD offset
+        if ifd_offset + entries_size > data.len() {
+            return false;
+        }
+        
+        // Look for EXIF-specific tags in the first few entries
+        let mut found_exif_tags = 0;
+        for i in 0..num_entries.min(10) { // Check first 10 entries
+            let entry_offset = ifd_offset + 2 + (i as usize) * 12;
+            if entry_offset + 12 <= data.len() {
+                let tag = if is_little_endian {
+                    (data[entry_offset] as u16) | ((data[entry_offset + 1] as u16) << 8)
+                } else {
+                    ((data[entry_offset] as u16) << 8) | (data[entry_offset + 1] as u16)
+                };
+                
+                // Check for common EXIF tags
+                match tag {
+                    0x010F => found_exif_tags += 1, // Make
+                    0x0110 => found_exif_tags += 1, // Model
+                    0x0132 => found_exif_tags += 1, // DateTime
+                    0x0131 => found_exif_tags += 1, // Software
+                    0x010E => found_exif_tags += 1, // ImageDescription
+                    _ => {}
+                }
+            }
+        }
+        
+        // If we found at least 2 EXIF-specific tags, this is likely EXIF data
+        found_exif_tags >= 2
     }
     
     fn extract_exif_from_item_data<'a>(&self, item_data: &'a [u8]) -> Option<&'a [u8]> {
