@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use memmap2::Mmap;
 use thiserror::Error;
+use pyo3::types::PyBytes;
 
 #[derive(Error, Debug)]
 pub enum ExifError {
@@ -24,6 +25,7 @@ impl From<ExifError> for PyErr {
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
+#[derive(Clone)]
 pub struct FastExifReader {
     // Pre-allocated buffers for performance
     buffer: Vec<u8>,
@@ -52,6 +54,21 @@ impl FastExifReader {
             let metadata = self.read_exif_from_bytes(data)?;
             Ok(metadata.into_py(py))
         })
+    }
+
+    /// Support for pickle protocol
+    fn __getstate__(&self, py: Python) -> PyResult<PyObject> {
+        // Serialize the buffer as bytes
+        let buffer_bytes = PyBytes::new(py, &self.buffer);
+        Ok(buffer_bytes.into())
+    }
+
+    /// Support for pickle protocol
+    fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
+        // Deserialize the buffer from bytes
+        let buffer_bytes: &PyBytes = state.extract(py)?;
+        self.buffer = buffer_bytes.as_bytes().to_vec();
+        Ok(())
     }
 }
 

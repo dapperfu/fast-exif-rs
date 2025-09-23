@@ -13,13 +13,27 @@ Example:
 """
 
 from .fast_exif_reader import FastExifReader
+from .multiprocessing import (
+    MultiprocessingExifReader,
+    extract_exif_batch,
+    extract_exif_from_directory,
+    read_multiple_files,
+    read_directory
+)
 
 __version__ = "0.1.0"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 __license__ = "MIT"
 
-__all__ = ["FastExifReader"]
+__all__ = [
+    "FastExifReader",
+    "MultiprocessingExifReader", 
+    "extract_exif_batch",
+    "extract_exif_from_directory",
+    "read_multiple_files",
+    "read_directory"
+]
 
 # Version info
 VERSION = __version__
