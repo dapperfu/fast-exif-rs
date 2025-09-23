@@ -143,7 +143,7 @@ The CLI tool leverages the high-performance Rust backend, providing:
 
 ## Compatibility
 
-- **File Formats**: JPEG, CR2 (Canon RAW), NEF (Nikon RAW), HEIF, TIFF
+- **File Formats**: JPEG, CR2 (Canon RAW), NEF (Nikon RAW), HEIF, HIF, TIFF
 - **Operating Systems**: Linux, macOS, Windows
 - **Python Versions**: 3.8+
 

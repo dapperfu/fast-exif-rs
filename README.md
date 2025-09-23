@@ -23,7 +23,7 @@ A high-performance EXIF metadata reader built in Rust with Python bindings, opti
 - **Nikon NEF** - Nikon RAW format with maker notes
 - **Olympus ORF** - Olympus RAW format with maker notes
 - **Ricoh DNG** - Ricoh Digital Negative format
-- **HEIF/HIF** - High Efficiency Image Format (mobile cameras)
+- **HEIF/HIF** - High Efficiency Image Format (mobile cameras, Apple devices)
 
 ### Current Features
 - **Comprehensive Camera Detection**: Automatic detection of camera make and model
