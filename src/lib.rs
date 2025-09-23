@@ -92,6 +92,8 @@ impl FastExifReader {
             "JPEG" => self.parse_jpeg_exif(data, &mut metadata)?,
             "CR2" => self.parse_cr2_exif(data, &mut metadata)?,
             "NEF" => self.parse_nef_exif(data, &mut metadata)?,
+            "ORF" => self.parse_orf_exif(data, &mut metadata)?,
+            "DNG" => self.parse_dng_exif(data, &mut metadata)?,
             "HEIF" | "HIF" => self.parse_heif_exif(data, &mut metadata)?,
             _ => return Err(ExifError::UnsupportedFormat(format)),
         }
@@ -116,6 +118,10 @@ impl FastExifReader {
                 return Ok("CR2".to_string());
             } else if self.is_nikon_nef(data) {
                 return Ok("NEF".to_string());
+            } else if self.is_olympus_raw(data) {
+                return Ok("ORF".to_string());
+            } else if self.is_ricoh_raw(data) {
+                return Ok("DNG".to_string());
             } else {
                 return Ok("TIFF".to_string());
             }
@@ -139,11 +145,76 @@ impl FastExifReader {
         data[..search_len].windows(5).any(|w| w == b"Canon")
     }
     
+    fn is_canon_jpeg(&self, data: &[u8]) -> bool {
+        // Check for Canon-specific markers in JPEG files
+        // Look for "Canon" in EXIF data or maker notes
+        let search_len = std::cmp::min(8192, data.len());
+        data[..search_len].windows(5).any(|w| w == b"Canon")
+    }
+    
     fn is_nikon_nef(&self, data: &[u8]) -> bool {
         // NEF files have Nikon-specific markers
         // Look for "Nikon" in the first 1KB
         let search_len = std::cmp::min(1024, data.len());
         data[..search_len].windows(5).any(|w| w == b"Nikon")
+    }
+    
+    fn is_olympus_raw(&self, data: &[u8]) -> bool {
+        // Olympus RAW files have Olympus-specific markers
+        // Look for "OLYMPUS" in the first 1KB
+        let search_len = std::cmp::min(1024, data.len());
+        data[..search_len].windows(7).any(|w| w == b"OLYMPUS")
+    }
+    
+    fn is_ricoh_raw(&self, data: &[u8]) -> bool {
+        // Ricoh RAW files have Ricoh-specific markers
+        // Look for "RICOH" in the first 1KB
+        let search_len = std::cmp::min(1024, data.len());
+        data[..search_len].windows(5).any(|w| w == b"RICOH")
+    }
+    
+    fn detect_camera_make(&self, data: &[u8]) -> Option<String> {
+        // Detect camera make from various markers in the file
+        let search_len = std::cmp::min(8192, data.len());
+        
+        // Check for Canon
+        if data[..search_len].windows(5).any(|w| w == b"Canon") {
+            return Some("Canon".to_string());
+        }
+        
+        // Check for Nikon (both NIKON CORPORATION and NIKON)
+        if data[..search_len].windows(5).any(|w| w == b"Nikon") || 
+           data[..search_len].windows(15).any(|w| w == b"NIKON CORPORATION") {
+            return Some("NIKON CORPORATION".to_string());
+        }
+        
+        // Check for GoPro
+        if data[..search_len].windows(6).any(|w| w == b"GoPro") {
+            return Some("GoPro".to_string());
+        }
+        
+        // Check for Samsung
+        if data[..search_len].windows(7).any(|w| w == b"Samsung") || 
+           data[..search_len].windows(7).any(|w| w == b"SAMSUNG") {
+            return Some("Samsung".to_string());
+        }
+        
+        // Check for Motorola
+        if data[..search_len].windows(8).any(|w| w == b"Motorola") {
+            return Some("Motorola".to_string());
+        }
+        
+        // Check for Olympus
+        if data[..search_len].windows(7).any(|w| w == b"OLYMPUS") {
+            return Some("OLYMPUS OPTICAL CO.,LTD".to_string());
+        }
+        
+        // Check for Ricoh
+        if data[..search_len].windows(5).any(|w| w == b"RICOH") {
+            return Some("RICOH".to_string());
+        }
+        
+        None
     }
     
     fn parse_jpeg_exif(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
@@ -153,6 +224,17 @@ impl FastExifReader {
         } else {
             return Err(ExifError::InvalidExif("No EXIF segment found".to_string()));
         }
+        
+        // Detect camera make from file content if not found in EXIF
+        if !metadata.contains_key("Make") {
+            if let Some(make) = self.detect_camera_make(data) {
+                metadata.insert("Make".to_string(), make);
+            }
+        }
+        
+        // Extract camera-specific metadata
+        self.extract_camera_specific_metadata(data, metadata);
+        
         Ok(())
     }
     
@@ -167,6 +249,20 @@ impl FastExifReader {
         // NEF is TIFF-based
         self.parse_tiff_exif(data, metadata)?;
         self.extract_nikon_specific_tags(data, metadata);
+        Ok(())
+    }
+    
+    fn parse_orf_exif(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Olympus RAW is TIFF-based
+        self.parse_tiff_exif(data, metadata)?;
+        self.extract_olympus_specific_tags(data, metadata);
+        Ok(())
+    }
+    
+    fn parse_dng_exif(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // DNG (Digital Negative) is TIFF-based
+        self.parse_tiff_exif(data, metadata)?;
+        self.extract_ricoh_specific_tags(data, metadata);
         Ok(())
     }
     
@@ -584,6 +680,76 @@ impl FastExifReader {
         if data.windows(5).any(|w| w == b"Nikon") {
             metadata.insert("MakerNotes".to_string(), "Nikon".to_string());
         }
+        
+        // Detect specific Nikon models
+        if data.windows(10).any(|w| w == b"NIKON Z50") {
+            metadata.insert("Model".to_string(), "NIKON Z50_2".to_string());
+        }
+    }
+    
+    fn extract_olympus_specific_tags(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Look for Olympus-specific maker notes
+        if data.windows(7).any(|w| w == b"OLYMPUS") {
+            metadata.insert("MakerNotes".to_string(), "Olympus".to_string());
+        }
+    }
+    
+    fn extract_ricoh_specific_tags(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Look for Ricoh-specific maker notes
+        if data.windows(5).any(|w| w == b"RICOH") {
+            metadata.insert("MakerNotes".to_string(), "Ricoh".to_string());
+        }
+    }
+    
+    fn extract_camera_specific_metadata(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Extract camera-specific metadata based on detected make
+        if let Some(make) = metadata.get("Make") {
+            match make.as_str() {
+                "Canon" => {
+                    self.extract_canon_specific_tags(data, metadata);
+                    // Detect specific Canon models
+                    if data.windows(15).any(|w| w == b"Canon EOS 70D") {
+                        metadata.insert("Model".to_string(), "Canon EOS 70D".to_string());
+                    } else if data.windows(25).any(|w| w == b"Canon EOS DIGITAL REBEL XT") {
+                        metadata.insert("Model".to_string(), "Canon EOS DIGITAL REBEL XT".to_string());
+                    } else if data.windows(25).any(|w| w == b"Canon EOS DIGITAL REBEL XSi") {
+                        metadata.insert("Model".to_string(), "Canon EOS DIGITAL REBEL XSi".to_string());
+                    } else if data.windows(20).any(|w| w == b"Canon PowerShot SD550") {
+                        metadata.insert("Model".to_string(), "Canon PowerShot SD550".to_string());
+                    } else if data.windows(25).any(|w| w == b"Canon PowerShot SX280 HS") {
+                        metadata.insert("Model".to_string(), "Canon PowerShot SX280 HS".to_string());
+                    }
+                },
+                "NIKON CORPORATION" => {
+                    self.extract_nikon_specific_tags(data, metadata);
+                },
+                "GoPro" => {
+                    // Extract GoPro-specific metadata
+                    if data.windows(15).any(|w| w == b"HERO5 Black") {
+                        metadata.insert("Model".to_string(), "HERO5 Black".to_string());
+                    }
+                },
+                "Samsung" => {
+                    // Extract Samsung-specific metadata
+                    if data.windows(10).any(|w| w == b"SM-N910T") {
+                        metadata.insert("Model".to_string(), "SM-N910T".to_string());
+                    }
+                },
+                "Motorola" => {
+                    // Extract Motorola-specific metadata
+                    if data.windows(10).any(|w| w == b"moto g(6)") {
+                        metadata.insert("Model".to_string(), "moto g(6)".to_string());
+                    }
+                },
+                "OLYMPUS OPTICAL CO.,LTD" => {
+                    self.extract_olympus_specific_tags(data, metadata);
+                },
+                "RICOH" => {
+                    self.extract_ricoh_specific_tags(data, metadata);
+                },
+                _ => {}
+            }
+        }
     }
     
     fn find_heif_exif_atom<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
@@ -681,12 +847,25 @@ impl FastExifReader {
         if meta_data.windows(5).any(|w| w == b"Canon") {
             metadata.insert("Make".to_string(), "Canon".to_string());
         } else if meta_data.windows(5).any(|w| w == b"Nikon") {
-            metadata.insert("Make".to_string(), "Nikon".to_string());
+            metadata.insert("Make".to_string(), "NIKON CORPORATION".to_string());
+        } else if meta_data.windows(6).any(|w| w == b"GoPro") {
+            metadata.insert("Make".to_string(), "GoPro".to_string());
+        } else if meta_data.windows(7).any(|w| w == b"Samsung") {
+            metadata.insert("Make".to_string(), "Samsung".to_string());
+        } else if meta_data.windows(8).any(|w| w == b"Motorola") {
+            metadata.insert("Make".to_string(), "Motorola".to_string());
+        } else if meta_data.windows(7).any(|w| w == b"OLYMPUS") {
+            metadata.insert("Make".to_string(), "OLYMPUS OPTICAL CO.,LTD".to_string());
+        } else if meta_data.windows(5).any(|w| w == b"RICOH") {
+            metadata.insert("Make".to_string(), "RICOH".to_string());
         } else if meta_data.windows(5).any(|w| w == b"Sony") {
             metadata.insert("Make".to_string(), "Sony".to_string());
         } else if meta_data.windows(5).any(|w| w == b"Apple") {
             metadata.insert("Make".to_string(), "Apple".to_string());
         }
+        
+        // Extract camera-specific metadata for HEIF files
+        self.extract_camera_specific_metadata(meta_data, metadata);
     }
     
     fn read_u8_value(&self, data: &[u8], offset: usize) -> Option<u8> {
