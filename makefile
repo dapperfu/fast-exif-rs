@@ -22,17 +22,22 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 install: venv/bin/python ## Install the package in development mode
-	venv/bin/maturin develop
+	# Try alternative method using pip install -e .
+	venv/bin/pip install -e .
+	# If that fails, try manual maturin build
+	@echo "If pip install failed, try: venv/bin/maturin develop"
 
 install-dev: venv/bin/python ## Install with development dependencies
-	venv/bin/maturin develop
+	venv/bin/pip install -e .
 	venv/bin/pip install -e .[dev]
 
 build: venv/bin/python ## Build the package
-	venv/bin/maturin build
+	venv/bin/pip install build
+	venv/bin/python -m build
 
 build-release: venv/bin/python ## Build the package in release mode
-	venv/bin/maturin build --release
+	venv/bin/pip install build
+	venv/bin/python -m build
 
 test: venv/bin/python ## Run tests
 	venv/bin/python -m pytest tests/ -v
