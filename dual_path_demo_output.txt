@@ -1,0 +1,140 @@
+✓ All imports successful
+Fast EXIF Reader - Dual-Path Multiprocessing Demonstration
+======================================================================
+System Information:
+  CPUs: 16
+  Python: 3.12.3
+  Rust Available: True
+
+============================================================
+SMALL BATCH PROCESSING (10 files)
+============================================================
+Testing with 10 files
+
+=== Python Multiprocessing ===
+✓ Success: 0.015s
+  Files processed: 10
+  Success rate: 100.0%
+  Files per second: 676.5
+  Average time per file: 0.001s
+
+=== Rust Multiprocessing ===
+✓ Success: 0.008s
+  Files processed: 10
+  Success rate: 100.0%
+  Files per second: 1261.2
+  Average time per file: 0.001s
+
+🏆 Fastest: Rust Multiprocessing (0.008s)
+   Python Multiprocessing: 1.79x slower
+
+============================================================
+LARGE BATCH PROCESSING (50 files)
+============================================================
+Testing with 50 files
+
+=== Python Multiprocessing ===
+✓ Success: 0.068s
+  Files processed: 50
+  Success rate: 100.0%
+  Files per second: 740.4
+  Average time per file: 0.003s
+
+=== Rust Multiprocessing ===
+✓ Success: 0.065s
+  Files processed: 50
+  Success rate: 100.0%
+  Files per second: 785.4
+  Average time per file: 0.002s
+
+🏆 Fastest: Rust Multiprocessing (0.065s)
+   Python Multiprocessing: 1.04x slower
+
+============================================================
+CLASS-BASED USAGE PATTERNS
+============================================================
+Testing with 20 files
+
+=== Python Class-Based ===
+✓ Success: 0.033s
+  Files per second: 611.0
+  Success rate: 100.0%
+
+=== Rust Class-Based ===
+✓ Success: 0.026s
+  Files per second: 796.5
+  Success rate: 100.0%
+
+============================================================
+DIRECTORY PROCESSING
+============================================================
+Processing directory: /keg/pictures/2015/05-May/
+
+=== Python Directory Processing ===
+✓ Success: 0.044s
+  Files found: 30
+  Files per second: 734.9
+  Success rate: 100.0%
+
+=== Rust Directory Processing ===
+✓ Success: 0.034s
+  Files found: 30
+  Files per second: 923.9
+  Success rate: 100.0%
+
+============================================================
+ERROR HANDLING DEMONSTRATION
+============================================================
+Testing error handling with mixed file list...
+
+=== Python Error Handling ===
+✓ Processed: 4 files
+  Success: 2
+  Errors: 2
+  Success rate: 50.0%
+  Error in file1.jpg: Unknown
+  Error in file2.jpg: Unknown
+
+=== Rust Error Handling ===
+✓ Processed: 4 files
+  Success: 2
+  Errors: 2
+  Success rate: 50.0%
+  Error in file1.jpg: IO error: No such file or directory (os error 2)
+  Error in file2.jpg: IO error: No such file or directory (os error 2)
+
+============================================================
+HYBRID APPROACH - OPTIMAL PERFORMANCE
+============================================================
+
+--- Small batch (10 files) ---
+Processing 10 files...
+  → Using Python multiprocessing (small batch, better error handling)
+✓ Completed in 0.014s
+  Files per second: 706.1
+  Success rate: 100.0%
+
+--- Medium batch (30 files) ---
+Processing 30 files...
+  → Using Rust multiprocessing (large batch, better performance)
+✓ Completed in 0.033s
+  Files per second: 934.9
+  Success rate: 100.0%
+
+--- Large batch (50 files) ---
+Processing 50 files...
+  → Using Rust multiprocessing (large batch, better performance)
+✓ Completed in 0.062s
+  Files per second: 820.6
+  Success rate: 100.0%
+
+======================================================================
+DEMONSTRATION COMPLETED
+======================================================================
+
+Key Takeaways:
+• Python multiprocessing: Best for small batches and development
+• Rust multiprocessing: Best for large batches and production
+• Hybrid approach: Choose implementation based on file count
+• Both implementations provide excellent error handling
+• Use class-based approach for reusable processing objects
