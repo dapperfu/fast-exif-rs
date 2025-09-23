@@ -351,7 +351,6 @@ impl FastExifReader {
         
         // First, validate the TIFF header
         if exif_data.len() < 8 {
-            println!("DEBUG: EXIF data too small: {} bytes", exif_data.len());
             return 0; // Invalid EXIF data
         }
         
@@ -365,7 +364,6 @@ impl FastExifReader {
         }
         
         if tiff_start + 8 > exif_data.len() {
-            println!("DEBUG: No valid TIFF header found in EXIF data");
             return 0; // No valid TIFF header found
         }
         
@@ -374,7 +372,6 @@ impl FastExifReader {
         let is_big_endian = &exif_data[tiff_start..tiff_start+2] == b"MM";
         
         if !is_little_endian && !is_big_endian {
-            println!("DEBUG: Invalid byte order: {:?}", &exif_data[tiff_start..tiff_start+2]);
             return 0; // Invalid byte order
         }
         
@@ -386,7 +383,6 @@ impl FastExifReader {
         };
         
         if tiff_version != 42 {
-            println!("DEBUG: Invalid TIFF version: {} (expected 42)", tiff_version);
             return 0; // Invalid TIFF version
         }
         
@@ -450,7 +446,6 @@ impl FastExifReader {
             }
         }
         
-        println!("DEBUG: Final score for EXIF block: {}", score);
         score
     }
     

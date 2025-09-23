@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "fast-exif-reader"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Fast EXIF reader optimized for Canon 70D and Nikon Z50 II"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -52,3 +52,11 @@ fast-exif-cli = "cli.fast_exif_cli:main"
 python-source = "python"
 module-name = "fast_exif_reader"
 features = ["pyo3/extension-module"]
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "fast_exif_reader/_version.py"
+versionfile_build = "fast_exif_reader/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "fast-exif-reader-"
