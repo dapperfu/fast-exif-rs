@@ -273,18 +273,278 @@ impl FastExifReader {
     
     fn parse_heif_exif(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
         // HEIF/HIF files are based on QuickTime/MOV container format
-        // They use ISO Base Media File Format (ISO 14496-12)
+        // They use ISO Base Media File Format (ISO 23008-12)
         metadata.insert("Format".to_string(), "HEIF".to_string());
         
-        // Parse HEIF atoms to find EXIF data
-        if let Some(exif_data) = self.find_heif_exif_atom(data) {
-            self.parse_tiff_exif(exif_data, metadata)?;
-        } else {
-            // If no EXIF atom found, try to extract basic HEIF metadata
+        // Parse HEIF file structure properly
+        self.parse_heif_structure(data, metadata)?;
+        
+        Ok(())
+    }
+    
+    fn parse_heif_structure(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse HEIF file structure according to ISO 23008-12
+        let mut pos = 0;
+        let mut primary_item_id = None;
+        let mut meta_box_data = None;
+        
+        // First pass: find meta box and primary item
+        while pos + 8 < data.len() {
+            let size = self.read_u32_be(data, pos)?;
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            match atom_type {
+                b"meta" => {
+                    // Found meta box - this contains the main metadata
+                    meta_box_data = Some(&data[pos + 8..pos + size as usize]);
+                },
+                b"pitm" => {
+                    // Primary Item box - contains the primary item ID
+                    if size >= 12 {
+                        primary_item_id = Some(self.read_u32_be(data, pos + 8)?);
+                    }
+                },
+                b"ftyp" => {
+                    // File type box - extract brand information
+                    self.extract_ftyp_box(&data[pos + 8..pos + size as usize], metadata);
+                },
+                _ => {}
+            }
+            
+            pos += size as usize;
+        }
+        
+        // Second pass: parse meta box for EXIF data
+        if let Some(meta_data) = meta_box_data {
+            self.parse_meta_box(meta_data, primary_item_id, metadata)?;
+        }
+        
+        // Fallback: try basic metadata extraction if no meta box found
+        if metadata.is_empty() || !metadata.contains_key("Make") {
             self.extract_heif_basic_metadata(data, metadata);
         }
         
         Ok(())
+    }
+    
+    fn parse_meta_box(&self, meta_data: &[u8], primary_item_id: Option<u32>, metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse meta box structure
+        let mut pos = 0;
+        
+        // Skip meta box header (version, flags)
+        if meta_data.len() >= 4 {
+            pos += 4;
+        }
+        
+        while pos + 8 < meta_data.len() {
+            let size = self.read_u32_be(meta_data, pos)?;
+            if size == 0 || size > meta_data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &meta_data[pos + 4..pos + 8];
+            
+            match atom_type {
+                b"hdlr" => {
+                    // Handler reference box
+                    self.extract_hdlr_box(&meta_data[pos + 8..pos + size as usize], metadata);
+                },
+                b"iinf" => {
+                    // Item info box - contains item information
+                    self.parse_item_info_box(&meta_data[pos + 8..pos + size as usize], metadata)?;
+                },
+                b"iloc" => {
+                    // Item location box - contains item locations
+                    self.parse_item_location_box(&meta_data[pos + 8..pos + size as usize], primary_item_id, metadata)?;
+                },
+                b"iprp" => {
+                    // Item properties box - contains properties
+                    self.parse_item_properties_box(&meta_data[pos + 8..pos + size as usize], metadata)?;
+                },
+                b"idat" => {
+                    // Item data box - contains actual data
+                    self.parse_item_data_box(&meta_data[pos + 8..pos + size as usize], metadata)?;
+                },
+                _ => {}
+            }
+            
+            pos += size as usize;
+        }
+        
+        Ok(())
+    }
+    
+    fn parse_item_info_box(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse item info box to find EXIF items
+        let mut pos = 0;
+        
+        // Skip version and flags
+        if data.len() >= 4 {
+            pos += 4;
+        }
+        
+        // Read entry count
+        if data.len() >= pos + 4 {
+            let entry_count = self.read_u32_be(data, pos)?;
+            pos += 4;
+            
+            for _ in 0..entry_count {
+                if pos + 4 <= data.len() {
+                    let item_id = self.read_u32_be(data, pos)?;
+                    pos += 4;
+                    
+                    // Look for EXIF items
+                    if pos + 4 <= data.len() {
+                        let item_type = &data[pos..pos + 4];
+                        if item_type == b"Exif" {
+                            metadata.insert("ExifItemID".to_string(), item_id.to_string());
+                        }
+                        pos += 4;
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn parse_item_location_box(&self, data: &[u8], primary_item_id: Option<u32>, metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse item location box to find EXIF data locations
+        let mut pos = 0;
+        
+        // Skip version and flags
+        if data.len() >= 4 {
+            pos += 4;
+        }
+        
+        // Read entry count
+        if data.len() >= pos + 4 {
+            let entry_count = self.read_u32_be(data, pos)?;
+            pos += 4;
+            
+            for _ in 0..entry_count {
+                if pos + 4 <= data.len() {
+                    let item_id = self.read_u32_be(data, pos)?;
+                    pos += 4;
+                    
+                    // Check if this is the primary item or EXIF item
+                    if Some(item_id) == primary_item_id || metadata.get("ExifItemID").map(|s| s.parse::<u32>().unwrap_or(0)) == Some(item_id) {
+                        // This is an important item, extract its location
+                        if pos + 8 <= data.len() {
+                            let offset = self.read_u32_be(data, pos)?;
+                            let length = self.read_u32_be(data, pos + 4)?;
+                            metadata.insert("ItemOffset".to_string(), offset.to_string());
+                            metadata.insert("ItemLength".to_string(), length.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn parse_item_properties_box(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse item properties box
+        let mut pos = 0;
+        
+        // Skip version and flags
+        if data.len() >= 4 {
+            pos += 4;
+        }
+        
+        // Read property container count
+        if data.len() >= pos + 4 {
+            let container_count = self.read_u32_be(data, pos)?;
+            pos += 4;
+            
+            for _ in 0..container_count {
+                if pos + 8 <= data.len() {
+                    let item_count = self.read_u32_be(data, pos)?;
+                    pos += 4;
+                    
+                    // Read property type
+                    if pos + 4 <= data.len() {
+                        let prop_type = &data[pos..pos + 4];
+                        pos += 4;
+                        
+                        // Look for EXIF properties
+                        if prop_type == b"Exif" {
+                            metadata.insert("ExifPropertyType".to_string(), "Exif".to_string());
+                        }
+                    }
+                    
+                    // Skip item associations
+                    pos += item_count as usize * 4;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn parse_item_data_box(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse item data box for actual EXIF data
+        if data.len() >= 4 {
+            // Skip version and flags
+            let mut pos = 4;
+            
+            // Look for EXIF data in the data box
+            while pos + 4 < data.len() {
+                if &data[pos..pos + 4] == b"Exif" {
+                    // Found EXIF data, parse it
+                    let exif_start = pos + 4;
+                    if exif_start < data.len() {
+                        self.parse_tiff_exif(&data[exif_start..], metadata)?;
+                        break;
+                    }
+                }
+                pos += 1;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn extract_ftyp_box(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Extract file type box information
+        if data.len() >= 4 {
+            let brand = &data[0..4];
+            match brand {
+                b"heic" => { metadata.insert("Brand".to_string(), "HEIC".to_string()); },
+                b"heix" => { metadata.insert("Brand".to_string(), "HEIX".to_string()); },
+                b"mif1" => { metadata.insert("Brand".to_string(), "MIF1".to_string()); },
+                b"msf1" => { metadata.insert("Brand".to_string(), "MSF1".to_string()); },
+                b"hevc" => { metadata.insert("Brand".to_string(), "HEVC".to_string()); },
+                b"avci" => { metadata.insert("Brand".to_string(), "AVCI".to_string()); },
+                b"avcs" => { metadata.insert("Brand".to_string(), "AVCS".to_string()); },
+                _ => {}
+            }
+        }
+    }
+    
+    fn extract_hdlr_box(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Extract handler reference box information
+        if data.len() >= 20 {
+            let handler_type = &data[8..12];
+            if handler_type == b"pict" {
+                metadata.insert("HandlerType".to_string(), "Picture".to_string());
+            }
+        }
+    }
+    
+    fn read_u32_be(&self, data: &[u8], pos: usize) -> Result<u32, ExifError> {
+        if pos + 4 > data.len() {
+            return Err(ExifError::InvalidExif("Insufficient data for u32 read".to_string()));
+        }
+        Ok(((data[pos] as u32) << 24) | 
+           ((data[pos + 1] as u32) << 16) | 
+           ((data[pos + 2] as u32) << 8) | 
+           (data[pos + 3] as u32))
     }
     
     fn find_jpeg_exif_segment<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
@@ -527,6 +787,38 @@ impl FastExifReader {
             0x9004 => { // DateTimeDigitized
                 if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
                     metadata.insert("DateTimeDigitized".to_string(), value);
+                }
+            },
+            0x0132 => { // DateTime
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("DateTime".to_string(), value);
+                }
+            },
+            0x0131 => { // Software
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("Software".to_string(), value);
+                }
+            },
+            0x010E => { // ImageDescription
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("ImageDescription".to_string(), value);
+                }
+            },
+            
+            // Sub-second timestamps
+            0x9290 => { // SubSecTime
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("SubSecTime".to_string(), value);
+                }
+            },
+            0x9291 => { // SubSecTimeOriginal
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("SubSecTimeOriginal".to_string(), value);
+                }
+            },
+            0x9292 => { // SubSecTimeDigitized
+                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                    metadata.insert("SubSecTimeDigitized".to_string(), value);
                 }
             },
             
@@ -1835,6 +2127,93 @@ impl FastExifReader {
         metadata.insert("ProfileDescriptionML-ko-KR".to_string(), "카메라 RGB 프로파일".to_string());
         metadata.insert("ProfileDescriptionML-zh-TW".to_string(), "數位相機 RGB 色彩描述".to_string());
         metadata.insert("ProfileDescriptionML-zh-CN".to_string(), "相机 RGB 描述文件".to_string());
+        
+        // Add missing HEIF-specific fields
+        self.add_heif_computed_fields(metadata);
+    }
+    
+    fn add_heif_computed_fields(&self, metadata: &mut HashMap<String, String>) {
+        // CreateDate - often same as DateTimeOriginal
+        if !metadata.contains_key("CreateDate") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("CreateDate".to_string(), dto.clone());
+            } else if let Some(dt) = metadata.get("DateTime") {
+                metadata.insert("CreateDate".to_string(), dt.clone());
+            }
+        }
+        
+        // SubSecCreateDate - combine CreateDate with SubSecTime
+        if !metadata.contains_key("SubSecCreateDate") {
+            if let Some(create_date) = metadata.get("CreateDate") {
+                if let Some(subsec) = metadata.get("SubSecTime") {
+                    metadata.insert("SubSecCreateDate".to_string(), format!("{}.{}", create_date, subsec));
+                } else {
+                    metadata.insert("SubSecCreateDate".to_string(), create_date.clone());
+                }
+            }
+        }
+        
+        // SubSecDateTimeOriginal - combine DateTimeOriginal with SubSecTimeOriginal
+        if !metadata.contains_key("SubSecDateTimeOriginal") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), format!("{}.{}", dto, subsec));
+                } else {
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), dto.clone());
+                }
+            }
+        }
+        
+        // SubSecModifyDate - combine DateTime with SubSecTime
+        if !metadata.contains_key("SubSecModifyDate") {
+            if let Some(dt) = metadata.get("DateTime") {
+                if let Some(subsec) = metadata.get("SubSecTime") {
+                    metadata.insert("SubSecModifyDate".to_string(), format!("{}.{}", dt, subsec));
+                } else {
+                    metadata.insert("SubSecModifyDate".to_string(), dt.clone());
+                }
+            }
+        }
+        
+        // LensID - combine Make and Model
+        if !metadata.contains_key("LensID") {
+            if let Some(make) = metadata.get("Make") {
+                if let Some(model) = metadata.get("Model") {
+                    metadata.insert("LensID".to_string(), format!("{} {}", make, model));
+                } else {
+                    metadata.insert("LensID".to_string(), make.clone());
+                }
+            }
+        }
+        
+        // LensSpec - combine lens information
+        if !metadata.contains_key("LensSpec") {
+            if let Some(lens) = metadata.get("Lens") {
+                metadata.insert("LensSpec".to_string(), lens.clone());
+            } else if let Some(lens_model) = metadata.get("LensModel") {
+                metadata.insert("LensSpec".to_string(), lens_model.clone());
+            }
+        }
+        
+        // Update format information for HEIF files
+        if metadata.contains_key("Brand") {
+            if let Some(brand) = metadata.get("Brand") {
+                match brand.as_str() {
+                    "HEIX" => {
+                        metadata.insert("FileTypeExtension".to_string(), "heif".to_string());
+                        metadata.insert("MIMEType".to_string(), "image/heif".to_string());
+                    },
+                    "HEIC" => {
+                        metadata.insert("FileTypeExtension".to_string(), "heic".to_string());
+                        metadata.insert("MIMEType".to_string(), "image/heic".to_string());
+                    },
+                    _ => {
+                        metadata.insert("FileTypeExtension".to_string(), "heif".to_string());
+                        metadata.insert("MIMEType".to_string(), "image/heif".to_string());
+                    }
+                }
+            }
+        }
     }
 }
 
