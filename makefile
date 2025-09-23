@@ -1,48 +1,64 @@
 # Makefile for fast-exif-reader
 
-.PHONY: help install install-dev build test clean benchmark format lint
+.PHONY: help venv install install-dev build test clean benchmark format lint
+
+# Virtual environment setup
+venv: ## Create virtual environment
+	python3 -m venv venv --copies
+	venv/bin/pip install --upgrade pip
+	venv/bin/pip install maturin click
+
+# Ensure virtual environment exists
+venv/bin/python:
+	$(MAKE) venv
+
+# Simple install that works with existing setup
+install-simple: venv/bin/python ## Simple install using existing method
+	venv/bin/pip install click
+	# Note: Use 'maturin develop' manually if needed
 
 help: ## Show this help message
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-install: ## Install the package in development mode
-	maturin develop
+install: venv/bin/python ## Install the package in development mode
+	venv/bin/maturin develop
 
-install-dev: ## Install with development dependencies
-	maturin develop
-	pip install -e .[dev]
+install-dev: venv/bin/python ## Install with development dependencies
+	venv/bin/maturin develop
+	venv/bin/pip install -e .[dev]
 
-build: ## Build the package
-	maturin build
+build: venv/bin/python ## Build the package
+	venv/bin/maturin build
 
-build-release: ## Build the package in release mode
-	maturin build --release
+build-release: venv/bin/python ## Build the package in release mode
+	venv/bin/maturin build --release
 
-test: ## Run tests
-	python -m pytest tests/ -v
+test: venv/bin/python ## Run tests
+	venv/bin/python -m pytest tests/ -v
 
-test-performance: ## Run performance tests
-	python -m pytest tests/test_performance.py -v
+test-performance: venv/bin/python ## Run performance tests
+	venv/bin/python -m pytest tests/test_performance.py -v
 
-benchmark: ## Run benchmarks
-	python examples/benchmark.py
+benchmark: venv/bin/python ## Run benchmarks
+	venv/bin/python examples/benchmark.py
 
 clean: ## Clean build artifacts
 	cargo clean
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
+	rm -rf venv/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-format: ## Format code
+format: venv/bin/python ## Format code
 	cargo fmt
-	black python/ examples/ tests/
+	venv/bin/black python/ examples/ tests/ cli/
 
-lint: ## Lint code
+lint: venv/bin/python ## Lint code
 	cargo clippy
-	flake8 python/ examples/ tests/
+	venv/bin/flake8 python/ examples/ tests/ cli/
 
 check: ## Check code without building
 	cargo check
@@ -50,7 +66,18 @@ check: ## Check code without building
 # Development targets
 dev-setup: ## Set up development environment
 	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-	pip install maturin pytest black flake8
+	$(MAKE) venv
+	venv/bin/pip install pytest black flake8
+
+# CLI specific targets
+cli-test: venv/bin/python ## Test the CLI tool
+	venv/bin/python test_cli.py
+
+cli-example: venv/bin/python ## Run CLI examples
+	venv/bin/python cli_example.py
+
+cli-install: venv/bin/python ## Install CLI dependencies
+	venv/bin/pip install click
 
 # Documentation
 docs: ## Generate documentation
