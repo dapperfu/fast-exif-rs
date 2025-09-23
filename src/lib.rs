@@ -344,6 +344,46 @@ impl FastExifReader {
         
         let mut score = 0;
         
+        // First, validate the TIFF header
+        if exif_data.len() < 8 {
+            return 0; // Invalid EXIF data
+        }
+        
+        // Find TIFF header
+        let mut tiff_start = 0;
+        for i in 0..exif_data.len().saturating_sub(8) {
+            if &exif_data[i..i+2] == b"II" || &exif_data[i..i+2] == b"MM" {
+                tiff_start = i;
+                break;
+            }
+        }
+        
+        if tiff_start + 8 > exif_data.len() {
+            return 0; // No valid TIFF header found
+        }
+        
+        // Check byte order
+        let is_little_endian = &exif_data[tiff_start..tiff_start+2] == b"II";
+        let is_big_endian = &exif_data[tiff_start..tiff_start+2] == b"MM";
+        
+        if !is_little_endian && !is_big_endian {
+            return 0; // Invalid byte order
+        }
+        
+        // Check TIFF version
+        let tiff_version = if is_little_endian {
+            ((exif_data[tiff_start + 2] as u16) | ((exif_data[tiff_start + 3] as u16) << 8))
+        } else {
+            (((exif_data[tiff_start + 2] as u16) << 8) | (exif_data[tiff_start + 3] as u16))
+        };
+        
+        if tiff_version != 42 {
+            return 0; // Invalid TIFF version
+        }
+        
+        // Base score for valid TIFF header
+        score += 100;
+        
         // Parse EXIF data to check for important fields
         let mut metadata = HashMap::new();
         if self.parse_tiff_exif(exif_data, &mut metadata).is_ok() {
@@ -498,6 +538,7 @@ impl FastExifReader {
     fn find_exif_in_item_data_boxes<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // Look for EXIF data in item data boxes throughout the file
         let mut pos = 0;
+        let mut all_exif_data = Vec::new();
         
         while pos + 8 < data.len() {
             let size = match self.read_u32_be(data, pos) {
@@ -514,19 +555,25 @@ impl FastExifReader {
             if atom_type == b"idat" {
                 // Found item data box - look for EXIF data
                 if let Some(exif_data) = self.extract_exif_from_item_data(&data[pos + 8..pos + size as usize]) {
-                    return Some(exif_data);
+                    all_exif_data.push(exif_data);
                 }
             }
             
             pos += size as usize;
         }
         
-        None
+        // Choose the best EXIF data from all found blocks
+        if !all_exif_data.is_empty() {
+            Some(self.choose_best_exif_data(&all_exif_data))
+        } else {
+            None
+        }
     }
     
     fn find_exif_in_meta_structure<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // Look for EXIF data in meta box structure
         let mut pos = 0;
+        let mut all_exif_data = Vec::new();
         
         while pos + 8 < data.len() {
             let size = match self.read_u32_be(data, pos) {
@@ -543,14 +590,19 @@ impl FastExifReader {
             if atom_type == b"meta" {
                 // Found meta box - look for EXIF data within
                 if let Some(exif_data) = self.extract_exif_from_meta_box(&data[pos + 8..pos + size as usize]) {
-                    return Some(exif_data);
+                    all_exif_data.push(exif_data);
                 }
             }
             
             pos += size as usize;
         }
         
-        None
+        // Choose the best EXIF data from all found blocks
+        if !all_exif_data.is_empty() {
+            Some(self.choose_best_exif_data(&all_exif_data))
+        } else {
+            None
+        }
     }
     
     fn find_exif_anywhere_in_file<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
@@ -567,7 +619,7 @@ impl FastExifReader {
                 
                 // Found TIFF header, check if it contains EXIF data
                 if self.is_valid_exif_data(&data[i..]) {
-                    let score = self.score_exif_data_for_subsec(&data[i..]);
+                    let score = self.score_exif_data(&data[i..]);
                     if score > best_score {
                         best_score = score;
                         best_exif_data = Some(&data[i..]);
@@ -656,6 +708,17 @@ impl FastExifReader {
         let is_big_endian = data[0] == 0x4D && data[1] == 0x4D;
         
         if !is_little_endian && !is_big_endian {
+            return false;
+        }
+        
+        // Check TIFF version (should be 42)
+        let tiff_version = if is_little_endian {
+            ((data[2] as u16) | ((data[3] as u16) << 8))
+        } else {
+            (((data[2] as u16) << 8) | (data[3] as u16))
+        };
+        
+        if tiff_version != 42 {
             return false;
         }
         
