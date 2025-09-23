@@ -12,13 +12,33 @@ Example:
     Canon
 """
 
-from .fast_exif_reader import FastExifReader
+# Import from the compiled Rust module
+try:
+    from .fast_exif_reader import (
+        FastExifReader,
+        MultiprocessingExifReader,
+        process_files_parallel,
+        process_directory_parallel
+    )
+except ImportError:
+    # Fallback to Python implementation if Rust module not available
+    from .multiprocessing import (
+        MultiprocessingExifReader,
+        extract_exif_batch,
+        extract_exif_from_directory,
+        read_multiple_files,
+        read_directory
+    )
+    FastExifReader = None
+    process_files_parallel = None
+    process_directory_parallel = None
+
+# Also import Python multiprocessing functions for comparison
 from .multiprocessing import (
-    MultiprocessingExifReader,
-    extract_exif_batch,
-    extract_exif_from_directory,
+    extract_exif_batch as python_extract_exif_batch,
+    extract_exif_from_directory as python_extract_exif_from_directory,
     read_multiple_files,
-    read_directory
+    read_directory as python_read_directory
 )
 
 __version__ = "0.1.0"
@@ -29,10 +49,15 @@ __license__ = "MIT"
 __all__ = [
     "FastExifReader",
     "MultiprocessingExifReader", 
+    "process_files_parallel",
+    "process_directory_parallel",
     "extract_exif_batch",
     "extract_exif_from_directory",
     "read_multiple_files",
-    "read_directory"
+    "read_directory",
+    "python_extract_exif_batch",
+    "python_extract_exif_from_directory",
+    "python_read_directory"
 ]
 
 # Version info

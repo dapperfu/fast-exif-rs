@@ -4,6 +4,8 @@ use std::fs::File;
 use memmap2::Mmap;
 use thiserror::Error;
 use pyo3::types::PyBytes;
+use rayon::prelude::*;
+use std::time::Instant;
 
 #[derive(Error, Debug)]
 pub enum ExifError {
@@ -3076,9 +3078,249 @@ impl FastExifReader {
     }
 }
 
+/// Result structure for multiprocessing operations
+#[derive(Debug, Clone)]
+pub struct ExifResult {
+    pub file_path: String,
+    pub metadata: HashMap<String, String>,
+    pub processing_time: f64,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+/// Statistics for multiprocessing operations
+#[derive(Debug, Clone)]
+pub struct ProcessingStats {
+    pub total_files: usize,
+    pub success_count: usize,
+    pub error_count: usize,
+    pub success_rate: f64,
+    pub total_time: f64,
+    pub avg_processing_time: f64,
+    pub files_per_second: f64,
+}
+
+/// Multiprocessing EXIF reader using Rayon for parallel processing
+#[pyclass]
+pub struct MultiprocessingExifReader {
+    max_workers: Option<usize>,
+}
+
+#[pymethods]
+impl MultiprocessingExifReader {
+    #[new]
+    fn new(max_workers: Option<usize>) -> Self {
+        Self { max_workers }
+    }
+
+    /// Read EXIF data from multiple files using Rust parallel processing
+    fn read_files(&self, file_paths: Vec<String>) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let results = self.process_files_parallel(file_paths)?;
+            Ok(results.into_py(py))
+        })
+    }
+
+    /// Read EXIF data from all image files in a directory
+    fn read_directory(&self, directory: String, extensions: Option<Vec<String>>, max_files: Option<usize>) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let file_paths = self.scan_directory(directory, extensions, max_files)?;
+            let results = self.process_files_parallel(file_paths)?;
+            Ok(results.into_py(py))
+        })
+    }
+}
+
+impl MultiprocessingExifReader {
+    fn process_files_parallel(&self, file_paths: Vec<String>) -> Result<HashMap<String, PyObject>, ExifError> {
+        let start_time = Instant::now();
+        
+        // Configure rayon thread pool if max_workers is specified
+        if let Some(max_workers) = self.max_workers {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(max_workers)
+                .build_global()
+                .map_err(|e| ExifError::InvalidExif(format!("Failed to create thread pool: {}", e)))?;
+        }
+
+        // Process files in parallel using rayon
+        let results: Vec<ExifResult> = file_paths
+            .par_iter()
+            .map(|file_path| self.process_single_file(file_path))
+            .collect();
+
+        let total_time = start_time.elapsed().as_secs_f64();
+
+        // Calculate statistics
+        let success_count = results.iter().filter(|r| r.success).count();
+        let error_count = results.len() - success_count;
+        let success_rate = if !results.is_empty() {
+            success_count as f64 / results.len() as f64 * 100.0
+        } else {
+            0.0
+        };
+
+        let avg_processing_time = if !results.is_empty() {
+            results.iter().map(|r| r.processing_time).sum::<f64>() / results.len() as f64
+        } else {
+            0.0
+        };
+
+        let files_per_second = if total_time > 0.0 {
+            results.len() as f64 / total_time
+        } else {
+            0.0
+        };
+
+        let stats = ProcessingStats {
+            total_files: results.len(),
+            success_count,
+            error_count,
+            success_rate,
+            total_time,
+            avg_processing_time,
+            files_per_second,
+        };
+
+        // Convert results to Python-compatible format
+        let mut python_results = HashMap::new();
+        
+        // Add individual file results
+        let mut file_results = HashMap::new();
+        for result in results {
+            let mut result_dict = HashMap::new();
+            Python::with_gil(|py| {
+                result_dict.insert("metadata".to_string(), result.metadata.into_py(py));
+                result_dict.insert("processing_time".to_string(), result.processing_time.into_py(py));
+                result_dict.insert("success".to_string(), result.success.into_py(py));
+                if let Some(error) = result.error {
+                    result_dict.insert("error".to_string(), error.into_py(py));
+                }
+            });
+            Python::with_gil(|py| {
+                file_results.insert(result.file_path, result_dict.into_py(py));
+            });
+        }
+        Python::with_gil(|py| {
+            python_results.insert("results".to_string(), file_results.into_py(py));
+        });
+
+        // Add statistics
+        let mut stats_dict = HashMap::new();
+        Python::with_gil(|py| {
+            stats_dict.insert("total_files".to_string(), stats.total_files.into_py(py));
+            stats_dict.insert("success_count".to_string(), stats.success_count.into_py(py));
+            stats_dict.insert("error_count".to_string(), stats.error_count.into_py(py));
+            stats_dict.insert("success_rate".to_string(), stats.success_rate.into_py(py));
+            stats_dict.insert("total_time".to_string(), stats.total_time.into_py(py));
+            stats_dict.insert("avg_processing_time".to_string(), stats.avg_processing_time.into_py(py));
+            stats_dict.insert("files_per_second".to_string(), stats.files_per_second.into_py(py));
+            python_results.insert("statistics".to_string(), stats_dict.into_py(py));
+        });
+
+        Ok(python_results)
+    }
+
+    fn process_single_file(&self, file_path: &str) -> ExifResult {
+        let start_time = Instant::now();
+        
+        match self.read_file_internal(file_path) {
+            Ok(metadata) => {
+                let processing_time = start_time.elapsed().as_secs_f64();
+                ExifResult {
+                    file_path: file_path.to_string(),
+                    metadata,
+                    processing_time,
+                    success: true,
+                    error: None,
+                }
+            }
+            Err(e) => {
+                let processing_time = start_time.elapsed().as_secs_f64();
+                ExifResult {
+                    file_path: file_path.to_string(),
+                    metadata: HashMap::new(),
+                    processing_time,
+                    success: false,
+                    error: Some(e.to_string()),
+                }
+            }
+        }
+    }
+
+    fn read_file_internal(&self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
+        let mut reader = FastExifReader::new();
+        reader.read_exif_fast(file_path)
+    }
+
+    fn scan_directory(&self, directory: String, extensions: Option<Vec<String>>, max_files: Option<usize>) -> Result<Vec<String>, ExifError> {
+        let default_extensions = vec![
+            ".jpg".to_string(), ".jpeg".to_string(), ".cr2".to_string(), 
+            ".nef".to_string(), ".heic".to_string(), ".heif".to_string(), 
+            ".tiff".to_string(), ".tif".to_string(), ".png".to_string(), 
+            ".bmp".to_string()
+        ];
+        
+        let extensions = extensions.unwrap_or(default_extensions);
+        let mut file_paths = Vec::new();
+        
+        let dir = std::fs::read_dir(&directory)
+            .map_err(|e| ExifError::IoError(e))?;
+        
+        for entry in dir {
+            let entry = entry.map_err(|e| ExifError::IoError(e))?;
+            let path = entry.path();
+            
+            if path.is_file() {
+                if let Some(extension) = path.extension() {
+                    let ext_str = extension.to_string_lossy().to_lowercase();
+                    let ext_with_dot = format!(".{}", ext_str);
+                    
+                    if extensions.contains(&ext_with_dot) {
+                        file_paths.push(path.to_string_lossy().to_string());
+                        
+                        if let Some(max) = max_files {
+                            if file_paths.len() >= max {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(file_paths)
+    }
+}
+
+/// Standalone function for parallel EXIF processing
+#[pyfunction]
+fn process_files_parallel(file_paths: Vec<String>, max_workers: Option<usize>) -> PyResult<PyObject> {
+    Python::with_gil(|py| {
+        let reader = MultiprocessingExifReader::new(max_workers);
+        let results = reader.process_files_parallel(file_paths)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(results.into_py(py))
+    })
+}
+
+/// Standalone function for directory processing
+#[pyfunction]
+fn process_directory_parallel(directory: String, extensions: Option<Vec<String>>, max_files: Option<usize>, max_workers: Option<usize>) -> PyResult<PyObject> {
+    Python::with_gil(|_py| {
+        let reader = MultiprocessingExifReader::new(max_workers);
+        let results = reader.read_directory(directory, extensions, max_files)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(results)
+    })
+}
+
 /// Python module definition
 #[pymodule]
 fn fast_exif_reader(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<FastExifReader>()?;
+    m.add_class::<MultiprocessingExifReader>()?;
+    m.add_function(wrap_pyfunction!(process_files_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(process_directory_parallel, m)?)?;
     Ok(())
 }

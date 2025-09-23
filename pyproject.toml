@@ -46,7 +46,7 @@ dev = [
 ]
 
 [project.scripts]
-fast-exif-cli = "cli.fast_exif_cli:main"
+fast-exif-cli = "fast_exif_reader.cli.fast_exif_cli:main"
 
 [tool.maturin]
 python-source = "python"
