@@ -76,7 +76,7 @@ dev-setup: ## Set up development environment
 
 # CLI specific targets
 cli-test: venv/bin/python ## Test the CLI tool
-	venv/bin/python test_cli.py
+	venv/bin/python tests/test_cli.py
 
 cli-example: venv/bin/python ## Run CLI examples
 	venv/bin/python cli_example.py
