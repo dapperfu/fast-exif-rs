@@ -1,0 +1,3 @@
+Rust multiprocessing: 0.001s
+Success rate: 100.0%
+Files per second: 4303.8

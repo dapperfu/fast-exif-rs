@@ -1,0 +1,97 @@
+Checking implementations...
+✓ Rust implementation available
+
+Starting comprehensive benchmark:
+  File counts: [10, 20]
+  Thread counts: [1, 2, 4]
+  Runs per test: 2
+Scanning /keg/pictures/2015/05-May/...
+Found 4468 image files
+
+================================================================================
+BENCHMARKING 10 FILES
+================================================================================
+
+Testing with 1 threads...
+  Python Single-threaded... Avg: 0.001s, Success: 20/20
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.001s, Success: 20/20
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Avg: 0.001s, Success: 10/20
+
+Testing with 2 threads...
+  Python Single-threaded... Avg: 0.001s, Success: 20/20
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.001s, Success: 20/20
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Failed
+
+Testing with 4 threads...
+  Python Single-threaded... Avg: 0.001s, Success: 20/20
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.001s, Success: 20/20
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Failed
+
+================================================================================
+BENCHMARKING 20 FILES
+================================================================================
+
+Testing with 1 threads...
+  Python Single-threaded... Avg: 0.002s, Success: 40/40
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.002s, Success: 40/40
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Failed
+
+Testing with 2 threads...
+  Python Single-threaded... Avg: 0.002s, Success: 40/40
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.002s, Success: 40/40
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Failed
+
+Testing with 4 threads...
+  Python Single-threaded... Avg: 0.002s, Success: 40/40
+  Python Multiprocessing... Failed
+  Rust Single-threaded... Avg: 0.002s, Success: 40/40
+  Rust Multiprocessing... Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Error in Rust multiprocessing: Invalid EXIF data: Failed to create thread pool: The global thread pool has already been initialized.
+Failed
+
+====================================================================================================
+RUST vs PYTHON MULTIPROCESSING BENCHMARK SUMMARY
+====================================================================================================
+Timestamp: 2025-09-23T16:07:18.392840
+System: 16 CPUs
+Python: 3.12.3
+
+================================================================================
+RESULTS FOR 10 FILES
+================================================================================
+Method                    Threads  Total(s) Files/s  MB/s     Success%
+----------------------------------------------------------------------------------------------------
+Rust Single-threaded      1        0.01     13932.0  69660.1  100.0   
+Python Single-threaded    2        0.01     13360.6  66803.2  100.0   
+Rust Multiprocessing      1        0.01     11626.9  58134.7  50.0    
+
+Speedup Analysis:
+  Rust Single-threaded is 1.04x faster than Python Single-threaded
+  Rust Single-threaded is 1.20x faster than Rust Multiprocessing
+
+================================================================================
+RESULTS FOR 20 FILES
+================================================================================
+Method                    Threads  Total(s) Files/s  MB/s     Success%
+----------------------------------------------------------------------------------------------------
+Python Single-threaded    4        0.07     11375.7  56878.5  100.0   
+Rust Single-threaded      1        0.07     11166.5  55832.5  100.0   
+
+Speedup Analysis:
+  Python Single-threaded is 1.02x faster than Rust Single-threaded
+
+Results saved to: rust_vs_python_benchmark_20250923_160719.json
