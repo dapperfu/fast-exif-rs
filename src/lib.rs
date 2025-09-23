@@ -1360,17 +1360,17 @@ impl FastExifReader {
             
             // Sub-second timestamps
             0x9290 => { // SubSecTime
-                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                if let Some(value) = self.read_subsec_time_value(data, tiff_start + value_offset as usize, count as usize) {
                     metadata.insert("SubSecTime".to_string(), value);
                 }
             },
             0x9291 => { // SubSecTimeOriginal
-                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                if let Some(value) = self.read_subsec_time_value(data, tiff_start + value_offset as usize, count as usize) {
                     metadata.insert("SubSecTimeOriginal".to_string(), value);
                 }
             },
             0x9292 => { // SubSecTimeDigitized
-                if let Some(value) = self.read_string_value(data, tiff_start + value_offset as usize, count as usize) {
+                if let Some(value) = self.read_subsec_time_value(data, tiff_start + value_offset as usize, count as usize) {
                     metadata.insert("SubSecTimeDigitized".to_string(), value);
                 }
             },
@@ -1847,6 +1847,59 @@ impl FastExifReader {
         // Remove null terminator
         let end = string_data.iter().position(|&b| b == 0).unwrap_or(count);
         Some(String::from_utf8_lossy(&string_data[..end]).to_string())
+    }
+    
+    fn read_subsec_time_value(&self, data: &[u8], offset: usize, count: usize) -> Option<String> {
+        if offset + count > data.len() || count == 0 {
+            return None;
+        }
+        
+        // SubSecTime fields are ASCII strings representing fractions of a second
+        // Based on exiftool source code analysis:
+        // - They are variable-length ASCII strings
+        // - They represent fractions of a second (e.g., "06" = 6 hundredths)
+        // - They can vary in format ("06" vs "6" depending on camera)
+        // - They should be read as ASCII, not UTF-8
+        
+        let subsec_data = &data[offset..offset + count];
+        
+        // Find the end of the string (null terminator or end of data)
+        let end = subsec_data.iter().position(|&b| b == 0).unwrap_or(count);
+        let string_data = &subsec_data[..end];
+        
+        // First, try to read as ASCII string (most common case)
+        let ascii_string: String = string_data
+            .iter()
+            .filter(|&&b| b >= 32 && b <= 126) // Printable ASCII range
+            .map(|&b| b as char)
+            .collect();
+        
+        if !ascii_string.is_empty() {
+            return Some(ascii_string);
+        }
+        
+        // If no printable ASCII found, try to extract numeric values
+        // Some cameras store sub-second values as binary data
+        let mut numeric_string = String::new();
+        
+        for &byte in string_data {
+            if byte >= b'0' && byte <= b'9' {
+                // ASCII digit
+                numeric_string.push(byte as char);
+            } else if byte <= 99 {
+                // Binary value that could be a sub-second value (0-99)
+                // Convert to string representation
+                numeric_string.push_str(&byte.to_string());
+                break; // Take only the first valid numeric value
+            }
+        }
+        
+        if !numeric_string.is_empty() {
+            Some(numeric_string)
+        } else {
+            // If still no valid data, return empty string
+            Some("".to_string())
+        }
     }
     
     fn read_rational_value(&self, data: &[u8], offset: usize, is_little_endian: bool) -> Option<String> {
