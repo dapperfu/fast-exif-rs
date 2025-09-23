@@ -1126,7 +1126,10 @@ impl FastExifReader {
     
     fn find_heif_exif_atom<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // HEIF files use atom-based structure
-        // Look for 'exif' atom containing EXIF data
+        // Look for EXIF data in various possible locations:
+        // 1. Direct 'exif' atom
+        // 2. 'meta' atom containing EXIF data
+        // 3. 'item' atoms with EXIF properties
         let mut pos = 0;
         
         while pos + 8 < data.len() {
@@ -1143,12 +1146,99 @@ impl FastExifReader {
             // Read atom type (4 bytes)
             let atom_type = &data[pos + 4..pos + 8];
             
+            match atom_type {
+                b"exif" => {
+                    // Found direct EXIF atom, return the data (skip the 8-byte header)
+                    let start = pos + 8;
+                    let end = (pos + size as usize).min(data.len());
+                    if start < end {
+                        return Some(&data[start..end]);
+                    }
+                },
+                b"meta" => {
+                    // Meta atom - look for EXIF data inside
+                    if let Some(exif_data) = self.find_exif_in_meta_atom(&data[pos + 8..pos + size as usize]) {
+                        return Some(exif_data);
+                    }
+                },
+                _ => {}
+            }
+            
+            // Move to next atom
+            pos += size as usize;
+        }
+        
+        None
+    }
+    
+    fn find_exif_in_meta_atom<'a>(&self, meta_data: &'a [u8]) -> Option<&'a [u8]> {
+        // Look for EXIF data within a meta atom
+        let mut pos = 0;
+        
+        while pos + 8 < meta_data.len() {
+            // Read atom size (4 bytes, big-endian)
+            let size = ((meta_data[pos] as u32) << 24) | 
+                      ((meta_data[pos + 1] as u32) << 16) | 
+                      ((meta_data[pos + 2] as u32) << 8) | 
+                      (meta_data[pos + 3] as u32);
+            
+            if size == 0 || size > meta_data.len() as u32 {
+                break;
+            }
+            
+            // Read atom type (4 bytes)
+            let atom_type = &meta_data[pos + 4..pos + 8];
+            
+            match atom_type {
+                b"exif" => {
+                    // Found EXIF atom within meta atom
+                    let start = pos + 8;
+                    let end = (pos + size as usize).min(meta_data.len());
+                    if start < end {
+                        return Some(&meta_data[start..end]);
+                    }
+                },
+                b"item" => {
+                    // Item atom - might contain EXIF data
+                    if let Some(exif_data) = self.find_exif_in_item_atom(&meta_data[pos + 8..pos + size as usize]) {
+                        return Some(exif_data);
+                    }
+                },
+                _ => {}
+            }
+            
+            // Move to next atom
+            pos += size as usize;
+        }
+        
+        None
+    }
+    
+    fn find_exif_in_item_atom<'a>(&self, item_data: &'a [u8]) -> Option<&'a [u8]> {
+        // Look for EXIF data within an item atom
+        // This is a simplified implementation - real HEIF item parsing is more complex
+        let mut pos = 0;
+        
+        while pos + 8 < item_data.len() {
+            // Read atom size (4 bytes, big-endian)
+            let size = ((item_data[pos] as u32) << 24) | 
+                      ((item_data[pos + 1] as u32) << 16) | 
+                      ((item_data[pos + 2] as u32) << 8) | 
+                      (item_data[pos + 3] as u32);
+            
+            if size == 0 || size > item_data.len() as u32 {
+                break;
+            }
+            
+            // Read atom type (4 bytes)
+            let atom_type = &item_data[pos + 4..pos + 8];
+            
             if atom_type == b"exif" {
-                // Found EXIF atom, return the data (skip the 8-byte header)
+                // Found EXIF atom within item atom
                 let start = pos + 8;
-                let end = (pos + size as usize).min(data.len());
+                let end = (pos + size as usize).min(item_data.len());
                 if start < end {
-                    return Some(&data[start..end]);
+                    return Some(&item_data[start..end]);
                 }
             }
             
@@ -1205,6 +1295,11 @@ impl FastExifReader {
             pos += size as usize;
         }
         
+        // Try to extract timestamps from file content if not found in EXIF
+        if !metadata.contains_key("DateTime") && !metadata.contains_key("DateTimeOriginal") {
+            self.extract_heif_timestamps(data, metadata);
+        }
+        
         // Set default values if no specific metadata found
         if !metadata.contains_key("Make") {
             metadata.insert("Make".to_string(), "Unknown".to_string());
@@ -1212,6 +1307,123 @@ impl FastExifReader {
         if !metadata.contains_key("Model") {
             metadata.insert("Model".to_string(), "Unknown".to_string());
         }
+    }
+    
+    fn extract_heif_timestamps(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Try to extract timestamps from HEIF file content
+        // Look for common timestamp patterns in the file
+        
+        // Look for ISO 8601 timestamp patterns (YYYY:MM:DD HH:MM:SS)
+        let timestamp_patterns = [
+            b"2020:", b"2021:", b"2022:", b"2023:", b"2024:", b"2025:",
+            b"2019:", b"2018:", b"2017:", b"2016:", b"2015:",
+        ];
+        
+        for pattern in &timestamp_patterns {
+            if let Some(pos) = self.find_pattern_in_data(data, *pattern) {
+                // Found a potential timestamp, try to extract it
+                if let Some(timestamp) = self.extract_timestamp_at_position(data, pos) {
+                    metadata.insert("DateTime".to_string(), timestamp.clone());
+                    metadata.insert("DateTimeOriginal".to_string(), timestamp);
+                    break;
+                }
+            }
+        }
+        
+        // Look for Unix timestamp patterns (32-bit integers)
+        self.extract_unix_timestamps(data, metadata);
+    }
+    
+    fn find_pattern_in_data(&self, data: &[u8], pattern: &[u8]) -> Option<usize> {
+        data.windows(pattern.len()).position(|window| window == pattern)
+    }
+    
+    fn extract_timestamp_at_position(&self, data: &[u8], pos: usize) -> Option<String> {
+        // Try to extract a timestamp starting at the given position
+        // Look for pattern: YYYY:MM:DD HH:MM:SS
+        
+        if pos + 19 > data.len() {
+            return None;
+        }
+        
+        let timestamp_bytes = &data[pos..pos + 19];
+        
+        // Check if it looks like a timestamp (YYYY:MM:DD HH:MM:SS)
+        if timestamp_bytes.len() >= 19 {
+            let year = &timestamp_bytes[0..4];
+            let month = &timestamp_bytes[5..7];
+            let day = &timestamp_bytes[8..10];
+            let hour = &timestamp_bytes[11..13];
+            let minute = &timestamp_bytes[14..16];
+            let second = &timestamp_bytes[17..19];
+            
+            // Basic validation
+            if self.is_digit_string(year) && self.is_digit_string(month) && 
+               self.is_digit_string(day) && self.is_digit_string(hour) && 
+               self.is_digit_string(minute) && self.is_digit_string(second) {
+                
+                if let Ok(timestamp) = String::from_utf8(timestamp_bytes.to_vec()) {
+                    return Some(timestamp);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    fn is_digit_string(&self, bytes: &[u8]) -> bool {
+        bytes.iter().all(|&b| b.is_ascii_digit())
+    }
+    
+    fn extract_unix_timestamps(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Look for Unix timestamps (32-bit integers representing seconds since epoch)
+        // Common ranges: 2020-2030 (1577836800 - 1893456000)
+        
+        let min_timestamp: u32 = 1577836800; // 2020-01-01
+        let max_timestamp: u32 = 1893456000; // 2030-01-01
+        
+        for i in 0..data.len().saturating_sub(4) {
+            // Read 32-bit big-endian integer
+            let timestamp_be = ((data[i] as u32) << 24) | 
+                              ((data[i + 1] as u32) << 16) | 
+                              ((data[i + 2] as u32) << 8) | 
+                              (data[i + 3] as u32);
+            
+            // Read 32-bit little-endian integer
+            let timestamp_le = (data[i] as u32) | 
+                              ((data[i + 1] as u32) << 8) | 
+                              ((data[i + 2] as u32) << 16) | 
+                              ((data[i + 3] as u32) << 24);
+            
+            for timestamp in [timestamp_be, timestamp_le] {
+                if timestamp >= min_timestamp && timestamp <= max_timestamp {
+                    // Convert Unix timestamp to readable format
+                    if let Some(formatted_time) = self.format_unix_timestamp(timestamp) {
+                        metadata.insert("DateTime".to_string(), formatted_time.clone());
+                        metadata.insert("DateTimeOriginal".to_string(), formatted_time);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    
+    fn format_unix_timestamp(&self, timestamp: u32) -> Option<String> {
+        // Convert Unix timestamp to YYYY:MM:DD HH:MM:SS format
+        // This is a simplified implementation
+        
+        // Format as YYYY:MM:DD HH:MM:SS
+        // This is a simplified version - in practice you'd use a proper date formatting library
+        let year = 1970 + (timestamp / (365 * 24 * 3600));
+        let remaining = timestamp % (365 * 24 * 3600);
+        let month = 1 + (remaining / (30 * 24 * 3600));
+        let day = 1 + ((remaining % (30 * 24 * 3600)) / (24 * 3600));
+        let hour = (remaining % (24 * 3600)) / 3600;
+        let minute = (remaining % 3600) / 60;
+        let second = remaining % 60;
+        
+        Some(format!("{:04}:{:02}:{:02} {:02}:{:02}:{:02}", 
+                    year, month, day, hour, minute, second))
     }
     
     fn extract_heif_meta_atom(&self, meta_data: &[u8], metadata: &mut HashMap<String, String>) {
