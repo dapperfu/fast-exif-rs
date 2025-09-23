@@ -1,0 +1,44 @@
+[package]
+name = "fast-exif-reader"
+version = "0.1.0"
+edition = "2021"
+description = "Fast EXIF reader optimized for Canon 70D and Nikon Z50 II"
+license = "MIT"
+repository = "https://github.com/dapperfu/fast-exif-rs"
+keywords = ["exif", "metadata", "image", "canon", "nikon", "rust", "performance"]
+categories = ["multimedia", "development-tools"]
+
+[lib]
+name = "fast_exif_reader"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Core parsing
+nom = "7.1"
+byteorder = "1.4"
+
+# Python bindings
+pyo3 = { version = "0.20", features = ["extension-module"] }
+
+# Performance
+rayon = "1.8"
+memmap2 = "0.9"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Serialization for Python
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# EXIF parsing - using pure Rust implementation
+# exif = "0.0.1"  # Requires system libexif
+# image = "0.24"  # Not needed for basic EXIF parsing
+
+[dev-dependencies]
+# Testing
+criterion = "0.5"
+
+[build-dependencies]
+pyo3-build-config = "0.20"
