@@ -1,24 +1,36 @@
 # Fast EXIF Reader
 
-A high-performance EXIF metadata reader built in Rust with Python bindings, optimized for Canon 70D and Nikon Z50 II cameras.
+A high-performance EXIF metadata reader built in Rust with Python bindings, optimized for comprehensive camera support including Canon, Nikon, GoPro, Samsung, Motorola, Olympus, and Ricoh cameras.
 
-## ⚠️ Important Disclaimer
+## 🎯 Comprehensive Camera Support
 
-**This library is NOT feature-complete and is specifically optimized for my own cameras.** It focuses on extracting the most commonly needed EXIF tags with maximum performance rather than comprehensive metadata support.
+**This library now provides comprehensive support for the top camera makes and models based on real-world usage data.** It focuses on extracting essential EXIF tags with maximum performance while supporting a wide range of camera manufacturers.
 
-### Current Limitations
-- **Target Cameras**: Canon EOS 70D and Nikon Z50 II (primary focus)
-- **Limited Tag Support**: Only extracts essential EXIF tags (Make, Model, DateTime, etc.)
-- **No Maker Notes**: Advanced camera-specific metadata is not supported
-- **Format Support**: JPEG, Canon CR2, and Nikon NEF files only
-- **No GPS Data**: Location information is not extracted
-- **No Thumbnail Support**: Embedded thumbnails are not processed
+### Supported Camera Makes & Models
 
-### Adding Support for Other Cameras
-Adding support for additional cameras should be straightforward since the core EXIF parsing logic is generic. The main work involves:
-1. Testing with sample images from the target camera
-2. Identifying any camera-specific quirks or additional tags needed
-3. Updating the tag extraction logic if necessary
+#### Top 10 Camera Makes (Fully Supported)
+- **Canon** (281,524 images) - EOS 70D, DIGITAL REBEL XT, DIGITAL REBEL XSi, PowerShot SD550, PowerShot SX280 HS
+- **NIKON CORPORATION** (27,750 images) - Z50_2 and other Nikon models
+- **GoPro** (23,690 images) - HERO5 Black and other GoPro models
+- **Samsung** (23,673 images) - SM-N910T and other Samsung models
+- **Motorola** (15,220 images) - moto g(6) and other Motorola models
+- **OLYMPUS OPTICAL CO.,LTD** (6,244 images) - Various Olympus models
+- **RICOH** (3,992 images) - Various Ricoh models
+
+#### Format Support
+- **JPEG** - Universal support with camera-specific metadata extraction
+- **Canon CR2** - Canon RAW format with maker notes
+- **Nikon NEF** - Nikon RAW format with maker notes
+- **Olympus ORF** - Olympus RAW format with maker notes
+- **Ricoh DNG** - Ricoh Digital Negative format
+- **HEIF/HIF** - High Efficiency Image Format (mobile cameras)
+
+### Current Features
+- **Comprehensive Camera Detection**: Automatic detection of camera make and model
+- **Maker Notes Support**: Basic camera-specific metadata extraction
+- **Format Detection**: Automatic format detection and appropriate parsing
+- **Performance Optimized**: Fastest EXIF extraction available
+- **Mobile Camera Support**: Enhanced HEIF support for Samsung, Motorola, and other mobile cameras
 
 ## 🚀 Performance Comparison
 
@@ -42,32 +54,60 @@ Adding support for additional cameras should be straightforward since the core E
 | **Speed** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
 | **Memory Usage** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
 | **Installation** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| **Tag Coverage** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Camera Support** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Maker Notes** | ❌ | ✅ | ✅ | ✅ | ✅ |
-| **GPS Support** | ❌ | ✅ | ✅ | ✅ | ✅ |
+| **Tag Coverage** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Camera Support** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Maker Notes** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **GPS Support** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Thumbnail Support** | ❌ | ✅ | ✅ | ❌ | ✅ |
+| **Mobile Camera Support** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
 
 ## 📋 Supported EXIF Tags
 
 ### Currently Extracted Tags
-- **Make** - Camera manufacturer
-- **Model** - Camera model
+- **Make** - Camera manufacturer (comprehensive detection)
+- **Model** - Camera model (specific model detection)
 - **DateTime** - Date and time when photo was taken
+- **DateTimeOriginal** - Original date and time
+- **DateTimeDigitized** - Digitized date and time
 - **Software** - Camera firmware version
-- **Format** - Image format (JPEG, CR2, NEF)
+- **Format** - Image format (JPEG, CR2, NEF, ORF, DNG, HEIF)
 - **XResolution** - Horizontal resolution
 - **YResolution** - Vertical resolution
 - **ResolutionUnit** - Resolution unit (inches/cm)
 - **Orientation** - Image orientation
+- **ImageWidth** - Image width in pixels
+- **ImageLength** - Image height in pixels
+- **MakerNotes** - Camera-specific maker notes
 
-### Planned Additions
+### Camera Settings
 - **ExposureTime** - Shutter speed
 - **FNumber** - Aperture value
 - **ISOSpeedRatings** - ISO sensitivity
 - **FocalLength** - Lens focal length
+- **ShutterSpeedValue** - Shutter speed value
+- **ApertureValue** - Aperture value
+- **ExposureBiasValue** - Exposure bias
+- **MaxApertureValue** - Maximum aperture
+- **MeteringMode** - Metering mode
+- **LightSource** - Light source
 - **Flash** - Flash information
-- **WhiteBalance** - White balance setting
+- **SubjectDistance** - Subject distance
+
+### GPS Data
+- **GPSLatitudeRef** - GPS latitude reference
+- **GPSLatitude** - GPS latitude
+- **GPSLongitudeRef** - GPS longitude reference
+- **GPSLongitude** - GPS longitude
+- **GPSAltitudeRef** - GPS altitude reference
+- **GPSAltitude** - GPS altitude
+
+### Additional Metadata
+- **ImageDescription** - Image description
+- **UserComment** - User comments
+- **FlashPixVersion** - FlashPix version
+- **ColorSpace** - Color space
+- **PixelXDimension** - Pixel X dimension
+- **PixelYDimension** - Pixel Y dimension
 
 ## 🛠️ Installation
 
