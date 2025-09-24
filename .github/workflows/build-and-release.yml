@@ -44,7 +44,12 @@ jobs:
         python-version: '3.12'
 
     - name: Install maturin
-      run: pip install maturin[patchelf]
+      run: |
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          pip install maturin
+        else
+          pip install maturin[patchelf]
+        fi
 
     - name: Build wheels
       run: maturin build --release --out dist
@@ -123,7 +128,12 @@ jobs:
           
           ### Installation
           
-          **From source (recommended):**
+          **From wheel (recommended):**
+          ```bash
+          pip install fast_exif_reader-*.whl
+          ```
+          
+          **From source:**
           ```bash
           git clone https://github.com/dapperfu/fast-exif-rs.git
           cd fast-exif-rs
@@ -131,7 +141,15 @@ jobs:
           maturin develop
           ```
           
-          ### What's New
+          ### What's New in ${{ steps.get_tag.outputs.tag }}
+          
+          - 🔒 **Security**: Upgraded pyo3 to 0.24.2 to fix security vulnerabilities
+          - 🛠️ **Compatibility**: Improved Python 3.10+ support and Windows compatibility
+          - 🚀 **CI/CD**: Enhanced GitHub Actions with better error handling and logging
+          - 📦 **Packaging**: Improved wheel building for all platforms
+          - 🐛 **Bug Fixes**: Resolved all linting and formatting issues
+          
+          ### Features
           
           - High-performance EXIF metadata reader built in Rust
           - Optimized for Canon 70D and Nikon Z50 II cameras
