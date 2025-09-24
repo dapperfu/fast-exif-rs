@@ -54,12 +54,19 @@ jobs:
         pip install maturin[patchelf] pytest pytest-cov
 
     - name: Build package
-      run: maturin develop
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin[patchelf]
+        maturin develop
 
     - name: Run comprehensive tests
       run: |
         # Create test results directory
         mkdir -p test-results
+        
+        # Activate virtual environment
+        source venv/bin/activate
         
         # Run all tests with coverage
         python -m pytest tests/ -v --cov=fast_exif_reader --cov-report=xml --cov-report=html --junitxml=test-results/junit.xml
