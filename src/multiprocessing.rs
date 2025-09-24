@@ -11,6 +11,7 @@ use crate::types::{ExifError, ExifResult, ProcessingStats};
 
 /// Multiprocessing EXIF reader using Rayon for parallel processing
 #[pyclass]
+#[allow(non_local_definitions)]
 pub struct MultiprocessingExifReader {
     max_workers: Option<usize>,
 }
