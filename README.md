@@ -6,7 +6,13 @@ A blazingly fast EXIF metadata reader built in Rust with Python bindings. Extrac
 
 Fast EXIF Reader solves a simple problem: **reading metadata from images should be fast and reliable**. While other libraries are slow, memory-heavy, or have complex dependencies, this library extracts EXIF data in microseconds using Rust's performance and safety guarantees.
 
-*"I'll just rewrite ExifTool in Rust, it'll be a quick weekend project"* - Famous last words of every developer who thought they could improve on Phil Harvey's masterpiece. Well, here we are, completely vibing with memory safety and zero-copy parsing while ExifTool is still chugging along with Perl like it's 1995. 
+*"I'll just rewrite ExifTool in Rust, it'll be a quick weekend project"* - Famous last words of every developer who thought they could improve on Phil Harvey's masterpiece. 
+
+*Rick Sanchez voice:* "Twenty minutes, Morty. Quick in and out adventure. Just gonna rewrite ExifTool in Rust, in and out, twenty minutes."
+
+*Three months later:* Still parsing TIFF headers and debugging endianness issues at 3 AM.
+
+Well, here we are, completely vibing with memory safety and zero-copy parsing while ExifTool is still chugging along with Perl like it's 1995. 
 
 **Perfect for:**
 - Processing large photo collections (without the existential dread of Perl)
@@ -142,7 +148,7 @@ try:
     print(f"Camera: {metadata['Make']} {metadata['Model']}")
 except FileNotFoundError:
     print("File not found")
-except Exception as e:
+            except Exception as e:
     print(f"Error reading EXIF: {e}")
 ```
 
