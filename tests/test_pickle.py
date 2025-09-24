@@ -3,16 +3,16 @@
 Test script to verify pickle functionality of FastExifReader.
 """
 
-import multiprocessing as mp
 import pickle
-
+import tempfile
+import multiprocessing as mp
 from fast_exif_reader import FastExifReader
 
 
 def worker_function():
     """Worker function that creates a FastExifReader."""
     try:
-        FastExifReader()
+        reader = FastExifReader()
         return f"Success: Created FastExifReader in process {mp.current_process().name}"
     except Exception as e:
         return f"Error: {e}"
@@ -56,6 +56,7 @@ def test_multiprocessing_compatibility():
     """Test that FastExifReader works with multiprocessing."""
     print("\nTesting multiprocessing compatibility...")
 
+    import multiprocessing as mp
     from concurrent.futures import ProcessPoolExecutor
 
     try:
