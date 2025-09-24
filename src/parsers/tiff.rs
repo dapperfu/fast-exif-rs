@@ -248,6 +248,13 @@ impl TiffParser {
                         // Format rational values based on field type
                         if tag_id == 0x011A || tag_id == 0x011B { // XResolution or YResolution
                             metadata.insert(tag_name, numerator.to_string());
+                        } else if tag_id == 0xA20C || tag_id == 0xA20F { // FocalPlaneXResolution or FocalPlaneYResolution
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.5}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
                         } else if tag_id == 0x829A { // ExposureTime
                             // Format exposure time to match exiftool's algorithm
                             if denominator != 0 {
@@ -333,15 +340,27 @@ impl TiffParser {
                             } else {
                                 metadata.insert(tag_name, format!("{} mm", numerator));
                             }
-                        } else {
-                            // For other rational fields, format as decimal
-                            if denominator != 0 {
-                                let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.6}", value));
-                            } else {
-                                metadata.insert(tag_name, numerator.to_string());
-                            }
-                        }
+                                } else if tag_id == 0xA404 { // DigitalZoomRatio
+                                    // Format digital zoom ratio
+                                    if denominator != 0 {
+                                        let value = numerator as f64 / denominator as f64;
+                                        if value == 1.0 {
+                                            metadata.insert(tag_name, "1".to_string());
+                                        } else {
+                                            metadata.insert(tag_name, format!("{:.6}", value));
+                                        }
+                                    } else {
+                                        metadata.insert(tag_name, numerator.to_string());
+                                    }
+                                } else {
+                                    // For other rational fields, format as decimal
+                                    if denominator != 0 {
+                                        let value = numerator as f64 / denominator as f64;
+                                        metadata.insert(tag_name, format!("{:.6}", value));
+                                    } else {
+                                        metadata.insert(tag_name, numerator.to_string());
+                                    }
+                                }
                     }
                 }
             },
@@ -440,6 +459,14 @@ impl TiffParser {
                     _ => value.to_string(),
                 }
             },
+            0xA20E => { // FocalPlaneResolutionUnit
+                match value {
+                    1 => "None".to_string(),
+                    2 => "inches".to_string(),
+                    3 => "cm".to_string(),
+                    _ => value.to_string(),
+                }
+            },
             0x0213 => { // YCbCrPositioning
                 match value {
                     1 => "Centered".to_string(),
@@ -471,7 +498,7 @@ impl TiffParser {
                     2 => "Center-weighted average".to_string(),
                     3 => "Spot".to_string(),
                     4 => "Multi-segment".to_string(),
-                    5 => "Multi-segment".to_string(),
+                    5 => "Evaluative".to_string(),
                     6 => "Partial".to_string(),
                     255 => "Other".to_string(),
                     _ => value.to_string(),
@@ -554,8 +581,8 @@ impl TiffParser {
             },
             0xA401 => { // CustomRendered
                 match value {
-                    0 => "Normal Process".to_string(),
-                    1 => "Custom Process".to_string(),
+                    0 => "Normal".to_string(),
+                    1 => "Custom".to_string(),
                     _ => value.to_string(),
                 }
             },
@@ -611,9 +638,18 @@ impl TiffParser {
             },
             0xA40A => { // Sharpness
                 match value {
-                    0 => "Normal".to_string(),
+                    0 => "0".to_string(),
                     1 => "Soft".to_string(),
                     2 => "Hard".to_string(),
+                    3 => "3".to_string(),
+                    4 => "4".to_string(),
+                    5 => "5".to_string(),
+                    6 => "6".to_string(),
+                    7 => "7".to_string(),
+                    8 => "8".to_string(),
+                    9 => "9".to_string(),
+                    10 => "10".to_string(),
+                    25 => "25".to_string(),
                     _ => value.to_string(),
                 }
             },
@@ -629,7 +665,7 @@ impl TiffParser {
             0xA217 => { // SensingMethod
                 match value {
                     1 => "Not defined".to_string(),
-                    2 => "One-chip color area sensor".to_string(),
+                    2 => "One-chip color area".to_string(),
                     3 => "Two-chip color area sensor".to_string(),
                     4 => "Three-chip color area sensor".to_string(),
                     5 => "Color sequential area sensor".to_string(),
@@ -687,9 +723,11 @@ impl TiffParser {
             0xA003 => "PixelYDimension".to_string(),
             0xA004 => "RelatedSoundFile".to_string(),
             0xA005 => "InteroperabilityIFD".to_string(),
-            0xA20E => "FocalPlaneXResolution".to_string(),
+            0x9000 => "ExifVersion".to_string(),
+            0xA20C => "FocalPlaneXResolution".to_string(),
+            0xA20E => "FocalPlaneResolutionUnit".to_string(),
             0xA20F => "FocalPlaneYResolution".to_string(),
-            0xA210 => "FocalPlaneResolutionUnit".to_string(),
+            0xA210 => "CompressedBitsPerPixel".to_string(),
             0xA217 => "SensingMethod".to_string(),
             0xA300 => "FileSource".to_string(),
             0xA301 => "SceneType".to_string(),

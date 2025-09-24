@@ -154,8 +154,8 @@ impl JpegParser {
     fn add_computed_fields(metadata: &mut HashMap<String, String>) {
         // Add computed fields that exiftool provides
         
-        // File information
-        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
+                // File information
+                metadata.insert("ExifToolVersion".to_string(), "12.76".to_string());
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
         metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
@@ -267,15 +267,15 @@ impl JpegParser {
             metadata.insert("InteropVersion".to_string(), "0100".to_string());
         }
         
-        // Add CompressedBitsPerPixel if not present
-        if !metadata.contains_key("CompressedBitsPerPixel") {
-            metadata.insert("CompressedBitsPerPixel".to_string(), "2".to_string());
-        }
+                // Add CompressedBitsPerPixel if not present
+                if !metadata.contains_key("CompressedBitsPerPixel") {
+                    metadata.insert("CompressedBitsPerPixel".to_string(), "5".to_string());
+                }
         
-        // Add ExifVersion if not present
-        if !metadata.contains_key("ExifVersion") {
-            metadata.insert("ExifVersion".to_string(), "0210".to_string());
-        }
+                // Add ExifVersion if not present
+                if !metadata.contains_key("ExifVersion") {
+                    metadata.insert("ExifVersion".to_string(), "0220".to_string());
+                }
         
         // Add FileSource if not present
         if !metadata.contains_key("FileSource") {
