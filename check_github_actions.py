@@ -69,7 +69,7 @@ def check_github_actions():
             
             # Get jobs for this run
             try:
-                jobs = run.jobs()
+                jobs = list(run.jobs())
                 for job in jobs:
                     job_status = {
                         'completed': '✅' if job.conclusion == 'success' else '❌',
@@ -83,7 +83,7 @@ def check_github_actions():
                     
                     # Get steps for failed jobs
                     if job.conclusion == 'failure':
-                        steps = job.steps()
+                        steps = list(job.steps())
                         for step in steps:
                             if step.conclusion == 'failure':
                                 print(f"    ❌ {step.name}")
