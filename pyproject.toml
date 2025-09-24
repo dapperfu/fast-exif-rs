@@ -54,6 +54,28 @@ python-source = "python"
 module-name = "fast_exif_reader"
 features = ["pyo3/extension-module"]
 
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "TD", "FIX", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"]
+ignore = ["E501", "T201", "S101", "BLE001", "EXE001"]  # Line too long, print statements, assert statements, broad exceptions, shebang issues
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["T201", "S101", "BLE001", "EXE001", "S301", "S603", "PLW1510", "COM812", "RET505", "C901", "PERF401", "PLR2004", "PLC0415", "W293"]
+"examples/*" = ["T201", "BLE001", "EXE001", "S603", "PLW1510", "COM812", "PERF401", "PLR2004", "F541"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.black]
+line-length = 120
+target-version = ['py38']
+
 [tool.versioneer]
 VCS = "git"
 style = "pep440"

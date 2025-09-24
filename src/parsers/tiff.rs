@@ -186,7 +186,7 @@ impl TiffParser {
                     if offset + count as usize <= data.len() {
                         let bytes = &data[offset..offset + count as usize];
                         if let Ok(string) = String::from_utf8(bytes.to_vec()) {
-                            metadata.insert(tag_name, string.trim_end_matches('\0').to_string());
+                            metadata.insert(tag_name, string.trim_end_matches('\0').trim().to_string());
                         }
                     }
                 }
@@ -199,10 +199,14 @@ impl TiffParser {
                         let version_string = Self::format_version_field(value_offset, is_little_endian);
                         metadata.insert(tag_name, version_string);
                     } else {
-                        // Value is inline
-                        let bytes = value_offset.to_le_bytes();
+                        // Value is inline - respect endianness
+                        let bytes = if is_little_endian {
+                            value_offset.to_le_bytes()
+                        } else {
+                            value_offset.to_be_bytes()
+                        };
                         if let Ok(string) = String::from_utf8(bytes.to_vec()) {
-                            metadata.insert(tag_name, string.trim_end_matches('\0').to_string());
+                            metadata.insert(tag_name, string.trim_end_matches('\0').trim().to_string());
                         }
                     }
                 } else {
@@ -211,7 +215,7 @@ impl TiffParser {
                     if offset + count as usize <= data.len() {
                         let bytes = &data[offset..offset + count as usize];
                         if let Ok(string) = String::from_utf8(bytes.to_vec()) {
-                            metadata.insert(tag_name, string.trim_end_matches('\0').to_string());
+                            metadata.insert(tag_name, string.trim_end_matches('\0').trim().to_string());
                         }
                     }
                 }
@@ -817,14 +821,14 @@ impl TiffParser {
             0x0213 => "YCbCrPositioning".to_string(),
             0x0214 => "ReferenceBlackWhite".to_string(),
             0x8298 => "Copyright".to_string(),
-            0x8769 => "ExifIFD".to_string(),
-            0x8825 => "GPSInfo".to_string(),
+            0x8769 => "".to_string(), // ExifIFD - internal reference, not a metadata field
+            0x8825 => "".to_string(), // GPSInfo - internal reference, not a metadata field
             0xA000 => "FlashpixVersion".to_string(),
             0xA001 => "ColorSpace".to_string(),
             0xA002 => "PixelXDimension".to_string(),
             0xA003 => "PixelYDimension".to_string(),
             0xA004 => "RelatedSoundFile".to_string(),
-            0xA005 => "InteroperabilityIFD".to_string(),
+            0xA005 => "".to_string(), // InteroperabilityIFD - internal reference, not a metadata field
             0x9000 => "ExifVersion".to_string(),
             0xA20C => "FocalPlaneXResolution".to_string(),
             0xA20E => "FocalPlaneResolutionUnit".to_string(),

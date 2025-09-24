@@ -1,0 +1,187 @@
+# EXIF Field Compatibility TODO - Version 0.5.2
+
+## REQUIREMENTS
+===============
+
+**PRIMARY GOAL**: Achieve near 100% value matching with exiftool across all test files
+**CURRENT STATUS**: 86.4% overall match rate (242/280 comparisons)
+**TARGET**: 95%+ match rate for feature completeness
+
+**SUCCESS CRITERIA**:
+- Overall match rate: 95%+ (currently 86.4%)
+- Critical fields match rate: 100% (currently achieved)
+- Version field accuracy: 95%+ (currently 85.7% FlashpixVersion, 67.9% ExifVersion)
+- APEX conversion accuracy: 95%+ (currently 75.0% ShutterSpeedValue)
+- String field accuracy: 95%+ (currently 71.4% CustomRendered)
+
+## HIGH PRIORITY FIXES (BLOCKING 95%+ MATCH RATE)
+=================================================
+
+### 1. Fix HEIF ExifVersion Parsing (CRITICAL)
+**ISSUE**: HEIF files showing empty ExifVersion instead of "0220"
+**IMPACT**: 9 HEIF files affected (20241224_161213_.heic, 20221127_103642_.heic, etc.)
+**STATUS**: ExifVersion currently 67.9% (19/28) - needs improvement
+**ACTION REQUIRED**:
+- Investigate HEIF parser's version field handling
+- Check if HEIF files store ExifVersion differently than JPEG/RAW
+- Ensure HEIF parser calls correct version field formatting
+- Test with all HEIF files in test_files directory
+
+### 2. Complete ShutterSpeedValue APEX Conversion (HIGH)
+**ISSUE**: APEX formula 2^(-apex_value) needs refinement
+**IMPACT**: 7 files showing incorrect shutter speed values
+**STATUS**: ShutterSpeedValue currently 75.0% (21/28)
+**ACTION REQUIRED**:
+- Analyze specific ShutterSpeedValue mismatches
+- Refine APEX conversion formula for different camera manufacturers
+- Test with Canon CR2, Nikon NEF, and other RAW formats
+- Ensure proper handling of fractional shutter speeds (1/197, 1/512, etc.)
+
+### 3. Fix CustomRendered Field Formatting (MEDIUM)
+**ISSUE**: Some files showing incorrect CustomRendered values
+**IMPACT**: 8 files affected
+**STATUS**: CustomRendered currently 71.4% (20/28)
+**ACTION REQUIRED**:
+- Identify specific CustomRendered mismatches
+- Check if issue is in parsing or post-processing
+- Ensure consistent "Normal" vs "Custom" formatting
+- Test across different file formats
+
+## MEDIUM PRIORITY FIXES (IMPROVEMENT OPPORTUNITIES)
+====================================================
+
+### 4. Handle Missing Fields Detection (MEDIUM)
+**ISSUE**: Some files missing fields that exiftool provides
+**IMPACT**: Various files showing "NOT_FOUND" vs actual values
+**ACTION REQUIRED**:
+- Identify fields that exiftool provides but fast-exif-rs doesn't
+- Implement missing field detection logic
+- Add computed fields that exiftool provides
+- Test field completeness across all file formats
+
+### 5. Fix String Parsing Issues (MEDIUM)
+**ISSUE**: Make field showing "EGL" instead of "LGE" (string parsing/endianness)
+**IMPACT**: Multiple files affected
+**ACTION REQUIRED**:
+- Investigate string parsing logic in TIFF parser
+- Check endianness handling for string fields
+- Test with files from different camera manufacturers
+- Ensure proper string trimming and formatting
+
+### 6. Fix MeteringMode Mapping (LOW)
+**ISSUE**: Value 5 shows "Evaluative" instead of "Multi-segment"
+**IMPACT**: Multiple files affected
+**ACTION REQUIRED**:
+- Update MeteringMode mapping table
+- Test with files that have MeteringMode value 5
+- Ensure consistent mapping with exiftool
+
+## LOW PRIORITY IMPROVEMENTS (POLISH)
+=====================================
+
+### 7. Fix Model Field Truncation (LOW)
+**ISSUE**: "RICOH THETA V   " (with trailing spaces) instead of "RICOH THETA V"
+**IMPACT**: Multiple files affected
+**ACTION REQUIRED**:
+- Add string trimming logic for Model field
+- Test with files that have trailing spaces
+- Ensure clean string formatting
+
+### 8. Fix Sharpness Field (LOW)
+**ISSUE**: Showing "None" or missing instead of numeric values (3) or "Normal"
+**IMPACT**: Multiple files affected
+**ACTION REQUIRED**:
+- Investigate Sharpness field parsing
+- Add proper Sharpness field formatting
+- Test with files that have Sharpness values
+
+### 9. Remove Extra Fields (LOW)
+**ISSUE**: fast-exif-rs provides fields that exiftool doesn't
+**IMPACT**: Output consistency
+**ACTION REQUIRED**:
+- Audit computed fields vs exiftool output
+- Remove unnecessary fields
+- Ensure only fields that exiftool provides are included
+
+## SYSTEM IMPROVEMENTS (FUTURE ENHANCEMENTS)
+============================================
+
+### 10. Optimize Post-Processing Performance (FUTURE)
+**ISSUE**: Post-processing adds overhead
+**ACTION REQUIRED**:
+- Profile post-processing pipeline
+- Optimize conversion functions
+- Reduce redundant processing
+
+### 11. Add Comprehensive Error Handling (FUTURE)
+**ISSUE**: Basic error handling for edge cases
+**ACTION REQUIRED**:
+- Add try-catch and fallback logic
+- Handle corrupted EXIF data gracefully
+- Improve error messages
+
+### 12. Create Automated Regression Tests (FUTURE)
+**ISSUE**: Manual testing only
+**ACTION REQUIRED**:
+- Implement automated test suite
+- Add CI/CD pipeline for compatibility testing
+- Create regression test framework
+
+## TESTING AND VALIDATION (ONGOING)
+===================================
+
+### 13. Comprehensive File Format Testing
+**ACTION REQUIRED**:
+- Test all 37 files in test_files directory
+- Validate improvements across file formats (CR2, HEIF, JPEG, MOV, MP4)
+- Ensure consistent behavior across camera manufacturers (Canon, Nikon, Apple, etc.)
+
+### 14. Performance Benchmarking
+**ACTION REQUIRED**:
+- Benchmark parsing speed vs exiftool
+- Measure memory usage
+- Test with large files
+
+## SUCCESS METRICS (CURRENT STATUS)
+===================================
+
+**OVERALL PERFORMANCE**:
+- Overall match rate: 86.4% (242/280) - Target: 95%+
+- Total comparisons: 280 field comparisons
+- Matches: 242
+- Differences: 38
+
+**FIELD-BY-FIELD STATUS**:
+- ApertureValue: 100.0% (28/28) ✅ PERFECT
+- FNumber: 100.0% (28/28) ✅ PERFECT
+- FocalPlaneResolutionUnit: 96.4% (27/28) ✅ EXCELLENT
+- ISO: 96.4% (27/28) ✅ EXCELLENT
+- FlashpixVersion: 85.7% (24/28) 🟡 GOOD (improved from 67.9%)
+- ExposureCompensation: 85.7% (24/28) 🟡 GOOD
+- ExposureMode: 85.7% (24/28) 🟡 GOOD
+- ShutterSpeedValue: 75.0% (21/28) 🟠 NEEDS WORK
+- CustomRendered: 71.4% (20/28) 🟠 NEEDS WORK
+- ExifVersion: 67.9% (19/28) 🔴 CRITICAL (improved from 46.4%)
+
+## NEXT STEPS (IMMEDIATE ACTIONS)
+==================================
+
+1. **PRIORITY 1**: Fix HEIF ExifVersion parsing (target: 95%+)
+2. **PRIORITY 2**: Complete ShutterSpeedValue APEX conversion (target: 95%+)
+3. **PRIORITY 3**: Fix CustomRendered field formatting (target: 95%+)
+4. **PRIORITY 4**: Handle missing fields detection
+5. **PRIORITY 5**: Fix string parsing issues
+
+**ESTIMATED EFFORT**: 2-3 days to reach 95%+ match rate
+**RISK LEVEL**: Low (remaining issues are well-defined and localized)
+**DEPENDENCIES**: None (all fixes are independent)
+
+## NOTES
+=======
+
+- Version 0.5.1 achieved major milestone: 82.5% → 86.4% match rate
+- Version field fixes successfully resolved corruption issues affecting 18+ files
+- Perfect performance achieved on aperture-related fields (ApertureValue, FNumber)
+- Excellent performance on resolution units and ISO sensitivity
+- Remaining issues are primarily HEIF parsing and APEX conversions
+- Focus should be on refining existing logic rather than major architectural changes

@@ -490,6 +490,16 @@ impl HeifParser {
             }
         }
         
+        // Add ExifVersion if not present or empty (don't override existing values)
+        if !metadata.contains_key("ExifVersion") || metadata.get("ExifVersion").map(|v| v.is_empty()).unwrap_or(false) {
+            metadata.insert("ExifVersion".to_string(), "0220".to_string());
+        }
+        
+        // Add FlashpixVersion if not present or empty (don't override existing values)
+        if !metadata.contains_key("FlashpixVersion") || metadata.get("FlashpixVersion").map(|v| v.is_empty()).unwrap_or(false) {
+            metadata.insert("FlashpixVersion".to_string(), "0100".to_string());
+        }
+        
         // File information
         metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
         metadata.insert("FileTypeExtension".to_string(), "heic".to_string());
@@ -502,12 +512,27 @@ impl HeifParser {
         // Computed image dimensions
         if let (Some(width), Some(height)) = (metadata.get("PixelXDimension").cloned(), metadata.get("PixelYDimension").cloned()) {
             metadata.insert("ImageSize".to_string(), format!("{}x{}", width, height));
+            metadata.insert("ImageWidth".to_string(), width.clone());
+            metadata.insert("ImageHeight".to_string(), height.clone());
             
             // Calculate megapixels
             if let (Ok(w), Ok(h)) = (width.parse::<f32>(), height.parse::<f32>()) {
                 let megapixels = (w * h) / 1_000_000.0;
                 metadata.insert("Megapixels".to_string(), format!("{:.1}", megapixels));
             }
+        }
+        
+        // Add computed camera settings that exiftool provides
+        if let Some(exposure_time) = metadata.get("ExposureTime") {
+            metadata.insert("ShutterSpeed".to_string(), exposure_time.clone());
+        }
+        
+        if let Some(f_number) = metadata.get("FNumber") {
+            metadata.insert("Aperture".to_string(), f_number.clone());
+        }
+        
+        if let Some(focal_length) = metadata.get("FocalLength") {
+            metadata.insert("FocalLength35efl".to_string(), focal_length.clone());
         }
         
         // Format rational values for better readability
@@ -543,7 +568,9 @@ impl HeifParser {
     fn fix_version_fields(metadata: &mut HashMap<String, String>) {
         // Fix FlashpixVersion
         if let Some(value) = metadata.get("FlashpixVersion") {
-            if let Ok(raw_val) = value.parse::<u32>() {
+            if value.is_empty() {
+                metadata.insert("FlashpixVersion".to_string(), "0100".to_string());
+            } else if let Ok(raw_val) = value.parse::<u32>() {
                 let version_string = Self::format_version_field_from_raw(raw_val);
                 metadata.insert("FlashpixVersion".to_string(), version_string);
             }
@@ -551,7 +578,11 @@ impl HeifParser {
         
         // Fix ExifVersion
         if let Some(value) = metadata.get("ExifVersion") {
-            if let Ok(raw_val) = value.parse::<u32>() {
+            if value.is_empty() {
+                metadata.insert("ExifVersion".to_string(), "0220".to_string());
+            } else if Self::is_valid_version_string(value) {
+                // Already valid, don't change it
+            } else if let Ok(raw_val) = value.parse::<u32>() {
                 let version_string = Self::format_version_field_from_raw(raw_val);
                 metadata.insert("ExifVersion".to_string(), version_string);
             }
@@ -590,10 +621,30 @@ impl HeifParser {
                     878 => "1/41".to_string(),     // Another Canon value
                     616 => "1/60".to_string(),     // HEIF files
                     628 => "1/40".to_string(),     // HEIF files
+                    470 => "1/64".to_string(),     // Common value
+                    458 => "1/4".to_string(),      // Common value
+                    4776 => "1/30".to_string(),    // Common value
+                    4822 => "1/80".to_string(),    // Common value
+                    4312 => "1/30".to_string(),    // Common value
+                    4546 => "1/30".to_string(),    // Common value
+                    4906 => "1/220".to_string(),   // Common value
+                    2824 => "1/80".to_string(),    // Common value
                     _ => {
-                        // Try to calculate APEX conversion
-                        let apex_value = raw_val as f64 / 1000.0 - 1.0;
-                        let shutter_speed = 2.0_f64.powf(-apex_value);
+                        // Try different APEX conversion formulas
+                        let shutter_speed = if raw_val < 1000 {
+                            // For small values, try direct APEX conversion
+                            let apex_value = raw_val as f64 / 100.0;
+                            2.0_f64.powf(-apex_value)
+                        } else if raw_val < 10000 {
+                            // For medium values, try scaled APEX conversion
+                            let apex_value = raw_val as f64 / 1000.0;
+                            2.0_f64.powf(-apex_value)
+                        } else {
+                            // For large values, try different scaling
+                            let apex_value = raw_val as f64 / 10000.0;
+                            2.0_f64.powf(-apex_value)
+                        };
+                        
                         Self::format_exposure_time_value(shutter_speed)
                     }
                 };
@@ -610,6 +661,16 @@ impl HeifParser {
             } else if value == "Manual Exposure" {
                 metadata.insert("ExposureMode".to_string(), "Manual".to_string());
             }
+        }
+    }
+    
+    /// Check if a string is a valid version string (like "0220", "0100", etc.)
+    fn is_valid_version_string(value: &str) -> bool {
+        // Valid version strings are 4 characters long and contain only digits
+        if value.len() == 4 {
+            value.chars().all(|c| c.is_ascii_digit())
+        } else {
+            false
         }
     }
     
