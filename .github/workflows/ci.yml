@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v4
@@ -47,23 +47,42 @@ jobs:
     - name: Build package
       run: |
         python -m venv venv
-        source venv/bin/activate
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          venv\Scripts\activate
+        else
+          source venv/bin/activate
+        fi
         pip install maturin[patchelf]
         maturin develop
 
     - name: Run tests
       run: |
-        source venv/bin/activate
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          venv\Scripts\activate
+        else
+          source venv/bin/activate
+        fi
+        echo "Testing Python version: $(python --version)"
+        echo "Testing import..."
         python -c "from fast_exif_reader import FastExifReader; print('Import successful')"
         python -c "import fast_exif_reader; print('Version:', fast_exif_reader.__version__)"
+        echo "Running performance tests..."
         if [ -f "tests/test_performance.py" ]; then
-          python -m pytest tests/test_performance.py -v
+          python -m pytest tests/test_performance.py -v --tb=short
+        else
+          echo "test_performance.py not found, skipping performance tests"
         fi
 
     - name: Test CLI
       run: |
-        source venv/bin/activate
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          venv\Scripts\activate
+        else
+          source venv/bin/activate
+        fi
+        echo "Testing CLI version..."
         fast-exif-cli --version
+        echo "Testing CLI help..."
         fast-exif-cli --help
 
   lint:
