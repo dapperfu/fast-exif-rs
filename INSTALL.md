@@ -94,11 +94,6 @@ make install
 make install-dev
 ```
 
-### Method 4: From PyPI (when published)
-
-```bash
-pip install fast-exif-reader
-```
 
 ## Verification
 
