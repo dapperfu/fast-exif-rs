@@ -5,30 +5,29 @@ Dual-Path Multiprocessing Example
 This script demonstrates both Python and Rust multiprocessing implementations
 of Fast EXIF Reader, showing when to use each approach.
 """
-from __future__ import annotations
 
-import multiprocessing as mp
 import os
 import sys
 import time
+import multiprocessing as mp
 from pathlib import Path
-from typing import Any
+from typing import List, Dict, Any
 
 # Add the parent directory to path to import our module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from fast_exif_reader import (
-        # Utility
-        RUST_AVAILABLE,
         # Python multiprocessing
         PythonMultiprocessingExifReader,
-        # Rust multiprocessing
-        RustMultiprocessingExifReader,
         python_extract_exif_batch,
         python_extract_exif_from_directory,
-        rust_process_directory_parallel,
+        # Rust multiprocessing
+        RustMultiprocessingExifReader,
         rust_process_files_parallel,
+        rust_process_directory_parallel,
+        # Utility
+        RUST_AVAILABLE,
     )
 
     print("✓ All imports successful")
@@ -37,7 +36,7 @@ except ImportError as e:
     sys.exit(1)
 
 
-def get_test_files(directory: str, max_files: int = 50) -> list[str]:
+def get_test_files(directory: str, max_files: int = 50) -> List[str]:
     """Get test image files from directory"""
     image_extensions = {
         ".jpg",
@@ -55,7 +54,7 @@ def get_test_files(directory: str, max_files: int = 50) -> list[str]:
         print(f"Directory {directory} not found")
         return []
 
-    for root, _dirs, filenames in os.walk(directory):
+    for root, dirs, filenames in os.walk(directory):
         for filename in filenames:
             if Path(filename).suffix.lower() in image_extensions:
                 files.append(os.path.join(root, filename))
@@ -68,8 +67,8 @@ def get_test_files(directory: str, max_files: int = 50) -> list[str]:
 
 
 def benchmark_implementation(
-    name: str, func, file_paths: list[str], **kwargs
-) -> dict[str, Any]:
+    name: str, func, file_paths: List[str], **kwargs
+) -> Dict[str, Any]:
     """Benchmark a multiprocessing implementation"""
     print(f"\n=== {name} ===")
 
@@ -388,8 +387,8 @@ def demonstrate_hybrid_approach():
     print("=" * 60)
 
     def process_files_optimally(
-        file_paths: list[str], max_workers: int = 4
-    ) -> dict[str, Any]:
+        file_paths: List[str], max_workers: int = 4
+    ) -> Dict[str, Any]:
         """Choose optimal implementation based on file count and availability"""
         file_count = len(file_paths)
 
@@ -400,11 +399,12 @@ def demonstrate_hybrid_approach():
                 "  → Using Python multiprocessing (small batch, better error handling)"
             )
             return python_extract_exif_batch(file_paths, max_workers=max_workers)
-        if RUST_AVAILABLE:
+        elif RUST_AVAILABLE:
             print("  → Using Rust multiprocessing (large batch, better performance)")
             return rust_process_files_parallel(file_paths, max_workers=max_workers)
-        print("  → Using Python multiprocessing (Rust not available)")
-        return python_extract_exif_batch(file_paths, max_workers=max_workers)
+        else:
+            print("  → Using Python multiprocessing (Rust not available)")
+            return python_extract_exif_batch(file_paths, max_workers=max_workers)
 
     # Test with different file counts
     test_cases = [("Small batch", 10), ("Medium batch", 30), ("Large batch", 50)]
