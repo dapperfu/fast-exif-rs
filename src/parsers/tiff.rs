@@ -265,6 +265,74 @@ impl TiffParser {
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
+                        } else if tag_id == 0x9201 { // ShutterSpeedValue
+                            // Format shutter speed value
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.1}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x9202 { // ApertureValue
+                            // Format aperture value
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.1}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x9203 { // BrightnessValue
+                            // Format brightness value
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.2}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x9204 { // ExposureCompensation
+                            // Format exposure compensation
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.1}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x9205 { // MaxApertureValue
+                            // Format max aperture value
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.1}", value));
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x9206 { // SubjectDistance
+                            // Format subject distance
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                if value >= 1000.0 {
+                                    metadata.insert(tag_name, format!("{:.0} m", value / 1000.0));
+                                } else {
+                                    metadata.insert(tag_name, format!("{:.2} m", value));
+                                }
+                            } else {
+                                metadata.insert(tag_name, numerator.to_string());
+                            }
+                        } else if tag_id == 0x920A { // FocalLength
+                            // Format focal length
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.1} mm", value));
+                            } else {
+                                metadata.insert(tag_name, format!("{} mm", numerator));
+                            }
+                        } else if tag_id == 0xA405 { // FocalLengthIn35mmFilm
+                            // Format focal length in 35mm film
+                            if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                metadata.insert(tag_name, format!("{:.0} mm", value));
+                            } else {
+                                metadata.insert(tag_name, format!("{} mm", numerator));
+                            }
                         } else {
                             // For other rational fields, format as decimal
                             if denominator != 0 {
@@ -376,6 +444,197 @@ impl TiffParser {
                 match value {
                     1 => "Centered".to_string(),
                     2 => "Co-sited".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0x8822 => { // ExposureProgram
+                match value {
+                    0 => "Not Defined".to_string(),
+                    1 => "Manual".to_string(),
+                    2 => "Program AE".to_string(),
+                    3 => "Aperture-priority AE".to_string(),
+                    4 => "Shutter-priority AE".to_string(),
+                    5 => "Creative Program (biased toward depth of field)".to_string(),
+                    6 => "Action Program (biased toward fast shutter speed)".to_string(),
+                    7 => "Portrait Mode (for closeup photos with background blur)".to_string(),
+                    8 => "Landscape Mode (for landscape photos with background sharp)".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0x8827 => { // ISO
+                format!("{}", value)
+            },
+            0x9207 => { // MeteringMode
+                match value {
+                    0 => "Unknown".to_string(),
+                    1 => "Average".to_string(),
+                    2 => "Center-weighted average".to_string(),
+                    3 => "Spot".to_string(),
+                    4 => "Multi-segment".to_string(),
+                    5 => "Multi-segment".to_string(),
+                    6 => "Partial".to_string(),
+                    255 => "Other".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0x9208 => { // LightSource
+                match value {
+                    0 => "Unknown".to_string(),
+                    1 => "Daylight".to_string(),
+                    2 => "Fluorescent".to_string(),
+                    3 => "Tungsten (Incandescent)".to_string(),
+                    4 => "Flash".to_string(),
+                    9 => "Fine Weather".to_string(),
+                    10 => "Cloudy Weather".to_string(),
+                    11 => "Shade".to_string(),
+                    12 => "Daylight Fluorescent (D 5700-7100K)".to_string(),
+                    13 => "Day White Fluorescent (N 4600-5400K)".to_string(),
+                    14 => "Cool White Fluorescent (W 3900-4500K)".to_string(),
+                    15 => "White Fluorescent (WW 3200-3700K)".to_string(),
+                    17 => "Standard Light A".to_string(),
+                    18 => "Standard Light B".to_string(),
+                    19 => "Standard Light C".to_string(),
+                    20 => "D55".to_string(),
+                    21 => "D65".to_string(),
+                    22 => "D75".to_string(),
+                    23 => "D50".to_string(),
+                    24 => "ISO Studio Tungsten".to_string(),
+                    255 => "Other".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0x9209 => { // Flash
+                match value {
+                    0 => "No Flash".to_string(),
+                    1 => "Fired".to_string(),
+                    5 => "Fired, Return not detected".to_string(),
+                    7 => "Fired, Return detected".to_string(),
+                    8 => "On, Did not fire".to_string(),
+                    9 => "On, Fired".to_string(),
+                    13 => "On, Return not detected".to_string(),
+                    15 => "On, Return detected".to_string(),
+                    16 => "Off, Did not fire".to_string(),
+                    24 => "Off, Did not fire".to_string(),
+                    25 => "Off, Fired".to_string(),
+                    29 => "Off, Return not detected".to_string(),
+                    31 => "Off, Return detected".to_string(),
+                    32 => "No Flash Function".to_string(),
+                    65 => "Fired, Red-eye reduction".to_string(),
+                    69 => "Fired, Red-eye reduction, Return not detected".to_string(),
+                    71 => "Fired, Red-eye reduction, Return detected".to_string(),
+                    73 => "On, Red-eye reduction".to_string(),
+                    77 => "On, Red-eye reduction, Return not detected".to_string(),
+                    79 => "On, Red-eye reduction, Return detected".to_string(),
+                    89 => "On, Red-eye reduction".to_string(),
+                    93 => "On, Red-eye reduction, Return not detected".to_string(),
+                    95 => "On, Red-eye reduction, Return detected".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA001 => { // ColorSpace
+                match value {
+                    1 => "sRGB".to_string(),
+                    65535 => "Uncalibrated".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA300 => { // FileSource
+                match value {
+                    1 => "Film Scanner".to_string(),
+                    2 => "Reflection Print Scanner".to_string(),
+                    3 => "Digital Camera".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA301 => { // SceneType
+                match value {
+                    1 => "Directly photographed".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA401 => { // CustomRendered
+                match value {
+                    0 => "Normal Process".to_string(),
+                    1 => "Custom Process".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA402 => { // ExposureMode
+                match value {
+                    0 => "Auto Exposure".to_string(),
+                    1 => "Manual Exposure".to_string(),
+                    2 => "Auto Bracket".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA403 => { // WhiteBalance
+                match value {
+                    0 => "Auto".to_string(),
+                    1 => "Manual".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA406 => { // SceneCaptureType
+                match value {
+                    0 => "Standard".to_string(),
+                    1 => "Landscape".to_string(),
+                    2 => "Portrait".to_string(),
+                    3 => "Night Scene".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA407 => { // GainControl
+                match value {
+                    0 => "None".to_string(),
+                    1 => "Low gain up".to_string(),
+                    2 => "High gain up".to_string(),
+                    3 => "Low gain down".to_string(),
+                    4 => "High gain down".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA408 => { // Contrast
+                match value {
+                    0 => "Normal".to_string(),
+                    1 => "Soft".to_string(),
+                    2 => "Hard".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA409 => { // Saturation
+                match value {
+                    0 => "Normal".to_string(),
+                    1 => "Low".to_string(),
+                    2 => "High".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA40A => { // Sharpness
+                match value {
+                    0 => "Normal".to_string(),
+                    1 => "Soft".to_string(),
+                    2 => "Hard".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA40C => { // SubjectDistanceRange
+                match value {
+                    0 => "Unknown".to_string(),
+                    1 => "Macro".to_string(),
+                    2 => "Close View".to_string(),
+                    3 => "Distant View".to_string(),
+                    _ => value.to_string(),
+                }
+            },
+            0xA217 => { // SensingMethod
+                match value {
+                    1 => "Not defined".to_string(),
+                    2 => "One-chip color area sensor".to_string(),
+                    3 => "Two-chip color area sensor".to_string(),
+                    4 => "Three-chip color area sensor".to_string(),
+                    5 => "Color sequential area sensor".to_string(),
+                    7 => "Trilinear sensor".to_string(),
+                    8 => "Color sequential linear sensor".to_string(),
                     _ => value.to_string(),
                 }
             },
