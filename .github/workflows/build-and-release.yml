@@ -123,14 +123,12 @@ jobs:
           
           ### Installation
           
-          **Wheel (recommended):**
+          **From source (recommended):**
           ```bash
-          pip install fast_exif_reader
-          ```
-          
-          **From source:**
-          ```bash
-          pip install fast_exif_reader --no-binary fast_exif_reader
+          git clone https://github.com/dapperfu/fast-exif-rs.git
+          cd fast-exif-rs
+          pip install maturin
+          maturin develop
           ```
           
           ### What's New

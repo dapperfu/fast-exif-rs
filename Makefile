@@ -93,9 +93,3 @@ dist: ## Create distribution packages
 	maturin build --release
 	twine check dist/*
 
-upload-test: ## Upload to test PyPI
-	twine upload --repository testpypi dist/*
-
-upload: ## Upload to PyPI
-	twine upload dist/*
-
