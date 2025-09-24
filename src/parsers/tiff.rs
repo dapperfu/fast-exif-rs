@@ -218,25 +218,11 @@ impl TiffParser {
                             
                             // Special handling for ExposureCompensation as SHORT
                             if tag_id == 0x9204 { // ExposureCompensation
-                                // Convert SHORT value to EV (divide by 100)
-                                let ev_value = value as f64 / 100.0;
-                                if ev_value == 0.0 {
-                                    metadata.insert(tag_name, "0".to_string());
-                                } else if ev_value == -0.33 {
-                                    metadata.insert(tag_name, "-1/3".to_string());
-                                } else if ev_value == 0.33 {
-                                    metadata.insert(tag_name, "1/3".to_string());
-                                } else if ev_value == -0.67 {
-                                    metadata.insert(tag_name, "-2/3".to_string());
-                                } else if ev_value == 0.67 {
-                                    metadata.insert(tag_name, "2/3".to_string());
-                                } else if ev_value == -1.0 {
-                                    metadata.insert(tag_name, "-1".to_string());
-                                } else if ev_value == 1.0 {
-                                    metadata.insert(tag_name, "1".to_string());
-                                } else {
-                                    metadata.insert(tag_name, format!("{:.1}", ev_value));
-                                }
+                                // Convert SHORT value to EV using PrintFraction logic
+                                // Raw value 980 should be 0, so divide by 1000
+                                let ev_value = value as f64 / 1000.0;
+                                let formatted_value = Self::print_fraction(ev_value);
+                                metadata.insert(tag_name, formatted_value);
                             } else {
                                 // Format special fields
                                 let formatted_value = Self::format_special_field(tag_id, value);
@@ -316,10 +302,14 @@ impl TiffParser {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9201 { // ShutterSpeedValue
-                            // Convert APEX value to shutter speed: 1/(2^apex_value)
+                            // Convert APEX value to shutter speed: 2^(-apex_value) like exiftool
                             if denominator != 0 {
                                 let apex_value = numerator as f64 / denominator as f64;
-                                let shutter_speed = 1.0 / (2.0_f64.powf(apex_value));
+                                let shutter_speed = if apex_value.abs() < 100.0 {
+                                    2.0_f64.powf(-apex_value)
+                                } else {
+                                    0.0
+                                };
                                 let formatted = Self::format_exposure_time(shutter_speed);
                                 metadata.insert(tag_name, formatted);
                             } else {
@@ -343,26 +333,11 @@ impl TiffParser {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9204 { // ExposureCompensation
-                            // Format exposure compensation for RATIONAL type
+                            // Format exposure compensation for RATIONAL type using PrintFraction logic
                             if denominator != 0 {
                                 let value = numerator as f64 / denominator as f64;
-                                if value == 0.0 {
-                                    metadata.insert(tag_name, "0".to_string());
-                                } else if value == -0.33 {
-                                    metadata.insert(tag_name, "-1/3".to_string());
-                                } else if value == 0.33 {
-                                    metadata.insert(tag_name, "1/3".to_string());
-                                } else if value == -0.67 {
-                                    metadata.insert(tag_name, "-2/3".to_string());
-                                } else if value == 0.67 {
-                                    metadata.insert(tag_name, "2/3".to_string());
-                                } else if value == -1.0 {
-                                    metadata.insert(tag_name, "-1".to_string());
-                                } else if value == 1.0 {
-                                    metadata.insert(tag_name, "1".to_string());
-                                } else {
-                                    metadata.insert(tag_name, format!("{:.1}", value));
-                                }
+                                let formatted_value = Self::print_fraction(value);
+                                metadata.insert(tag_name, formatted_value);
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
@@ -428,9 +403,10 @@ impl TiffParser {
                 }
             },
             _ => {
-                // Special handling for version fields (often stored as UNDEFINED type)
+                // Special handling for version fields (stored as UNDEFINED type)
                 if tag_id == 0xA000 || tag_id == 0x9000 { // FlashpixVersion or ExifVersion
-                    // Convert 4-byte version field to ASCII string
+                    // Version fields are stored as 4-byte ASCII strings
+                    // Convert the 32-bit value to ASCII characters
                     let version_string = Self::format_version_field(value_offset, is_little_endian);
                     metadata.insert(tag_name, version_string);
                 } else if tag_id == 0xA402 { // ExposureMode as other types
@@ -454,58 +430,6 @@ impl TiffParser {
             a = temp;
         }
         a
-    }
-    
-    /// Format exposure time to match exiftool's algorithm
-    fn format_exposure_time(value: f64) -> String {
-        // Handle very long exposures (> 1 second)
-        if value >= 1.0 {
-            if value == value.floor() {
-                return format!("{}", value as u32);
-            } else {
-                return format!("{:.1}", value);
-            }
-        }
-        
-        // Handle fractional exposures (< 1 second)
-        // Try to find the best fraction representation
-        let common_denominators = vec![
-            1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 25, 30, 40, 50, 60, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000, 12500, 16000, 20000, 25000, 32000, 40000, 50000, 64000, 80000, 100000, 125000, 160000, 200000, 250000, 320000, 400000, 500000, 640000, 800000, 1000000
-        ];
-        
-        let mut best_fraction = (1, 1);
-        let mut best_error = f64::MAX;
-        
-        for &denom in &common_denominators {
-            let num = (value * denom as f64).round() as u32;
-            if num > 0 {
-                let fraction_value = num as f64 / denom as f64;
-                let error = (fraction_value - value).abs();
-                
-                if error < best_error {
-                    best_error = error;
-                    best_fraction = (num, denom);
-                }
-                
-                // If we're very close, use this fraction
-                if error < 0.0001 {
-                    break;
-                }
-            }
-        }
-        
-        let (num, denom) = best_fraction;
-        
-        // Simplify the fraction
-        let gcd = Self::gcd(num, denom);
-        let simplified_num = num / gcd;
-        let simplified_den = denom / gcd;
-        
-        if simplified_den == 1 {
-            format!("{}", simplified_num)
-        } else {
-            format!("{}/{}", simplified_num, simplified_den)
-        }
     }
     
     /// Format special field values to match exiftool output
@@ -751,35 +675,52 @@ impl TiffParser {
         }
     }
     
-    /// Format version field (4 bytes) to hex string
-    fn format_version_field(value: u32, is_little_endian: bool) -> String {
-        if is_little_endian {
-            // For little-endian, extract bytes in correct order
-            let byte1 = value as u8;
-            let byte2 = (value >> 8) as u8;
-            let byte3 = (value >> 16) as u8;
-            let byte4 = (value >> 24) as u8;
-            
-            // Convert ASCII bytes to characters (reverse order for little-endian)
-            format!("{}{}{}{}", 
-                byte4 as char,
-                byte3 as char,
-                byte2 as char,
-                byte1 as char)
+    /// Print fraction - converts decimal values to fractions like exiftool
+    fn print_fraction(value: f64) -> String {
+        let val = value * 1.00001; // avoid round-off errors
+        
+        if val == 0.0 {
+            "0".to_string()
+        } else if (val.trunc() / val).abs() > 0.999 {
+            format!("{:+}", val.trunc() as i32)
+        } else if ((val * 2.0).trunc() / (val * 2.0)).abs() > 0.999 {
+            format!("{:+}/2", (val * 2.0).trunc() as i32)
+        } else if ((val * 3.0).trunc() / (val * 3.0)).abs() > 0.999 {
+            format!("{:+}/3", (val * 3.0).trunc() as i32)
         } else {
-            // For big-endian, extract bytes and convert ASCII to characters
-            let byte1 = (value >> 24) as u8;
-            let byte2 = (value >> 16) as u8;
-            let byte3 = (value >> 8) as u8;
-            let byte4 = value as u8;
-            
-            // Convert ASCII bytes to characters
-            format!("{}{}{}{}", 
-                byte1 as char,
-                byte2 as char,
-                byte3 as char,
-                byte4 as char)
+            format!("{:+.3}", val)
         }
+    }
+    
+    /// Format exposure time like exiftool's PrintExposureTime
+    fn format_exposure_time(secs: f64) -> String {
+        if secs < 0.25001 && secs > 0.0 {
+            format!("1/{}", (0.5 + 1.0 / secs) as i32)
+        } else {
+            let formatted = format!("{:.1}", secs);
+            if formatted.ends_with(".0") {
+                formatted.trim_end_matches(".0").to_string()
+            } else {
+                formatted
+            }
+        }
+    }
+    
+    /// Format version field (4 bytes) to ASCII string
+    fn format_version_field(value: u32, _is_little_endian: bool) -> String {
+        // Version fields are stored as 4-byte ASCII strings
+        // Extract bytes and convert to ASCII characters (little-endian order)
+        let byte1 = value as u8;
+        let byte2 = (value >> 8) as u8;
+        let byte3 = (value >> 16) as u8;
+        let byte4 = (value >> 24) as u8;
+        
+        // Convert ASCII bytes to characters (little-endian order)
+        format!("{}{}{}{}", 
+            byte1 as char,
+            byte2 as char,
+            byte3 as char,
+            byte4 as char)
     }
     
     /// Get human-readable tag name
