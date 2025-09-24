@@ -66,9 +66,7 @@ def get_test_files(directory: str, max_files: int = 50) -> List[str]:
     return files
 
 
-def benchmark_implementation(
-    name: str, func, file_paths: List[str], **kwargs
-) -> Dict[str, Any]:
+def benchmark_implementation(name: str, func, file_paths: List[str], **kwargs) -> Dict[str, Any]:
     """Benchmark a multiprocessing implementation"""
     print(f"\n=== {name} ===")
 
@@ -279,9 +277,7 @@ def demonstrate_directory_processing():
     print("\n=== Python Directory Processing ===")
     start_time = time.time()
     try:
-        results = python_extract_exif_from_directory(
-            test_directory, max_files=30, max_workers=2
-        )
+        results = python_extract_exif_from_directory(test_directory, max_files=30, max_workers=2)
         end_time = time.time()
 
         stats = results["statistics"]
@@ -347,9 +343,7 @@ def demonstrate_error_handling():
         # Show error details
         for file_path, result in results["results"].items():
             if not result["success"]:
-                print(
-                    f"  Error in {os.path.basename(file_path)}: {result.get('error', 'Unknown')}"
-                )
+                print(f"  Error in {os.path.basename(file_path)}: {result.get('error', 'Unknown')}")
 
     except Exception as e:
         print(f"✗ Failed: {e}")
@@ -369,9 +363,7 @@ def demonstrate_error_handling():
             # Show error details
             for file_path, result in results["results"].items():
                 if not result["success"]:
-                    print(
-                        f"  Error in {os.path.basename(file_path)}: {result.get('error', 'Unknown')}"
-                    )
+                    print(f"  Error in {os.path.basename(file_path)}: {result.get('error', 'Unknown')}")
 
         except Exception as e:
             print(f"✗ Failed: {e}")
@@ -386,18 +378,14 @@ def demonstrate_hybrid_approach():
     print("HYBRID APPROACH - OPTIMAL PERFORMANCE")
     print("=" * 60)
 
-    def process_files_optimally(
-        file_paths: List[str], max_workers: int = 4
-    ) -> Dict[str, Any]:
+    def process_files_optimally(file_paths: List[str], max_workers: int = 4) -> Dict[str, Any]:
         """Choose optimal implementation based on file count and availability"""
         file_count = len(file_paths)
 
         print(f"Processing {file_count} files...")
 
         if file_count < 20:
-            print(
-                "  → Using Python multiprocessing (small batch, better error handling)"
-            )
+            print("  → Using Python multiprocessing (small batch, better error handling)")
             return python_extract_exif_batch(file_paths, max_workers=max_workers)
         elif RUST_AVAILABLE:
             print("  → Using Rust multiprocessing (large batch, better performance)")

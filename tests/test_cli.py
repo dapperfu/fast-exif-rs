@@ -23,9 +23,7 @@ def test_cli():
     # Test 1: Help
     print("\n1. Testing help:")
     try:
-        result = subprocess.run(
-            [str(cli_path), cli_module, "--help"], capture_output=True, text=True
-        )
+        result = subprocess.run([str(cli_path), cli_module, "--help"], capture_output=True, text=True)
         if result.returncode == 0:
             print("✓ Help command works")
         else:
@@ -36,9 +34,7 @@ def test_cli():
     # Test 2: Version
     print("\n2. Testing version:")
     try:
-        result = subprocess.run(
-            [str(cli_path), cli_module, "--version"], capture_output=True, text=True
-        )
+        result = subprocess.run([str(cli_path), cli_module, "--version"], capture_output=True, text=True)
         if result.returncode == 0:
             print(f"✓ Version: {result.stdout.strip()}")
         else:
@@ -49,9 +45,7 @@ def test_cli():
     # Test 3: No arguments (should show error)
     print("\n3. Testing no arguments:")
     try:
-        result = subprocess.run(
-            [str(cli_path), cli_module], capture_output=True, text=True
-        )
+        result = subprocess.run([str(cli_path), cli_module], capture_output=True, text=True)
         if result.returncode == 1 and "No files specified" in result.stderr:
             print("✓ Error handling works correctly")
         else:

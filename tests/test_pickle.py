@@ -76,17 +76,17 @@ def main():
     """Run all tests."""
     print("FastExifReader Pickle Compatibility Tests")
     print("=" * 50)
-    
+
     pickle_success = test_pickle_functionality()
     multiprocessing_success = test_multiprocessing_compatibility()
-    
+
     print("\n" + "=" * 50)
     if pickle_success and multiprocessing_success:
         print("🎉 All tests passed! FastExifReader is now pickle-compatible.")
         print("\nYou can now use FastExifReader with multiprocessing without pickle errors.")
     else:
         print("❌ Some tests failed. Check the error messages above.")
-    
+
     print("\nUsage examples:")
     print("1. Direct pickle: pickle.dumps(reader)")
     print("2. Multiprocessing: Use extract_exif_batch() or MultiprocessingExifReader")

@@ -4,7 +4,6 @@ Test if our TIFF validation is working by creating a simple test
 """
 
 
-
 def test_tiff_validation():
     """Test if our TIFF validation is working"""
     print("Testing TIFF Validation")
@@ -30,12 +29,8 @@ def test_tiff_validation():
     print("\nTIFF version check:")
     invalid_version = int.from_bytes(invalid_tiff[2:4], byteorder="little")
     valid_version = int.from_bytes(valid_tiff[2:4], byteorder="little")
-    print(
-        f"Invalid version: {invalid_version} -> {'Valid' if invalid_version == 42 else 'Invalid'}"
-    )
-    print(
-        f"Valid version: {valid_version} -> {'Valid' if valid_version == 42 else 'Invalid'}"
-    )
+    print(f"Invalid version: {invalid_version} -> {'Valid' if invalid_version == 42 else 'Invalid'}")
+    print(f"Valid version: {valid_version} -> {'Valid' if valid_version == 42 else 'Invalid'}")
 
 
 if __name__ == "__main__":

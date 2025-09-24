@@ -136,9 +136,7 @@ class TestPerformance:
         memory_increase = final_memory - initial_memory
 
         # Memory increase should be minimal (under 10MB)
-        assert (
-            memory_increase < 10 * 1024 * 1024
-        ), f"Memory usage too high: {memory_increase / 1024 / 1024:.2f}MB"
+        assert memory_increase < 10 * 1024 * 1024, f"Memory usage too high: {memory_increase / 1024 / 1024:.2f}MB"
 
     def test_bytes_vs_file_performance(self):
         """Test bytes vs file reading performance"""
