@@ -37,7 +37,7 @@ impl JpegParser {
     }
     
     /// Find JPEG EXIF segment in data
-    pub fn find_jpeg_exif_segment(data: &[u8]) -> Option<&[u8]> {
+    pub fn find_jpeg_exif_segment<'a>(data: &'a [u8]) -> Option<&'a [u8]> {
         // Look for APP1 segment (0xFFE1) containing EXIF
         let mut pos = 2;
         
