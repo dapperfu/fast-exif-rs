@@ -1,3 +1,6 @@
+// Allow non-local definitions for PyO3 macros
+#![allow(non_local_definitions)]
+
 use memmap2::Mmap;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -27,6 +30,7 @@ pub struct FastExifReader {
     buffer: Vec<u8>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl FastExifReader {
     #[new]

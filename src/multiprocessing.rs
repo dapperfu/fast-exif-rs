@@ -1,3 +1,6 @@
+// Allow non-local definitions for PyO3 macros
+#![allow(non_local_definitions)]
+
 use memmap2::Mmap;
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -16,6 +19,7 @@ pub struct MultiprocessingExifReader {
     max_workers: Option<usize>,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl MultiprocessingExifReader {
     #[new]
