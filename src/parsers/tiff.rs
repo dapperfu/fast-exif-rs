@@ -236,7 +236,14 @@ impl TiffParser {
                     },
             4 => { // LONG
                 if count == 1 {
-                    metadata.insert(tag_name, value_offset.to_string());
+                    // Special handling for version fields
+                    if tag_id == 0xA000 || tag_id == 0x9000 { // FlashpixVersion or ExifVersion
+                        // Convert 4-byte version field to hex string
+                        let version_string = Self::format_version_field(value_offset, is_little_endian);
+                        metadata.insert(tag_name, version_string);
+                    } else {
+                        metadata.insert(tag_name, value_offset.to_string());
+                    }
                 }
             },
             5 => { // RATIONAL
@@ -296,18 +303,21 @@ impl TiffParser {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9201 { // ShutterSpeedValue
-                            // Format shutter speed value
+                            // Convert APEX value to shutter speed: 1/(2^apex_value)
                             if denominator != 0 {
-                                let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.1}", value));
+                                let apex_value = numerator as f64 / denominator as f64;
+                                let shutter_speed = 1.0 / (2.0_f64.powf(apex_value));
+                                let formatted = Self::format_exposure_time(shutter_speed);
+                                metadata.insert(tag_name, formatted);
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9202 { // ApertureValue
-                            // Format aperture value
+                            // Convert APEX value to f-number: 2^(apex_value/2)
                             if denominator != 0 {
-                                let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.1}", value));
+                                let apex_value = numerator as f64 / denominator as f64;
+                                let f_number = 2.0_f64.powf(apex_value / 2.0);
+                                metadata.insert(tag_name, format!("{:.1}", f_number));
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
@@ -320,18 +330,35 @@ impl TiffParser {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9204 { // ExposureCompensation
-                            // Format exposure compensation
+                            // Format exposure compensation for RATIONAL type
                             if denominator != 0 {
                                 let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.1}", value));
+                                if value == 0.0 {
+                                    metadata.insert(tag_name, "0".to_string());
+                                } else if value == -0.33 {
+                                    metadata.insert(tag_name, "-1/3".to_string());
+                                } else if value == 0.33 {
+                                    metadata.insert(tag_name, "1/3".to_string());
+                                } else if value == -0.67 {
+                                    metadata.insert(tag_name, "-2/3".to_string());
+                                } else if value == 0.67 {
+                                    metadata.insert(tag_name, "2/3".to_string());
+                                } else if value == -1.0 {
+                                    metadata.insert(tag_name, "-1".to_string());
+                                } else if value == 1.0 {
+                                    metadata.insert(tag_name, "1".to_string());
+                                } else {
+                                    metadata.insert(tag_name, format!("{:.1}", value));
+                                }
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9205 { // MaxApertureValue
-                            // Format max aperture value
+                            // Convert APEX value to f-number: 2^(apex_value/2)
                             if denominator != 0 {
-                                let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.1}", value));
+                                let apex_value = numerator as f64 / denominator as f64;
+                                let f_number = 2.0_f64.powf(apex_value / 2.0);
+                                metadata.insert(tag_name, format!("{:.1}", f_number));
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());
                             }
@@ -521,7 +548,7 @@ impl TiffParser {
                     2 => "Center-weighted average".to_string(),
                     3 => "Spot".to_string(),
                     4 => "Multi-segment".to_string(),
-                    5 => "Evaluative".to_string(),
+                    5 => "Multi-segment".to_string(),
                     6 => "Partial".to_string(),
                     255 => "Other".to_string(),
                     _ => value.to_string(),
@@ -604,14 +631,14 @@ impl TiffParser {
             },
             0xA401 => { // CustomRendered
                 match value {
-                    0 => "Normal".to_string(),
+                    0 => "Normal Process".to_string(),
                     1 => "Custom".to_string(),
                     _ => value.to_string(),
                 }
             },
             0xA402 => { // ExposureMode
                 match value {
-                    0 => "Auto Exposure".to_string(),
+                    0 => "Auto".to_string(),
                     1 => "Manual Exposure".to_string(),
                     2 => "Auto Bracket".to_string(),
                     _ => value.to_string(),
@@ -661,7 +688,7 @@ impl TiffParser {
             },
             0xA40A => { // Sharpness
                 match value {
-                    0 => "0".to_string(),
+                    0 => "Normal".to_string(),
                     1 => "Soft".to_string(),
                     2 => "Hard".to_string(),
                     3 => "3".to_string(),
@@ -698,6 +725,25 @@ impl TiffParser {
                 }
             },
             _ => value.to_string(),
+        }
+    }
+    
+    /// Format version field (4 bytes) to hex string
+    fn format_version_field(value: u32, is_little_endian: bool) -> String {
+        if is_little_endian {
+            // For little-endian, the bytes are in the correct order
+            format!("{:02X}{:02X}{:02X}{:02X}", 
+                value as u8,
+                (value >> 8) as u8,
+                (value >> 16) as u8,
+                (value >> 24) as u8)
+        } else {
+            // For big-endian, the bytes are already in the correct order
+            format!("{:02X}{:02X}{:02X}{:02X}", 
+                (value >> 24) as u8,
+                (value >> 16) as u8,
+                (value >> 8) as u8,
+                value as u8)
         }
     }
     
