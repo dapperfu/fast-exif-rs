@@ -130,7 +130,10 @@ class ExifFormatter:
 )
 @click.option("-j", "--json", "output_format", flag_value="json", help="JSON format")
 @click.option(
-    "-v", "--verbose", is_flag=True, help="Verbose output with additional information",
+    "-v",
+    "--verbose",
+    is_flag=True,
+    help="Verbose output with additional information",
 )
 @click.option("-q", "--quiet", is_flag=True, help="Suppress error messages")
 @click.option("-r", "--recursive", is_flag=True, help="Process directories recursively")
@@ -141,7 +144,9 @@ class ExifFormatter:
     help="File extensions to process (e.g., --ext jpg --ext cr2)",
 )
 @click.version_option(
-    version="0.1.0", prog_name="fast-exif-cli", message="%(prog)s version %(version)s",
+    version="0.1.0",
+    prog_name="fast-exif-cli",
+    message="%(prog)s version %(version)s",
 )
 def main(
     files: tuple,
@@ -164,7 +169,8 @@ def main(
 
     if not files:
         click.echo(
-            "Error: No files specified. Use --help for usage information.", err=True,
+            "Error: No files specified. Use --help for usage information.",
+            err=True,
         )
         sys.exit(1)
 
@@ -197,7 +203,8 @@ def main(
                 )
         elif not quiet:
             click.echo(
-                f"Warning: {file_path} is not a valid file or directory.", err=True,
+                f"Warning: {file_path} is not a valid file or directory.",
+                err=True,
             )
 
     if not processed_files:

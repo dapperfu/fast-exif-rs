@@ -68,9 +68,7 @@ def example_multiprocessing_worker():
         if result["success"]:
             print(f"Fields extracted: {len(result['metadata'])}")
             if "Make" in result["metadata"]:
-                print(
-                    f"Camera: {result['metadata']['Make']} {result['metadata'].get('Model', '')}"
-                )
+                print(f"Camera: {result['metadata']['Make']} {result['metadata'].get('Model', '')}")
 
 
 def example_multiprocessing_class():
@@ -127,15 +125,9 @@ def main():
     print("\n" + "=" * 50)
     print("Examples completed!")
     print("\nKey points:")
-    print(
-        "1. Use extract_exif_batch() or MultiprocessingExifReader for multiprocessing"
-    )
-    print(
-        "2. Worker functions create new FastExifReader instances to avoid pickle issues"
-    )
-    print(
-        "3. The pickle support in FastExifReader allows it to be serialized if needed"
-    )
+    print("1. Use extract_exif_batch() or MultiprocessingExifReader for multiprocessing")
+    print("2. Worker functions create new FastExifReader instances to avoid pickle issues")
+    print("3. The pickle support in FastExifReader allows it to be serialized if needed")
     print("4. Error handling is built into the multiprocessing functions")
 
 

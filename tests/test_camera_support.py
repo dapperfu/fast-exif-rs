@@ -75,9 +75,7 @@ def test_camera_detection():
             print(f"   Detected Format: {detected_format}")
 
             # Check if detection matches expected
-            make_match = (
-                detected_make == test_case["make"] or test_case["make"] in detected_make
-            )
+            make_match = detected_make == test_case["make"] or test_case["make"] in detected_make
             format_match = detected_format == test_case["format"]
 
             if make_match and format_match:

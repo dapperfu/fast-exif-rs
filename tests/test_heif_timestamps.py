@@ -76,9 +76,7 @@ def test_heif_timestamp_extraction():
                 for ts in timestamps:
                     print(f"  {ts}")
             else:
-                print(
-                    "⚠ No timestamps found - this may indicate the file doesn't contain EXIF data"
-                )
+                print("⚠ No timestamps found - this may indicate the file doesn't contain EXIF data")
 
         except Exception as e:
             print(f"✗ Error reading {test_file}: {e}")
