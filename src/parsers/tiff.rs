@@ -69,6 +69,16 @@ impl TiffParser {
             Self::parse_ifd(data, tiff_start + exif_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
         }
         
+        // Parse GPS IFD if present (contains GPS metadata)
+        if let Some(gps_ifd_offset) = Self::find_sub_ifd_offset(data, tiff_start + ifd_offset as usize, 0x8825, is_little_endian, tiff_start) {
+            Self::parse_ifd(data, tiff_start + gps_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
+        }
+        
+        // Parse Interoperability IFD if present (contains InteropIndex, InteropVersion, etc.)
+        if let Some(interop_ifd_offset) = Self::find_sub_ifd_offset(data, tiff_start + ifd_offset as usize, 0xA005, is_little_endian, tiff_start) {
+            Self::parse_ifd(data, tiff_start + interop_ifd_offset as usize, is_little_endian, tiff_start, metadata)?;
+        }
+        
         Ok(())
     }
     
