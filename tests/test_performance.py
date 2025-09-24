@@ -103,13 +103,32 @@ class TestPerformance:
         """Test memory usage efficiency"""
         import psutil
         import os
+        from pathlib import Path
+        
+        # Check if test data file exists
+        test_file = Path("test_data/sample_image.jpg")
+        if not test_file.exists():
+            # Try alternative paths
+            alt_paths = [
+                "test_files/20130418_101628-1_.jpg",
+                "test_files/20191117_164632_.jpg",
+                "test_files/20180529_133155-2_.jpg"
+            ]
+            test_file = None
+            for alt_path in alt_paths:
+                if Path(alt_path).exists():
+                    test_file = Path(alt_path)
+                    break
+            
+            if test_file is None:
+                pytest.skip("No test image file found")
         
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss
         
         # Process multiple files
         for _ in range(50):
-            metadata = self.reader.read_file("test_data/sample_image.jpg")
+            metadata = self.reader.read_file(str(test_file))
         
         final_memory = process.memory_info().rss
         memory_increase = final_memory - initial_memory
@@ -119,16 +138,31 @@ class TestPerformance:
     
     def test_bytes_vs_file_performance(self):
         """Test bytes vs file reading performance"""
-        if not os.path.exists("test_data/sample_image.jpg"):
-            pytest.skip("Test file not available")
+        # Check if test data file exists
+        test_file = Path("test_data/sample_image.jpg")
+        if not test_file.exists():
+            # Try alternative paths
+            alt_paths = [
+                "test_files/20130418_101628-1_.jpg",
+                "test_files/20191117_164632_.jpg",
+                "test_files/20180529_133155-2_.jpg"
+            ]
+            test_file = None
+            for alt_path in alt_paths:
+                if Path(alt_path).exists():
+                    test_file = Path(alt_path)
+                    break
+            
+            if test_file is None:
+                pytest.skip("No test image file found")
         
         # Test file reading
         start_time = time.time()
-        metadata1 = self.reader.read_file("test_data/sample_image.jpg")
+        metadata1 = self.reader.read_file(str(test_file))
         file_time = time.time() - start_time
         
         # Test bytes reading
-        with open("test_data/sample_image.jpg", "rb") as f:
+        with open(str(test_file), "rb") as f:
             data = f.read()
         
         start_time = time.time()
