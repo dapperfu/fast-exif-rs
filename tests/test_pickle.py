@@ -33,11 +33,11 @@ def test_pickle_functionality():
         print("   ✓ FastExifReader instance is valid after unpickling")
         
         print("\n✅ All pickle tests passed!")
-        return True
+        assert True
         
     except Exception as e:
         print(f"\n❌ Pickle test failed: {e}")
-        return False
+        assert False
 
 
 def test_multiprocessing_compatibility():
@@ -60,10 +60,10 @@ def test_multiprocessing_compatibility():
             future = executor.submit(worker_function)
             result = future.result(timeout=10)
             print(f"   ✓ Multiprocessing test result: {result}")
-            return True
+            assert True
     except Exception as e:
         print(f"   ❌ Multiprocessing test failed: {e}")
-        return False
+        assert False
 
 
 def main():

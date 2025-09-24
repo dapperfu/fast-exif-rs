@@ -58,7 +58,7 @@ def test_heif_timestamp_extraction():
         print("- Fallback timestamp extraction from file content")
         print("- Enhanced CLI support for .hif files")
         
-        return True
+        assert True
     
     # Test with actual files
     for test_file in found_files:
