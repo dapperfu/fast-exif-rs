@@ -206,10 +206,15 @@ def main():
         if exif_data and fast_data:
             comparison = compare_fields(exif_data, fast_data)
         
+        try:
+            file_size = file_path.stat().st_size
+        except FileNotFoundError:
+            file_size = 0
+            
         result = {
             'file_path': str(file_path),
             'file_name': file_path.name,
-            'file_size': file_path.stat().st_size,
+            'file_size': file_size,
             'exif_data': exif_data,
             'exif_error': exif_error,
             'fast_data': fast_data,

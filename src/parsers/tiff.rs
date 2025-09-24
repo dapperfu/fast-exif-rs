@@ -198,19 +198,42 @@ impl TiffParser {
                     }
                 }
             },
-            3 => { // SHORT
-                if count == 1 {
-                    let value = if is_little_endian {
-                        (value_offset & 0xFFFF) as u16
-                    } else {
-                        (value_offset >> 16) as u16
-                    };
-                    
-                    // Format special fields
-                    let formatted_value = Self::format_special_field(tag_id, value);
-                    metadata.insert(tag_name, formatted_value);
-                }
-            },
+                    3 => { // SHORT
+                        if count == 1 {
+                            let value = if is_little_endian {
+                                (value_offset & 0xFFFF) as u16
+                            } else {
+                                (value_offset >> 16) as u16
+                            };
+                            
+                            // Special handling for ExposureCompensation as SHORT
+                            if tag_id == 0x9204 { // ExposureCompensation
+                                // Convert SHORT value to EV (divide by 1000)
+                                let ev_value = value as f64 / 1000.0;
+                                if ev_value == 0.0 {
+                                    metadata.insert(tag_name, "0".to_string());
+                                } else if ev_value == -0.33 {
+                                    metadata.insert(tag_name, "-1/3".to_string());
+                                } else if ev_value == 0.33 {
+                                    metadata.insert(tag_name, "1/3".to_string());
+                                } else if ev_value == -0.67 {
+                                    metadata.insert(tag_name, "-2/3".to_string());
+                                } else if ev_value == 0.67 {
+                                    metadata.insert(tag_name, "2/3".to_string());
+                                } else if ev_value == -1.0 {
+                                    metadata.insert(tag_name, "-1".to_string());
+                                } else if ev_value == 1.0 {
+                                    metadata.insert(tag_name, "1".to_string());
+                                } else {
+                                    metadata.insert(tag_name, format!("{:.1}", ev_value));
+                                }
+                            } else {
+                                // Format special fields
+                                let formatted_value = Self::format_special_field(tag_id, value);
+                                metadata.insert(tag_name, formatted_value);
+                            }
+                        }
+                    },
             4 => { // LONG
                 if count == 1 {
                     metadata.insert(tag_name, value_offset.to_string());
