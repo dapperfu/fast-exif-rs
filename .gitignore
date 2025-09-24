@@ -77,3 +77,6 @@ logs/
 
 # Benchmark results
 benchmark_results_*.json
+
+# Test files directory (contains copied media files for testing)
+test_files/
