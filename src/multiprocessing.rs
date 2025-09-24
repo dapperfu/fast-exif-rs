@@ -31,7 +31,7 @@ impl MultiprocessingExifReader {
     fn read_files(&self, file_paths: Vec<String>) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let results = self.process_files_parallel(file_paths)?;
-            Ok(results.into_py(py))
+            Ok(results.into_pyobject(py)?.into())
         })
     }
 
@@ -45,7 +45,7 @@ impl MultiprocessingExifReader {
         Python::with_gil(|py| {
             let file_paths = self.scan_directory(directory, extensions, max_files)?;
             let results = self.process_files_parallel(file_paths)?;
-            Ok(results.into_py(py))
+            Ok(results.into_pyobject(py)?.into())
         })
     }
 }
@@ -111,7 +111,7 @@ impl MultiprocessingExifReader {
             let mut result_map = HashMap::new();
 
             // Add statistics
-            result_map.insert("stats".to_string(), stats.into_py(py));
+            result_map.insert("stats".to_string(), stats.into_pyobject(py).map_err(|e| ExifError::InvalidExif(e.to_string()))?.into());
 
             // Add individual results
             for result in results {
@@ -119,7 +119,7 @@ impl MultiprocessingExifReader {
                     "file_{}",
                     result.file_path.replace("/", "_").replace("\\", "_")
                 );
-                result_map.insert(file_key, result.into_py(py));
+                result_map.insert(file_key, result.into_pyobject(py).map_err(|e| ExifError::InvalidExif(e.to_string()))?.into());
             }
 
             Ok(result_map)
@@ -250,7 +250,7 @@ pub fn process_files_parallel(
         let results = reader
             .process_files_parallel(file_paths)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(results.into_py(py))
+        Ok(results.into_pyobject(py)?.into())
     })
 }
 

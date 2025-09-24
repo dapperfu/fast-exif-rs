@@ -44,7 +44,7 @@ impl FastExifReader {
     fn read_file(&mut self, file_path: &str) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let metadata = self.read_exif_fast(file_path)?;
-            Ok(metadata.into_py(py))
+            Ok(metadata.into_pyobject(py)?.into())
         })
     }
 
@@ -52,7 +52,7 @@ impl FastExifReader {
     fn read_bytes(&mut self, data: &[u8]) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let metadata = self.read_exif_from_bytes(data)?;
-            Ok(metadata.into_py(py))
+            Ok(metadata.into_pyobject(py)?.into())
         })
     }
 
@@ -66,8 +66,8 @@ impl FastExifReader {
     /// Support for pickle protocol
     fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
         // Deserialize the buffer from bytes
-        let buffer_bytes: &PyBytes = state.extract(py)?;
-        self.buffer = buffer_bytes.as_bytes().to_vec();
+        let buffer_bytes: &[u8] = state.bind(py).extract()?;
+        self.buffer = buffer_bytes.to_vec();
         Ok(())
     }
 }
@@ -112,7 +112,7 @@ impl FastExifReader {
 
 /// Python module definition
 #[pymodule]
-fn fast_exif_reader(_py: Python, m: &PyModule) -> PyResult<()> {
+fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FastExifReader>()?;
     m.add_class::<MultiprocessingExifReader>()?;
     m.add_class::<ExifResult>()?;
