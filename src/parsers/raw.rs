@@ -234,16 +234,22 @@ impl RawParser {
     fn fix_version_fields(metadata: &mut HashMap<String, String>) {
         // Fix FlashpixVersion
         if let Some(value) = metadata.get("FlashpixVersion") {
+            eprintln!("DEBUG RAW: FlashpixVersion raw value: '{}'", value);
             if let Ok(raw_val) = value.parse::<u32>() {
+                eprintln!("DEBUG RAW: FlashpixVersion parsed as u32: 0x{:08X}", raw_val);
                 let version_string = Self::format_version_field_from_raw(raw_val);
+                eprintln!("DEBUG RAW: FlashpixVersion result: '{}'", version_string);
                 metadata.insert("FlashpixVersion".to_string(), version_string);
             }
         }
-        
+
         // Fix ExifVersion
         if let Some(value) = metadata.get("ExifVersion") {
+            eprintln!("DEBUG RAW: ExifVersion raw value: '{}'", value);
             if let Ok(raw_val) = value.parse::<u32>() {
+                eprintln!("DEBUG RAW: ExifVersion parsed as u32: 0x{:08X}", raw_val);
                 let version_string = Self::format_version_field_from_raw(raw_val);
+                eprintln!("DEBUG RAW: ExifVersion result: '{}'", version_string);
                 metadata.insert("ExifVersion".to_string(), version_string);
             }
         }
@@ -252,7 +258,9 @@ impl RawParser {
     /// Fix ExposureCompensation showing raw values
     fn fix_exposure_compensation(metadata: &mut HashMap<String, String>) {
         if let Some(value) = metadata.get("ExposureCompensation") {
+            eprintln!("DEBUG RAW: ExposureCompensation raw value: '{}'", value);
             if let Ok(raw_val) = value.parse::<u32>() {
+                eprintln!("DEBUG RAW: ExposureCompensation parsed as u32: {}", raw_val);
                 // Convert raw value to EV using pattern matching
                 let formatted_value = match raw_val {
                     980 | 924 | 894 => "0".to_string(),           // 0 EV
@@ -265,6 +273,7 @@ impl RawParser {
                         Self::print_fraction_value(ev_value)
                     }
                 };
+                eprintln!("DEBUG RAW: ExposureCompensation result: '{}'", formatted_value);
                 metadata.insert("ExposureCompensation".to_string(), formatted_value);
             }
         }
@@ -307,16 +316,22 @@ impl RawParser {
     /// Format version field from raw u32 value
     fn format_version_field_from_raw(value: u32) -> String {
         // Version fields are stored as 4-byte ASCII strings (little-endian)
-        let byte1 = value as u8;
-        let byte2 = (value >> 8) as u8;
-        let byte3 = (value >> 16) as u8;
-        let byte4 = (value >> 24) as u8;
+        let bytes = [
+            value as u8,
+            (value >> 8) as u8,
+            (value >> 16) as u8,
+            (value >> 24) as u8,
+        ];
         
-        format!("{}{}{}{}", 
-            byte1 as char,
-            byte2 as char,
-            byte3 as char,
-            byte4 as char)
+        // Convert ASCII bytes to characters, filtering out null bytes
+        let mut result = String::new();
+        for byte in bytes.iter() {
+            if *byte != 0 && *byte >= 32 && *byte <= 126 {
+                result.push(*byte as char);
+            }
+        }
+        
+        result
     }
     
     /// Print fraction value using same logic as TIFF parser
