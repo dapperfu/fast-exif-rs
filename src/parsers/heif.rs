@@ -495,10 +495,13 @@ impl HeifParser {
         }
         
         // File information
-        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.1.0".to_string());
+        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
         metadata.insert("FileTypeExtension".to_string(), "heic".to_string());
         metadata.insert("MIMEType".to_string(), "image/heic".to_string());
         metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        
+        // Override Format field to match exiftool
+        metadata.insert("Format".to_string(), "image/heic".to_string());
         
         // Computed image dimensions
         if let (Some(width), Some(height)) = (metadata.get("PixelXDimension").cloned(), metadata.get("PixelYDimension").cloned()) {

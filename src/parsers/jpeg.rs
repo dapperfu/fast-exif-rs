@@ -155,10 +155,16 @@ impl JpegParser {
         // Add computed fields that exiftool provides
         
         // File information
-        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.1.0".to_string());
+        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
         metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        
+        // Override Format field to match exiftool
+        metadata.insert("Format".to_string(), "image/jpeg".to_string());
+        
+        // Add computed time fields that exiftool provides
+        Self::add_computed_time_fields(metadata);
         
         // Computed image dimensions
         if let (Some(width), Some(height)) = (metadata.get("PixelXDimension").cloned(), metadata.get("PixelYDimension").cloned()) {
@@ -181,6 +187,57 @@ impl JpegParser {
         if let Some(f_number) = metadata.get("FNumber") {
             if let Ok(parsed) = f_number.parse::<f32>() {
                 metadata.insert("FNumberFormatted".to_string(), format!("f/{:.1}", parsed));
+            }
+        }
+    }
+    
+    /// Add computed time fields that exiftool provides
+    fn add_computed_time_fields(metadata: &mut HashMap<String, String>) {
+        // CreateDate - often same as DateTimeOriginal
+        if !metadata.contains_key("CreateDate") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("CreateDate".to_string(), dto.clone());
+            } else if let Some(dt) = metadata.get("DateTime") {
+                metadata.insert("CreateDate".to_string(), dt.clone());
+            }
+        }
+        
+        // DateTimeCreated - alias for CreateDate (only if DateTimeOriginal exists)
+        if !metadata.contains_key("DateTimeCreated") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("DateTimeCreated".to_string(), dto.clone());
+            }
+        }
+        
+        // TimeCreated - extract time portion from DateTimeOriginal (not CreateDate)
+        if !metadata.contains_key("TimeCreated") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                if dto.len() >= 19 && dto.chars().nth(10) == Some(' ') {
+                    let time_part = &dto[11..19]; // Extract "HH:MM:SS"
+                    metadata.insert("TimeCreated".to_string(), time_part.to_string());
+                }
+            }
+        }
+        
+        // SubSecDateTimeOriginal - combine DateTimeOriginal with SubSecTimeOriginal
+        if !metadata.contains_key("SubSecDateTimeOriginal") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), format!("{}.{}", dto, subsec));
+                } else {
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), dto.clone());
+                }
+            }
+        }
+        
+        // SubSecDateTimeDigitized - combine DateTimeDigitized with SubSecTimeDigitized
+        if !metadata.contains_key("SubSecDateTimeDigitized") {
+            if let Some(dtd) = metadata.get("DateTimeDigitized") {
+                if let Some(subsec) = metadata.get("SubSecTimeDigitized") {
+                    metadata.insert("SubSecDateTimeDigitized".to_string(), format!("{}.{}", dtd, subsec));
+                } else {
+                    metadata.insert("SubSecDateTimeDigitized".to_string(), dtd.clone());
+                }
             }
         }
     }
