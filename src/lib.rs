@@ -21,6 +21,7 @@ pub use utils::ExifUtils;
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
 #[derive(Clone)]
+#[allow(non_local_definitions)]
 pub struct FastExifReader {
     // Pre-allocated buffers for performance
     buffer: Vec<u8>,

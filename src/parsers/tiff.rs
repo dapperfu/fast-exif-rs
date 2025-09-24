@@ -265,27 +265,27 @@ impl TiffParser {
                     let offset = tiff_start + value_offset as usize;
                     if offset + 8 <= data.len() {
                         let numerator = if is_little_endian {
-                            ((data[offset] as u32) | 
+                            (data[offset] as u32) | 
                              ((data[offset + 1] as u32) << 8) |
                              ((data[offset + 2] as u32) << 16) |
-                             ((data[offset + 3] as u32) << 24))
+                             ((data[offset + 3] as u32) << 24)
                         } else {
-                            (((data[offset] as u32) << 24) |
+                            ((data[offset] as u32) << 24) |
                              ((data[offset + 1] as u32) << 16) |
                              ((data[offset + 2] as u32) << 8) |
-                             (data[offset + 3] as u32))
+                             (data[offset + 3] as u32)
                         };
                         
                         let denominator = if is_little_endian {
-                            ((data[offset + 4] as u32) | 
+                            (data[offset + 4] as u32) | 
                              ((data[offset + 5] as u32) << 8) |
                              ((data[offset + 6] as u32) << 16) |
-                             ((data[offset + 7] as u32) << 24))
+                             ((data[offset + 7] as u32) << 24)
                         } else {
-                            (((data[offset + 4] as u32) << 24) |
+                            ((data[offset + 4] as u32) << 24) |
                              ((data[offset + 5] as u32) << 16) |
                              ((data[offset + 6] as u32) << 8) |
-                             (data[offset + 7] as u32))
+                             (data[offset + 7] as u32)
                         };
                         
                         // Format rational values based on field type
