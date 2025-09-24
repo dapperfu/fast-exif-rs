@@ -125,7 +125,7 @@ impl FastExifReader {
                 return Ok("NEF".to_string());
             } else if self.is_olympus_raw(data) {
                 return Ok("ORF".to_string());
-            } else if self.is_ricoh_raw(data) {
+            } else if self.is_dng_file(data) {
                 return Ok("DNG".to_string());
             } else {
                 return Ok("TIFF".to_string());
@@ -207,11 +207,42 @@ impl FastExifReader {
         data[..search_len].windows(7).any(|w| w == b"OLYMPUS")
     }
     
-    fn is_ricoh_raw(&self, data: &[u8]) -> bool {
-        // Ricoh RAW files have Ricoh-specific markers
-        // Look for "RICOH" in the first 1KB
-        let search_len = std::cmp::min(1024, data.len());
-        data[..search_len].windows(5).any(|w| w == b"RICOH")
+    fn is_dng_file(&self, data: &[u8]) -> bool {
+        // DNG (Digital Negative) files are TIFF-based but have specific characteristics
+        // Look for DNG-specific markers in the first 8KB
+        let search_len = std::cmp::min(8192, data.len());
+        
+        // Debug: Check for Samsung first (most common case)
+        if data[..search_len].windows(7).any(|w| w.eq_ignore_ascii_case(b"samsung")) {
+            return true;
+        }
+        
+        // Check for DNG version tag (0xC612) or DNG-specific strings
+        for i in 0..search_len.saturating_sub(20) {
+            // Look for DNG version tag (0xC612) - check both byte orders
+            if i + 2 < data.len() {
+                let tag_bytes_le = u16::from_le_bytes([data[i], data[i+1]]);
+                let tag_bytes_be = u16::from_be_bytes([data[i], data[i+1]]);
+                if tag_bytes_le == 0xC612 || tag_bytes_be == 0xC612 { // DNGVersion tag
+                    return true;
+                }
+            }
+            
+            // Look for DNG-specific strings
+            if data[i..i+3] == *b"DNG" {
+                return true;
+            }
+        }
+        
+        // Check for common DNG manufacturer strings
+        let dng_manufacturers: &[&[u8]] = &[b"samsung", b"adobe", b"ricoh", b"leica", b"pentax"];
+        for manufacturer in dng_manufacturers {
+            if data[..search_len].windows(manufacturer.len()).any(|w| w.eq_ignore_ascii_case(manufacturer)) {
+                return true;
+            }
+        }
+        
+        false
     }
     
     fn detect_camera_make(&self, data: &[u8]) -> Option<String> {
@@ -310,7 +341,11 @@ impl FastExifReader {
     fn parse_dng_exif(&self, data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
         // DNG (Digital Negative) is TIFF-based
         self.parse_tiff_exif(data, metadata)?;
-        self.extract_ricoh_specific_tags(data, metadata);
+        self.extract_dng_specific_tags(data, metadata);
+        
+        // Add computed fields that exiftool provides
+        self.add_computed_fields(metadata);
+        
         Ok(())
     }
     
@@ -2257,10 +2292,56 @@ impl FastExifReader {
         }
     }
     
-    fn extract_ricoh_specific_tags(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
-        // Look for Ricoh-specific maker notes
-        if data.windows(5).any(|w| w == b"RICOH") {
+    fn extract_dng_specific_tags(&self, data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Look for DNG-specific maker notes and manufacturer information
+        let search_len = std::cmp::min(8192, data.len());
+        
+        // Check for Samsung DNG files
+        if data[..search_len].windows(7).any(|w| w.eq_ignore_ascii_case(b"samsung")) {
+            metadata.insert("MakerNotes".to_string(), "Samsung".to_string());
+            // Samsung DNG files often have specific model information
+            if !metadata.contains_key("Make") {
+                metadata.insert("Make".to_string(), "samsung".to_string());
+            }
+        }
+        // Check for Adobe DNG files
+        else if data[..search_len].windows(5).any(|w| w.eq_ignore_ascii_case(b"adobe")) {
+            metadata.insert("MakerNotes".to_string(), "Adobe".to_string());
+        }
+        // Check for Ricoh DNG files
+        else if data[..search_len].windows(5).any(|w| w == b"RICOH") {
             metadata.insert("MakerNotes".to_string(), "Ricoh".to_string());
+        }
+        // Check for Leica DNG files
+        else if data[..search_len].windows(5).any(|w| w.eq_ignore_ascii_case(b"leica")) {
+            metadata.insert("MakerNotes".to_string(), "Leica".to_string());
+        }
+        // Check for Pentax DNG files
+        else if data[..search_len].windows(6).any(|w| w.eq_ignore_ascii_case(b"pentax")) {
+            metadata.insert("MakerNotes".to_string(), "Pentax".to_string());
+        }
+        
+        // Look for DNG version information
+        for i in 0..search_len.saturating_sub(20) {
+            if i + 2 < data.len() {
+                let tag_bytes = u16::from_le_bytes([data[i], data[i+1]]);
+                if tag_bytes == 0xC612 { // DNGVersion tag
+                    // Try to read the DNG version
+                    if i + 10 < data.len() {
+                        let version_bytes = &data[i+8..i+12];
+                        let version = u32::from_le_bytes([
+                            version_bytes[0], version_bytes[1], 
+                            version_bytes[2], version_bytes[3]
+                        ]);
+                        let major = (version >> 24) & 0xFF;
+                        let minor = (version >> 16) & 0xFF;
+                        let patch = (version >> 8) & 0xFF;
+                        let build = version & 0xFF;
+                        metadata.insert("DNGVersion".to_string(), format!("{}.{}.{}.{}", major, minor, patch, build));
+                    }
+                    break;
+                }
+            }
         }
     }
     
@@ -2308,7 +2389,7 @@ impl FastExifReader {
                     self.extract_olympus_specific_tags(data, metadata);
                 },
                 "RICOH" => {
-                    self.extract_ricoh_specific_tags(data, metadata);
+                    self.extract_dng_specific_tags(data, metadata);
                 },
                 _ => {}
             }
