@@ -218,8 +218,8 @@ impl TiffParser {
                             
                             // Special handling for ExposureCompensation as SHORT
                             if tag_id == 0x9204 { // ExposureCompensation
-                                // Convert SHORT value to EV (divide by 1000)
-                                let ev_value = value as f64 / 1000.0;
+                                // Convert SHORT value to EV (divide by 100)
+                                let ev_value = value as f64 / 100.0;
                                 if ev_value == 0.0 {
                                     metadata.insert(tag_name, "0".to_string());
                                 } else if ev_value == -0.33 {
@@ -251,6 +251,9 @@ impl TiffParser {
                         // Convert 4-byte version field to hex string
                         let version_string = Self::format_version_field(value_offset, is_little_endian);
                         metadata.insert(tag_name, version_string);
+                    } else if tag_id == 0xA402 { // ExposureMode as LONG
+                        let formatted_value = Self::format_special_field(tag_id, value_offset as u16);
+                        metadata.insert(tag_name, formatted_value);
                     } else {
                         metadata.insert(tag_name, value_offset.to_string());
                     }
@@ -425,8 +428,18 @@ impl TiffParser {
                 }
             },
             _ => {
-                // For other types, just store the raw value
-                metadata.insert(tag_name, value_offset.to_string());
+                // Special handling for version fields (often stored as UNDEFINED type)
+                if tag_id == 0xA000 || tag_id == 0x9000 { // FlashpixVersion or ExifVersion
+                    // Convert 4-byte version field to ASCII string
+                    let version_string = Self::format_version_field(value_offset, is_little_endian);
+                    metadata.insert(tag_name, version_string);
+                } else if tag_id == 0xA402 { // ExposureMode as other types
+                    let formatted_value = Self::format_special_field(tag_id, value_offset as u16);
+                    metadata.insert(tag_name, formatted_value);
+                } else {
+                    // For other types, just store the raw value
+                    metadata.insert(tag_name, value_offset.to_string());
+                }
             }
         }
         
@@ -741,19 +754,31 @@ impl TiffParser {
     /// Format version field (4 bytes) to hex string
     fn format_version_field(value: u32, is_little_endian: bool) -> String {
         if is_little_endian {
-            // For little-endian, the bytes are in the correct order
-            format!("{:02X}{:02X}{:02X}{:02X}", 
-                value as u8,
-                (value >> 8) as u8,
-                (value >> 16) as u8,
-                (value >> 24) as u8)
+            // For little-endian, extract bytes in correct order
+            let byte1 = value as u8;
+            let byte2 = (value >> 8) as u8;
+            let byte3 = (value >> 16) as u8;
+            let byte4 = (value >> 24) as u8;
+            
+            // Convert ASCII bytes to characters (reverse order for little-endian)
+            format!("{}{}{}{}", 
+                byte4 as char,
+                byte3 as char,
+                byte2 as char,
+                byte1 as char)
         } else {
-            // For big-endian, the bytes are already in the correct order
-            format!("{:02X}{:02X}{:02X}{:02X}", 
-                (value >> 24) as u8,
-                (value >> 16) as u8,
-                (value >> 8) as u8,
-                value as u8)
+            // For big-endian, extract bytes and convert ASCII to characters
+            let byte1 = (value >> 24) as u8;
+            let byte2 = (value >> 16) as u8;
+            let byte3 = (value >> 8) as u8;
+            let byte4 = value as u8;
+            
+            // Convert ASCII bytes to characters
+            format!("{}{}{}{}", 
+                byte1 as char,
+                byte2 as char,
+                byte3 as char,
+                byte4 as char)
         }
     }
     
