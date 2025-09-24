@@ -45,10 +45,15 @@ jobs:
         pip install maturin[patchelf] pytest
 
     - name: Build package
-      run: maturin develop
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin[patchelf]
+        maturin develop
 
     - name: Run tests
       run: |
+        source venv/bin/activate
         python -c "from fast_exif_reader import FastExifReader; print('Import successful')"
         python -c "import fast_exif_reader; print('Version:', fast_exif_reader.__version__)"
         if [ -f "tests/test_performance.py" ]; then
@@ -57,6 +62,7 @@ jobs:
 
     - name: Test CLI
       run: |
+        source venv/bin/activate
         fast-exif-cli --version
         fast-exif-cli --help
 
