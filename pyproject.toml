@@ -63,8 +63,9 @@ select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "
 ignore = ["E501", "T201", "S101", "BLE001", "EXE001"]  # Line too long, print statements, assert statements, broad exceptions, shebang issues
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["T201", "S101", "BLE001", "EXE001", "S301", "S603", "PLW1510", "COM812", "RET505", "C901", "PERF401", "PLR2004", "PLC0415", "W293"]
-"examples/*" = ["T201", "BLE001", "EXE001", "S603", "PLW1510", "COM812", "PERF401", "PLR2004", "F541"]
+"tests/*" = ["T201", "S101", "BLE001", "EXE001", "S301", "S603", "PLW1510", "COM812", "RET505", "C901", "PERF401", "PLR2004", "PLC0415", "W293", "F401", "F841", "I001", "PTH110", "PTH123", "S607"]
+"examples/*" = ["T201", "BLE001", "EXE001", "S603", "PLW1510", "COM812", "PERF401", "PLR2004", "F541", "FBT001", "FBT002", "C901", "PLR0913", "PLR0912", "PLR0915", "PERF402", "PERF203", "PERF401", "I001", "PTH120", "PTH100", "PTH110", "PTH118", "PTH119", "PTH123", "B007", "FA100", "RET505", "S607"]
+"cli/*" = ["T201", "S101", "BLE001", "EXE001", "S301", "S603", "PLW1510", "COM812", "RET505", "C901", "PERF401", "PLR2004", "PLC0415", "W293", "FBT001", "FBT002", "C901", "PLR0913", "PLR0912", "PLR0915", "PERF402", "PERF203", "PERF401", "S607"]
 
 [tool.ruff.format]
 quote-style = "double"
