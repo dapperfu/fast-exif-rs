@@ -51,13 +51,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install maturin[patchelf] pytest pytest-cov psutil
+        pip install maturin[patchelf]
 
     - name: Build package
       run: |
         python -m venv venv
         source venv/bin/activate
-        pip install maturin[patchelf]
+        pip install maturin[patchelf] pytest pytest-cov psutil
         maturin develop
 
     - name: Run comprehensive tests
@@ -155,14 +155,21 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install maturin[patchelf] pytest
+        pip install maturin[patchelf]
 
     - name: Build package (release)
-      run: maturin develop --release
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin[patchelf] pytest
+        maturin develop --release
 
     - name: Run performance benchmarks
       run: |
         mkdir -p benchmark-results
+        
+        # Activate virtual environment
+        source venv/bin/activate
         
         # Run all available benchmarks
         for benchmark in benchmarks/*.py; do
@@ -221,14 +228,21 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install maturin[patchelf] pytest
+        pip install maturin[patchelf]
 
     - name: Build package
-      run: maturin develop
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install maturin[patchelf] pytest
+        maturin develop
 
     - name: Run correctness tests
       run: |
         mkdir -p correctness-results
+        
+        # Activate virtual environment
+        source venv/bin/activate
         
         # Run all correctness-related tests
         python -m pytest tests/ -k "correctness or validation" -v --junitxml=correctness-results/correctness.xml || true
