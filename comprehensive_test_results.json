@@ -2,17 +2,22 @@
   "summary": {
     "total_files": 37,
     "successful_tests": 28,
-    "avg_match_rate": 31.851424780438496
+    "avg_match_rate": 40.50540391595234
   },
   "results": {
     "20120608_085921_.cr2": {
       "status": "success",
       "file": "20120608_085921_.cr2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 78.94736842105263,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0221",
+          "ShutterSpeedValue": "1/512",
+          "ExposureMode": "Manual",
           "CustomRendered": "Normal",
           "MeteringMode": "Spot",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2012:06:08 08:59:21",
           "Make": "Canon",
           "Model": "Canon EOS DIGITAL REBEL XSi",
@@ -25,31 +30,11 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "924"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0221",
-            "fast_exif": "825373232"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 7.0,
-            "fast_exif": "5.6"
-          },
-          "ShutterSpeedValue": {
-            "exiftool": "1/512",
-            "fast_exif": "908"
-          },
-          "ExposureMode": {
-            "exiftool": "Manual",
-            "fast_exif": "Manual Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "4865.603645"
+            "fast_exif": "7.0"
           },
           "ISO": {
             "exiftool": 200,
@@ -70,7 +55,7 @@
         }
       },
       "exiftool_count": 311,
-      "fast_exif_count": 54
+      "fast_exif_count": 61
     },
     "DSCF0537_.MOV": {
       "status": "success",
@@ -103,11 +88,15 @@
     "IMG_9345_.CR2": {
       "status": "success",
       "file": "IMG_9345_.CR2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 73.68421052631578,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0230",
+          "ShutterSpeedValue": "1/197",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
-          "MeteringMode": "Evaluative",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2023:03:05 16:07:07",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -120,31 +109,15 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "980"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 5.7,
-            "fast_exif": "5.0"
+            "fast_exif": "5.7"
           },
-          "ShutterSpeedValue": {
-            "exiftool": "1/197",
-            "fast_exif": "964"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "6086.763070"
+          "MeteringMode": {
+            "exiftool": "Evaluative",
+            "fast_exif": "Multi-segment"
           },
           "ISO": {
             "exiftool": 2500,
@@ -165,7 +138,7 @@
         }
       },
       "exiftool_count": 358,
-      "fast_exif_count": 63
+      "fast_exif_count": 64
     },
     "20130418_101628-1_.jpg": {
       "status": "success",
@@ -181,11 +154,11 @@
         "differences": {
           "FlashpixVersion": {
             "exiftool": "0100",
-            "fast_exif": "808529968"
+            "fast_exif": "d"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "Make": {
             "exiftool": "LGE",
@@ -198,25 +171,27 @@
         },
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "ExposureMode": "Auto Exposure",
-          "CustomRendered": "Normal Process",
+          "ExposureMode": "Auto",
+          "CustomRendered": "Normal",
           "Sharpness": "Normal",
-          "CompressedBitsPerPixel": "5",
           "DateTimeDigitized": "2002:12:08 12:00:00",
           "WhiteBalance": "Auto"
         }
       },
       "exiftool_count": 57,
-      "fast_exif_count": 48
+      "fast_exif_count": 53
     },
     "IMG_9580_.CR2": {
       "status": "success",
       "file": "IMG_9580_.CR2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 68.42105263157895,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0230",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
-          "MeteringMode": "Evaluative",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2023:08:30 18:39:38",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -229,31 +204,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "980"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 3.5,
-            "fast_exif": "3.6"
+            "fast_exif": "3.5"
           },
           "ShutterSpeedValue": {
             "exiftool": "1/64",
-            "fast_exif": "964"
+            "fast_exif": "1/197"
           },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "6086.763070"
+          "MeteringMode": {
+            "exiftool": "Evaluative",
+            "fast_exif": "Multi-segment"
           },
           "ISO": {
             "exiftool": 1600,
@@ -274,16 +237,19 @@
         }
       },
       "exiftool_count": 361,
-      "fast_exif_count": 63
+      "fast_exif_count": 64
     },
     "IMG_9101_.CR2": {
       "status": "success",
       "file": "IMG_9101_.CR2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 68.42105263157895,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0230",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
-          "MeteringMode": "Evaluative",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2023:01:27 20:33:40",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -296,31 +262,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "980"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 5.0,
-            "fast_exif": "4.6"
+            "fast_exif": "5.0"
           },
           "ShutterSpeedValue": {
             "exiftool": "1/49",
-            "fast_exif": "964"
+            "fast_exif": "1/197"
           },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "6086.763070"
+          "MeteringMode": {
+            "exiftool": "Evaluative",
+            "fast_exif": "Multi-segment"
           },
           "ISO": {
             "exiftool": 2000,
@@ -341,7 +295,7 @@
         }
       },
       "exiftool_count": 358,
-      "fast_exif_count": 63
+      "fast_exif_count": 64
     },
     "20191129_190108_.mp4": {
       "status": "success",
@@ -365,9 +319,11 @@
     "20241224_161213_.heic": {
       "status": "success",
       "file": "20241224_161213_.heic",
-      "match_rate": 52.94117647058824,
+      "match_rate": 64.70588235294117,
       "comparison": {
         "matches": {
+          "ShutterSpeedValue": "1/60",
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2024:12:24 16:12:14",
           "Make": "samsung",
@@ -381,27 +337,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "632"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 1.5,
-            "fast_exif": "1.2"
-          },
-          "ShutterSpeedValue": {
-            "exiftool": "1/60",
-            "fast_exif": "616"
+            "fast_exif": "1.5"
           },
           "MaxApertureValue": {
             "exiftool": 2.4,
-            "fast_exif": "2.5"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
+            "fast_exif": "2.4"
           },
           "ISO": {
             "exiftool": 800,
@@ -419,7 +367,7 @@
         }
       },
       "exiftool_count": 95,
-      "fast_exif_count": 52
+      "fast_exif_count": 56
     },
     "20230112_175209_.mp4": {
       "status": "success",
@@ -456,9 +404,11 @@
     "20221127_103642_.heic": {
       "status": "success",
       "file": "20221127_103642_.heic",
-      "match_rate": 52.94117647058824,
+      "match_rate": 64.70588235294117,
       "comparison": {
         "matches": {
+          "ShutterSpeedValue": "1/40",
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2022:11:27 10:36:42",
           "Make": "samsung",
@@ -472,27 +422,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "652"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 1.5,
-            "fast_exif": "1.2"
-          },
-          "ShutterSpeedValue": {
-            "exiftool": "1/40",
-            "fast_exif": "628"
+            "fast_exif": "1.5"
           },
           "MaxApertureValue": {
             "exiftool": 2.4,
-            "fast_exif": "2.5"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
+            "fast_exif": "2.4"
           },
           "ISO": {
             "exiftool": 200,
@@ -510,7 +452,7 @@
         }
       },
       "exiftool_count": 96,
-      "fast_exif_count": 53
+      "fast_exif_count": 57
     },
     "Tandem1_.png": {
       "status": "fast_exif_error"
@@ -524,24 +466,25 @@
         "differences": {},
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "FlashpixVersion": "0100",
-          "ExifVersion": "0220",
-          "ExposureMode": "Auto Exposure",
-          "CustomRendered": "Normal Process",
+          "FlashpixVersion": "d",
+          "ExifVersion": "",
+          "ExposureMode": "Auto",
+          "CustomRendered": "Normal",
           "Sharpness": "Normal",
-          "CompressedBitsPerPixel": "5",
           "WhiteBalance": "Auto"
         }
       },
       "exiftool_count": 55,
-      "fast_exif_count": 26
+      "fast_exif_count": 25
     },
     "20231126_174400(0)_.heic": {
       "status": "success",
       "file": "20231126_174400(0)_.heic",
-      "match_rate": 52.94117647058824,
+      "match_rate": 64.70588235294117,
       "comparison": {
         "matches": {
+          "ShutterSpeedValue": "1/40",
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2023:11:26 17:44:00",
           "Make": "samsung",
@@ -555,27 +498,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "652"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 2.4,
-            "fast_exif": "2.5"
-          },
-          "ShutterSpeedValue": {
-            "exiftool": "1/40",
-            "fast_exif": "628"
+            "fast_exif": "2.4"
           },
           "MaxApertureValue": {
             "exiftool": 2.4,
-            "fast_exif": "2.5"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
+            "fast_exif": "2.4"
           },
           "ISO": {
             "exiftool": 320,
@@ -593,16 +528,17 @@
         }
       },
       "exiftool_count": 97,
-      "fast_exif_count": 53
+      "fast_exif_count": 57
     },
     "20180529_133155-2_.jpg": {
       "status": "success",
       "file": "20180529_133155-2_.jpg",
-      "match_rate": 50.0,
+      "match_rate": 55.00000000000001,
       "comparison": {
         "matches": {
+          "ShutterSpeedValue": "1/41",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
-          "MeteringMode": "Evaluative",
           "DateTimeOriginal": "2018:05:29 13:31:55",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -615,35 +551,31 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "894"
+            "fast_exif": "0"
           },
           "FlashpixVersion": {
             "exiftool": "0100",
-            "fast_exif": "808464688"
+            "fast_exif": "d"
           },
           "ExifVersion": {
             "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 4.0,
             "fast_exif": "4.0"
           },
-          "ShutterSpeedValue": {
-            "exiftool": "1/41",
-            "fast_exif": "878"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
           "Sharpness": {
             "exiftool": 3,
             "fast_exif": "Normal"
           },
+          "MeteringMode": {
+            "exiftool": "Evaluative",
+            "fast_exif": "Multi-segment"
+          },
           "FocalPlaneResolutionUnit": {
             "exiftool": "inches",
-            "fast_exif": "6086.763070"
+            "fast_exif": "5472000"
           },
           "ISO": {
             "exiftool": 800,
@@ -662,14 +594,15 @@
         }
       },
       "exiftool_count": 362,
-      "fast_exif_count": 75
+      "fast_exif_count": 76
     },
     "20240125_114922_.heic": {
       "status": "success",
       "file": "20240125_114922_.heic",
-      "match_rate": 52.94117647058824,
+      "match_rate": 58.82352941176471,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2024:01:25 11:49:22",
           "Make": "samsung",
@@ -683,11 +616,11 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "632"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 1.9,
@@ -695,15 +628,11 @@
           },
           "ShutterSpeedValue": {
             "exiftool": "1/30",
-            "fast_exif": "616"
+            "fast_exif": "1/60"
           },
           "MaxApertureValue": {
             "exiftool": 1.9,
             "fast_exif": "1.9"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
           },
           "ISO": {
             "exiftool": 640,
@@ -721,14 +650,15 @@
         }
       },
       "exiftool_count": 103,
-      "fast_exif_count": 52
+      "fast_exif_count": 56
     },
     "20241224_205253_.heic": {
       "status": "success",
       "file": "20241224_205253_.heic",
-      "match_rate": 52.94117647058824,
+      "match_rate": 58.82352941176471,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2024:12:24 20:52:53",
           "Make": "samsung",
@@ -742,11 +672,11 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "632"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 1.9,
@@ -754,15 +684,11 @@
           },
           "ShutterSpeedValue": {
             "exiftool": "1/30",
-            "fast_exif": "616"
+            "fast_exif": "1/60"
           },
           "MaxApertureValue": {
             "exiftool": 1.9,
             "fast_exif": "1.9"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
           },
           "ISO": {
             "exiftool": 400,
@@ -780,14 +706,18 @@
         }
       },
       "exiftool_count": 96,
-      "fast_exif_count": 52
+      "fast_exif_count": 56
     },
     "R0011229_20190622202257_.JPG": {
       "status": "success",
       "file": "R0011229_20190622202257_.JPG",
-      "match_rate": 33.33333333333333,
+      "match_rate": 55.55555555555556,
       "comparison": {
         "matches": {
+          "ExposureCompensation": "-2/3",
+          "ExposureMode": "Auto",
+          "Sharpness": "Normal",
+          "MeteringMode": "Multi-segment",
           "DateTimeOriginal": "2019:06:22 20:22:57",
           "Make": "RICOH",
           "ExposureTime": "1/6",
@@ -796,17 +726,13 @@
           "Orientation": "Horizontal (normal)"
         },
         "differences": {
-          "ExposureCompensation": {
-            "exiftool": "-2/3",
-            "fast_exif": "748"
-          },
           "FlashpixVersion": {
             "exiftool": "0100",
-            "fast_exif": "808529968"
+            "fast_exif": "d"
           },
           "ExifVersion": {
             "exiftool": "0230",
-            "fast_exif": "808596272"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 2.0,
@@ -815,18 +741,6 @@
           "MaxApertureValue": {
             "exiftool": 2.1,
             "fast_exif": "2.1"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "Sharpness": {
-            "exiftool": "Normal",
-            "fast_exif": "0"
-          },
-          "MeteringMode": {
-            "exiftool": "Multi-segment",
-            "fast_exif": "Evaluative"
           },
           "Model": {
             "exiftool": "RICOH THETA V",
@@ -847,25 +761,26 @@
         },
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "CustomRendered": "Normal Process",
-          "CompressedBitsPerPixel": "5",
+          "CustomRendered": "Normal",
           "DateTime": "2019:06:22 20:22:57",
           "DateTimeDigitized": "2019:06:22 20:22:57"
         }
       },
       "exiftool_count": 104,
-      "fast_exif_count": 65
+      "fast_exif_count": 73
     },
     "20220210_145910_.heic": {
       "status": "success",
       "file": "20220210_145910_.heic",
-      "match_rate": 47.05882352941176,
+      "match_rate": 58.82352941176471,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
           "MeteringMode": "Spot",
           "DateTimeOriginal": "2022:02:10 14:59:11",
           "Make": "samsung",
           "Model": "SM-G970U",
+          "ExposureTime": "1/7295",
           "FocalLength": "4.3 mm",
           "Flash": "Fired",
           "WhiteBalance": "Auto",
@@ -874,27 +789,23 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "652"
+            "fast_exif": "0"
           },
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 1.5,
-            "fast_exif": "1.2"
+            "fast_exif": "1.5"
           },
           "ShutterSpeedValue": {
             "exiftool": "1/7281",
-            "fast_exif": "628"
+            "fast_exif": "1/40"
           },
           "MaxApertureValue": {
             "exiftool": 2.4,
-            "fast_exif": "2.5"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
+            "fast_exif": "2.4"
           },
           "ISO": {
             "exiftool": 50,
@@ -903,10 +814,6 @@
           "FNumber": {
             "exiftool": 1.5,
             "fast_exif": "1.5"
-          },
-          "ExposureTime": {
-            "exiftool": "1/7295",
-            "fast_exif": "1/5000"
           }
         },
         "missing_in_fast_exif": {},
@@ -916,7 +823,7 @@
         }
       },
       "exiftool_count": 96,
-      "fast_exif_count": 53
+      "fast_exif_count": 57
     },
     "Pasted image 20240919234906_.png": {
       "status": "fast_exif_error"
@@ -930,17 +837,16 @@
         "differences": {},
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "FlashpixVersion": "0100",
-          "ExifVersion": "0220",
-          "ExposureMode": "Auto Exposure",
-          "CustomRendered": "Normal Process",
+          "FlashpixVersion": "d",
+          "ExifVersion": "",
+          "ExposureMode": "Auto",
+          "CustomRendered": "Normal",
           "Sharpness": "Normal",
-          "CompressedBitsPerPixel": "5",
           "WhiteBalance": "Auto"
         }
       },
       "exiftool_count": 55,
-      "fast_exif_count": 26
+      "fast_exif_count": 25
     },
     "Tandem1_cut_.png": {
       "status": "fast_exif_error"
@@ -948,9 +854,12 @@
     "R0011357_20190624185401_.JPG": {
       "status": "success",
       "file": "R0011357_20190624185401_.JPG",
-      "match_rate": 33.33333333333333,
+      "match_rate": 50.0,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
+          "Sharpness": "Normal",
+          "MeteringMode": "Multi-segment",
           "DateTimeOriginal": "2019:06:24 18:54:01",
           "Make": "RICOH",
           "ExposureTime": "1/800",
@@ -961,15 +870,15 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": "-1/3",
-            "fast_exif": "748"
+            "fast_exif": "-2/3"
           },
           "FlashpixVersion": {
             "exiftool": "0100",
-            "fast_exif": "808529968"
+            "fast_exif": "d"
           },
           "ExifVersion": {
             "exiftool": "0230",
-            "fast_exif": "808596272"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 2.0,
@@ -978,18 +887,6 @@
           "MaxApertureValue": {
             "exiftool": 2.1,
             "fast_exif": "2.1"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "Sharpness": {
-            "exiftool": "Normal",
-            "fast_exif": "0"
-          },
-          "MeteringMode": {
-            "exiftool": "Multi-segment",
-            "fast_exif": "Evaluative"
           },
           "Model": {
             "exiftool": "RICOH THETA V",
@@ -1010,14 +907,13 @@
         },
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "CustomRendered": "Normal Process",
-          "CompressedBitsPerPixel": "5",
+          "CustomRendered": "Normal",
           "DateTime": "2019:06:24 18:54:01",
           "DateTimeDigitized": "2019:06:24 18:54:01"
         }
       },
       "exiftool_count": 100,
-      "fast_exif_count": 65
+      "fast_exif_count": 71
     },
     "20200520_113727_.mp4": {
       "status": "success",
@@ -1041,11 +937,15 @@
     "IMG_9618_.CR2": {
       "status": "success",
       "file": "IMG_9618_.CR2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 73.68421052631578,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0230",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
           "MeteringMode": "Spot",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2023:10:14 09:07:22",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -1058,31 +958,15 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": "-1/3",
-            "fast_exif": "980"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 5.7,
-            "fast_exif": "5.0"
+            "fast_exif": "5.7"
           },
           "ShutterSpeedValue": {
             "exiftool": "1/99",
-            "fast_exif": "964"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "6086.763070"
+            "fast_exif": "1/197"
           },
           "ISO": {
             "exiftool": 800,
@@ -1103,7 +987,7 @@
         }
       },
       "exiftool_count": 358,
-      "fast_exif_count": 63
+      "fast_exif_count": 64
     },
     "1737773471_.png": {
       "status": "fast_exif_error"
@@ -1111,11 +995,14 @@
     "IMG_9094_.CR2": {
       "status": "success",
       "file": "IMG_9094_.CR2",
-      "match_rate": 52.63157894736842,
+      "match_rate": 68.42105263157895,
       "comparison": {
         "matches": {
+          "FlashpixVersion": "0100",
+          "ExifVersion": "0230",
+          "ExposureMode": "Auto",
           "CustomRendered": "Normal",
-          "MeteringMode": "Evaluative",
+          "FocalPlaneResolutionUnit": "inches",
           "DateTimeOriginal": "2023:01:14 19:46:24",
           "Make": "Canon",
           "Model": "Canon EOS 70D",
@@ -1128,31 +1015,19 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": 0,
-            "fast_exif": "980"
-          },
-          "FlashpixVersion": {
-            "exiftool": "0100",
-            "fast_exif": "808464688"
-          },
-          "ExifVersion": {
-            "exiftool": "0230",
-            "fast_exif": "808661552"
+            "fast_exif": "0"
           },
           "ApertureValue": {
             "exiftool": 5.7,
-            "fast_exif": "5.0"
+            "fast_exif": "5.7"
           },
           "ShutterSpeedValue": {
             "exiftool": "1/8",
-            "fast_exif": "964"
+            "fast_exif": "1/197"
           },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "FocalPlaneResolutionUnit": {
-            "exiftool": "inches",
-            "fast_exif": "6086.763070"
+          "MeteringMode": {
+            "exiftool": "Evaluative",
+            "fast_exif": "Multi-segment"
           },
           "ISO": {
             "exiftool": 6400,
@@ -1173,7 +1048,7 @@
         }
       },
       "exiftool_count": 358,
-      "fast_exif_count": 63
+      "fast_exif_count": 64
     },
     "_e791fc6e-f966-4185-9da6-a51068bf0032_.jpeg": {
       "status": "success",
@@ -1184,17 +1059,16 @@
         "differences": {},
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "FlashpixVersion": "0100",
-          "ExifVersion": "0220",
-          "ExposureMode": "Auto Exposure",
-          "CustomRendered": "Normal Process",
+          "FlashpixVersion": "d",
+          "ExifVersion": "",
+          "ExposureMode": "Auto",
+          "CustomRendered": "Normal",
           "Sharpness": "Normal",
-          "CompressedBitsPerPixel": "5",
           "WhiteBalance": "Auto"
         }
       },
       "exiftool_count": 55,
-      "fast_exif_count": 26
+      "fast_exif_count": 25
     },
     "20200416_134547_.mp4": {
       "status": "success",
@@ -1215,9 +1089,10 @@
     "20191117_164632_.jpg": {
       "status": "success",
       "file": "20191117_164632_.jpg",
-      "match_rate": 64.28571428571429,
+      "match_rate": 71.42857142857143,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
           "MeteringMode": "Center-weighted average",
           "DateTimeOriginal": "2019:11:17 16:46:32",
           "Make": "samsung",
@@ -1231,15 +1106,11 @@
         "differences": {
           "ExifVersion": {
             "exiftool": "0220",
-            "fast_exif": "808596016"
+            "fast_exif": ""
           },
           "MaxApertureValue": {
             "exiftool": 1.9,
             "fast_exif": "1.9"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
           },
           "ISO": {
             "exiftool": 800,
@@ -1252,16 +1123,15 @@
         },
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "FlashpixVersion": "0100",
-          "CustomRendered": "Normal Process",
+          "FlashpixVersion": "d",
+          "CustomRendered": "Normal",
           "Sharpness": "Normal",
-          "CompressedBitsPerPixel": "5",
           "DateTime": "2019:11:17 16:46:32",
           "DateTimeDigitized": "2019:11:17 16:46:32"
         }
       },
       "exiftool_count": 73,
-      "fast_exif_count": 60
+      "fast_exif_count": 61
     },
     "trainspacecasinosatellite_Pumkin_Paladin_42_8aca3fd8-a868-49b1-867d-aa0225905c9b_.png": {
       "status": "fast_exif_error"
@@ -1291,9 +1161,12 @@
     "R0011359_20190624185411_.JPG": {
       "status": "success",
       "file": "R0011359_20190624185411_.JPG",
-      "match_rate": 33.33333333333333,
+      "match_rate": 50.0,
       "comparison": {
         "matches": {
+          "ExposureMode": "Auto",
+          "Sharpness": "Normal",
+          "MeteringMode": "Multi-segment",
           "DateTimeOriginal": "2019:06:24 18:54:11",
           "Make": "RICOH",
           "ExposureTime": "1/1000",
@@ -1304,15 +1177,15 @@
         "differences": {
           "ExposureCompensation": {
             "exiftool": "-1/3",
-            "fast_exif": "748"
+            "fast_exif": "-2/3"
           },
           "FlashpixVersion": {
             "exiftool": "0100",
-            "fast_exif": "808529968"
+            "fast_exif": "d"
           },
           "ExifVersion": {
             "exiftool": "0230",
-            "fast_exif": "808596272"
+            "fast_exif": ""
           },
           "ApertureValue": {
             "exiftool": 2.0,
@@ -1321,18 +1194,6 @@
           "MaxApertureValue": {
             "exiftool": 2.1,
             "fast_exif": "2.1"
-          },
-          "ExposureMode": {
-            "exiftool": "Auto",
-            "fast_exif": "Auto Exposure"
-          },
-          "Sharpness": {
-            "exiftool": "Normal",
-            "fast_exif": "0"
-          },
-          "MeteringMode": {
-            "exiftool": "Multi-segment",
-            "fast_exif": "Evaluative"
           },
           "Model": {
             "exiftool": "RICOH THETA V",
@@ -1353,68 +1214,55 @@
         },
         "missing_in_fast_exif": {},
         "extra_in_fast_exif": {
-          "CustomRendered": "Normal Process",
-          "CompressedBitsPerPixel": "5",
+          "CustomRendered": "Normal",
           "DateTime": "2019:06:24 18:54:11",
           "DateTimeDigitized": "2019:06:24 18:54:11"
         }
       },
       "exiftool_count": 100,
-      "fast_exif_count": 65
+      "fast_exif_count": 71
     }
   },
   "common_issues": [
     [
-      "ExifVersion",
-      18
-    ],
-    [
       "ISO",
       18
-    ],
-    [
-      "ExposureMode",
-      17
     ],
     [
       "FNumber",
       17
     ],
     [
-      "ExposureCompensation",
-      16
-    ],
-    [
       "ApertureValue",
       16
     ],
     [
-      "ShutterSpeedValue",
-      13
+      "ExposureCompensation",
+      15
     ],
     [
-      "FlashpixVersion",
-      11
+      "ExifVersion",
+      12
     ],
     [
       "MaxApertureValue",
       10
     ],
     [
-      "FocalPlaneResolutionUnit",
+      "ShutterSpeedValue",
       7
+    ],
+    [
+      "MeteringMode",
+      5
+    ],
+    [
+      "FlashpixVersion",
+      5
     ],
     [
       "Model",
       4
-    ],
-    [
-      "Sharpness",
-      4
-    ],
-    [
-      "MeteringMode",
-      3
     ],
     [
       "Flash",
@@ -1425,7 +1273,11 @@
       2
     ],
     [
-      "ExposureTime",
+      "Sharpness",
+      1
+    ],
+    [
+      "FocalPlaneResolutionUnit",
       1
     ]
   ]

@@ -148,24 +148,36 @@ impl RawParser {
     
     /// Fix problematic fields directly in add_computed_fields
     fn fix_problematic_fields_directly(metadata: &mut HashMap<String, String>) {
-        // Fix version fields that are showing raw integer values
+        // Fix version fields that are showing raw integer values or corrupted single characters
         if let Some(value) = metadata.get("FlashpixVersion").cloned() {
-            // Only fix if the value looks like a raw number (not a formatted version string)
-            // Version strings are 4 characters starting with 0 (like "0100"), raw numbers are shorter
-            if value.len() < 4 || !value.starts_with('0') {
+            // Only fix if the value looks like a raw number or corrupted single character
+            // Valid version strings are 4 characters starting with 0 (like "0100")
+            // Corrupted values are single characters like "d" or short numbers
+            if value.len() == 1 || (value.len() < 4 && !value.starts_with('0')) {
                 if let Ok(raw_val) = value.parse::<u32>() {
                     let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try to reconstruct from ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
                     metadata.insert("FlashpixVersion".to_string(), version_string);
                 }
             }
         }
         
         if let Some(value) = metadata.get("ExifVersion").cloned() {
-            // Only fix if the value looks like a raw number (not a formatted version string)
-            // Version strings are 4 characters starting with 0 (like "0221"), raw numbers are shorter
-            if value.len() < 4 || !value.starts_with('0') {
+            // Only fix if the value looks like a raw number or corrupted single character
+            // Valid version strings are 4 characters starting with 0 (like "0220")
+            // Corrupted values are single characters or short numbers
+            if value.len() == 1 || (value.len() < 4 && !value.starts_with('0')) {
                 if let Ok(raw_val) = value.parse::<u32>() {
                     let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try to reconstruct from ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
                     metadata.insert("ExifVersion".to_string(), version_string);
                 }
             }
@@ -240,23 +252,35 @@ impl RawParser {
     
     /// Fix version fields (FlashpixVersion, ExifVersion) showing raw values
     fn fix_version_fields(metadata: &mut HashMap<String, String>) {
-        // Fix FlashpixVersion
+        // Fix FlashpixVersion - only fix if it's clearly corrupted (single character or empty)
         if let Some(value) = metadata.get("FlashpixVersion") {
-            // Only fix if the value looks like a raw number or single character
-            if value.len() <= 2 && !value.chars().all(|c| c.is_ascii_digit() || c == '.') {
+            // Only fix if the value is clearly corrupted (single character, empty, or very short)
+            if value.len() == 1 || value.is_empty() {
+                // Try to parse as raw value and convert
                 if let Ok(raw_val) = value.parse::<u32>() {
                     let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
                     metadata.insert("FlashpixVersion".to_string(), version_string);
                 }
             }
         }
 
-        // Fix ExifVersion
+        // Fix ExifVersion - only fix if it's clearly corrupted (single character or empty)
         if let Some(value) = metadata.get("ExifVersion") {
-            // Only fix if the value looks like a raw number or single character
-            if value.len() <= 2 && !value.chars().all(|c| c.is_ascii_digit() || c == '.') {
+            // Only fix if the value is clearly corrupted (single character, empty, or very short)
+            if value.len() == 1 || value.is_empty() {
+                // Try to parse as raw value and convert
                 if let Ok(raw_val) = value.parse::<u32>() {
                     let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
                     metadata.insert("ExifVersion".to_string(), version_string);
                 }
             }

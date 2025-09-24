@@ -246,10 +246,8 @@ impl TiffParser {
                 if count == 1 {
                     // Special handling for version fields
                     if tag_id == 0xA000 || tag_id == 0x9000 { // FlashpixVersion or ExifVersion
-                        // Convert 4-byte version field to hex string
-                        eprintln!("DEBUG: Version field {} value_offset: 0x{:08X}", tag_name, value_offset);
+                        // Convert 4-byte version field to ASCII string
                         let version_string = Self::format_version_field(value_offset, is_little_endian);
-                        eprintln!("DEBUG: Version field {} result: '{}'", tag_name, version_string);
                         metadata.insert(tag_name, version_string);
                     } else if tag_id == 0xA402 { // ExposureMode as LONG
                         let formatted_value = Self::format_special_field(tag_id, value_offset as u16);

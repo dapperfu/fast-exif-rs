@@ -37,7 +37,7 @@ impl JpegParser {
     }
     
     /// Find JPEG EXIF segment in data
-    pub fn find_jpeg_exif_segment(data: &[u8]) -> Option<&[u8]> {
+    pub fn find_jpeg_exif_segment<'a>(data: &'a [u8]) -> Option<&'a [u8]> {
         // Look for APP1 segment (0xFFE1) containing EXIF
         let mut pos = 2;
         
@@ -250,7 +250,7 @@ impl JpegParser {
     
     /// Add additional computed fields that exiftool provides
     fn add_additional_computed_fields(metadata: &mut HashMap<String, String>) {
-        // Add FlashpixVersion if not present
+        // Add FlashpixVersion if not present (don't override existing values)
         if !metadata.contains_key("FlashpixVersion") {
             metadata.insert("FlashpixVersion".to_string(), "0100".to_string());
         }
@@ -272,7 +272,7 @@ impl JpegParser {
         
                 // CompressedBitsPerPixel should only be added if present in EXIF data
         
-                // Add ExifVersion if not present
+                // Add ExifVersion if not present (don't override existing values)
                 if !metadata.contains_key("ExifVersion") {
                     metadata.insert("ExifVersion".to_string(), "0220".to_string());
                 }
@@ -355,19 +355,37 @@ impl JpegParser {
     
     /// Fix version fields (FlashpixVersion, ExifVersion) showing raw values
     fn fix_version_fields(metadata: &mut HashMap<String, String>) {
-        // Fix FlashpixVersion
+        // Fix FlashpixVersion - only fix if it's clearly corrupted (single character or empty)
         if let Some(value) = metadata.get("FlashpixVersion") {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                metadata.insert("FlashpixVersion".to_string(), version_string);
+            // Only fix if the value is clearly corrupted (single character, empty, or very short)
+            if value.len() == 1 || value.is_empty() {
+                // Try to parse as raw value and convert
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                }
             }
         }
         
-        // Fix ExifVersion
+        // Fix ExifVersion - only fix if it's clearly corrupted (single character or empty)
         if let Some(value) = metadata.get("ExifVersion") {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                metadata.insert("ExifVersion".to_string(), version_string);
+            // Only fix if the value is clearly corrupted (single character, empty, or very short)
+            if value.len() == 1 || value.is_empty() {
+                // Try to parse as raw value and convert
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                } else if value.len() == 1 {
+                    // Single character corruption - try ASCII value
+                    let ascii_val = value.chars().next().unwrap() as u32;
+                    let version_string = Self::format_version_field_from_raw(ascii_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                }
             }
         }
     }
