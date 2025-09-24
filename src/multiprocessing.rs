@@ -111,7 +111,13 @@ impl MultiprocessingExifReader {
             let mut result_map = HashMap::new();
 
             // Add statistics
-            result_map.insert("stats".to_string(), stats.into_pyobject(py).map_err(|e| ExifError::InvalidExif(e.to_string()))?.into());
+            result_map.insert(
+                "stats".to_string(),
+                stats
+                    .into_pyobject(py)
+                    .map_err(|e| ExifError::InvalidExif(e.to_string()))?
+                    .into(),
+            );
 
             // Add individual results
             for result in results {
@@ -119,7 +125,13 @@ impl MultiprocessingExifReader {
                     "file_{}",
                     result.file_path.replace("/", "_").replace("\\", "_")
                 );
-                result_map.insert(file_key, result.into_pyobject(py).map_err(|e| ExifError::InvalidExif(e.to_string()))?.into());
+                result_map.insert(
+                    file_key,
+                    result
+                        .into_pyobject(py)
+                        .map_err(|e| ExifError::InvalidExif(e.to_string()))?
+                        .into(),
+                );
             }
 
             Ok(result_map)
