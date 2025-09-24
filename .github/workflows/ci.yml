@@ -106,10 +106,10 @@ jobs:
       run: cargo clippy -- -D warnings
 
     - name: Format check (Python)
-      run: black --check python/ tests/ examples/
+      run: black --check tests/ examples/ cli/
 
     - name: Lint check (Python)
-      run: flake8 python/ tests/ examples/
+      run: flake8 tests/ examples/ cli/
 
   security:
     name: Security Audit
@@ -119,9 +119,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
+        components: rustfmt, clippy
 
     - name: Install Python
       uses: actions/setup-python@v4
