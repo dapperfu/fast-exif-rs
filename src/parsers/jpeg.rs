@@ -267,10 +267,7 @@ impl JpegParser {
             metadata.insert("InteropVersion".to_string(), "0100".to_string());
         }
         
-                // Add CompressedBitsPerPixel if not present
-                if !metadata.contains_key("CompressedBitsPerPixel") {
-                    metadata.insert("CompressedBitsPerPixel".to_string(), "5".to_string());
-                }
+                // CompressedBitsPerPixel should only be added if present in EXIF data
         
                 // Add ExifVersion if not present
                 if !metadata.contains_key("ExifVersion") {
