@@ -274,7 +274,7 @@ impl VideoParser {
         // Add computed fields that exiftool provides
         
         // File information
-        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.1.0".to_string());
+        metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
         
         // Determine file type extension based on format
         if let Some(format) = metadata.get("Format") {
