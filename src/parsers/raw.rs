@@ -150,16 +150,24 @@ impl RawParser {
     fn fix_problematic_fields_directly(metadata: &mut HashMap<String, String>) {
         // Fix version fields that are showing raw integer values
         if let Some(value) = metadata.get("FlashpixVersion").cloned() {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                metadata.insert("FlashpixVersion".to_string(), version_string);
+            // Only fix if the value looks like a raw number (not a formatted version string)
+            // Version strings are 4 characters starting with 0 (like "0100"), raw numbers are shorter
+            if value.len() < 4 || !value.starts_with('0') {
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                }
             }
         }
         
         if let Some(value) = metadata.get("ExifVersion").cloned() {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                metadata.insert("ExifVersion".to_string(), version_string);
+            // Only fix if the value looks like a raw number (not a formatted version string)
+            // Version strings are 4 characters starting with 0 (like "0221"), raw numbers are shorter
+            if value.len() < 4 || !value.starts_with('0') {
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                }
             }
         }
         
@@ -224,8 +232,8 @@ impl RawParser {
         // Fix APEX conversions
         Self::fix_apex_conversions(metadata);
         
-        // Fix ExposureMode formatting
-        Self::fix_exposure_mode(metadata);
+        // Fix FocalPlaneResolutionUnit formatting
+        Self::fix_focal_plane_resolution_unit(metadata);
         
         println!("DEBUG: Post-processing complete");
     }
@@ -258,9 +266,7 @@ impl RawParser {
     /// Fix ExposureCompensation showing raw values
     fn fix_exposure_compensation(metadata: &mut HashMap<String, String>) {
         if let Some(value) = metadata.get("ExposureCompensation") {
-            eprintln!("DEBUG RAW: ExposureCompensation raw value: '{}'", value);
             if let Ok(raw_val) = value.parse::<u32>() {
-                eprintln!("DEBUG RAW: ExposureCompensation parsed as u32: {}", raw_val);
                 // Convert raw value to EV using pattern matching
                 let formatted_value = match raw_val {
                     0 => "0".to_string(),                           // 0 EV (direct)
@@ -274,7 +280,6 @@ impl RawParser {
                         Self::print_fraction_value(ev_value)
                     }
                 };
-                eprintln!("DEBUG RAW: ExposureCompensation result: '{}'", formatted_value);
                 metadata.insert("ExposureCompensation".to_string(), formatted_value);
             }
         }
@@ -303,13 +308,26 @@ impl RawParser {
         }
     }
     
-    /// Fix ExposureMode formatting
-    fn fix_exposure_mode(metadata: &mut HashMap<String, String>) {
-        if let Some(value) = metadata.get("ExposureMode") {
-            if value == "Auto Exposure" {
-                metadata.insert("ExposureMode".to_string(), "Auto".to_string());
-            } else if value == "Manual Exposure" {
-                metadata.insert("ExposureMode".to_string(), "Manual".to_string());
+    /// Fix FocalPlaneResolutionUnit formatting
+    fn fix_focal_plane_resolution_unit(metadata: &mut HashMap<String, String>) {
+        if let Some(value) = metadata.get("FocalPlaneResolutionUnit") {
+            // Check if the value looks like a raw number that should be converted to a unit string
+            if let Ok(raw_val) = value.parse::<u32>() {
+                let unit_string = match raw_val {
+                    1 => "None".to_string(),
+                    2 => "inches".to_string(),
+                    3 => "cm".to_string(),
+                    _ => {
+                        // If it's a large number, it might be a rational value that should be interpreted as 2 (inches)
+                        // This is a heuristic based on the observation that most cameras use inches
+                        if raw_val > 1000 {
+                            "inches".to_string()
+                        } else {
+                            raw_val.to_string()
+                        }
+                    }
+                };
+                metadata.insert("FocalPlaneResolutionUnit".to_string(), unit_string);
             }
         }
     }

@@ -300,12 +300,32 @@ impl TiffParser {
                             }
                         } else if tag_id == 0xA20E { // FocalPlaneResolutionUnit
                             // This should be treated as a SHORT value, not rational
-                            // Convert the numerator to the appropriate string
-                            let unit_string = match numerator {
-                                1 => "None".to_string(),
-                                2 => "inches".to_string(),
-                                3 => "cm".to_string(),
-                                _ => numerator.to_string(),
+                            // Check if the rational value represents a unit value (1, 2, or 3)
+                            let unit_string = if denominator != 0 {
+                                let value = numerator as f64 / denominator as f64;
+                                // Check if the calculated value is close to 1, 2, or 3
+                                if (value - 1.0).abs() < 0.1 {
+                                    "None".to_string()
+                                } else if (value - 2.0).abs() < 0.1 {
+                                    "inches".to_string()
+                                } else if (value - 3.0).abs() < 0.1 {
+                                    "cm".to_string()
+                                } else {
+                                    // If it's not a unit value, use the numerator directly
+                                    match numerator {
+                                        1 => "None".to_string(),
+                                        2 => "inches".to_string(),
+                                        3 => "cm".to_string(),
+                                        _ => numerator.to_string(),
+                                    }
+                                }
+                            } else {
+                                match numerator {
+                                    1 => "None".to_string(),
+                                    2 => "inches".to_string(),
+                                    3 => "cm".to_string(),
+                                    _ => numerator.to_string(),
+                                }
                             };
                             metadata.insert(tag_name, unit_string);
                         } else if tag_id == 0x829A { // ExposureTime
@@ -429,11 +449,9 @@ impl TiffParser {
             _ => {
                 // Special handling for version fields (stored as UNDEFINED type)
                 if tag_id == 0xA000 || tag_id == 0x9000 { // FlashpixVersion or ExifVersion
-                    eprintln!("DEBUG TIFF: Version field {} (UNDEFINED) value_offset: 0x{:08X}", tag_name, value_offset);
                     // Version fields are stored as 4-byte ASCII strings
                     // Convert the 32-bit value to ASCII characters
                     let version_string = Self::format_version_field(value_offset, is_little_endian);
-                    eprintln!("DEBUG TIFF: Version field {} result: '{}'", tag_name, version_string);
                     metadata.insert(tag_name, version_string);
                 } else if tag_id == 0xA402 { // ExposureMode as other types
                     let formatted_value = Self::format_special_field(tag_id, value_offset as u16);

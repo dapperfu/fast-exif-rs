@@ -24,6 +24,7 @@ import json
 # Import our fast EXIF reader
 try:
     from fast_exif_reader import FastExifReader
+    from fast_exif_reader import __version__
 except ImportError:
     click.echo("Error: fast_exif_reader module not found. Please install the package first.", err=True)
     sys.exit(1)
@@ -89,7 +90,7 @@ class ExifFormatter:
         """JSON format"""
         output = {
             "SourceFile": filename,
-            "ExifToolVersion": "fast-exif-cli 0.1.0",
+            "ExifToolVersion": f"fast-exif-cli {__version__}",
             **metadata
         }
         return json.dumps(output, indent=2)
@@ -115,7 +116,7 @@ class ExifFormatter:
               help='Process directories recursively')
 @click.option('--ext', 'extensions', multiple=True,
               help='File extensions to process (e.g., --ext jpg --ext cr2)')
-@click.version_option(version='0.1.0', prog_name='fast-exif-cli', message='%(prog)s version %(version)s')
+@click.version_option(version=__version__, prog_name='fast-exif-cli', message='%(prog)s version %(version)s')
 def main(files: tuple, output_format: str, verbose: bool, quiet: bool, 
          recursive: bool, extensions: tuple):
     """
