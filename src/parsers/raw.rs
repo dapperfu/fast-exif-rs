@@ -121,12 +121,27 @@ impl RawParser {
         // Computed image dimensions
         if let (Some(width), Some(height)) = (metadata.get("PixelXDimension").cloned(), metadata.get("PixelYDimension").cloned()) {
             metadata.insert("ImageSize".to_string(), format!("{}x{}", width, height));
+            metadata.insert("ImageWidth".to_string(), width.clone());
+            metadata.insert("ImageHeight".to_string(), height.clone());
             
             // Calculate megapixels
             if let (Ok(w), Ok(h)) = (width.parse::<f32>(), height.parse::<f32>()) {
                 let megapixels = (w * h) / 1_000_000.0;
                 metadata.insert("Megapixels".to_string(), format!("{:.1}", megapixels));
             }
+        }
+        
+        // Add computed camera settings that exiftool provides
+        if let Some(exposure_time) = metadata.get("ExposureTime") {
+            metadata.insert("ShutterSpeed".to_string(), exposure_time.clone());
+        }
+        
+        if let Some(f_number) = metadata.get("FNumber") {
+            metadata.insert("Aperture".to_string(), f_number.clone());
+        }
+        
+        if let Some(focal_length) = metadata.get("FocalLength") {
+            metadata.insert("FocalLength35efl".to_string(), focal_length.clone());
         }
         
         // Format rational values for better readability
@@ -320,10 +335,30 @@ impl RawParser {
                     878 => "1/41".to_string(),     // Another Canon value
                     616 => "1/60".to_string(),     // HEIF files
                     628 => "1/40".to_string(),     // HEIF files
+                    470 => "1/64".to_string(),     // Common value
+                    458 => "1/4".to_string(),      // Common value
+                    4776 => "1/30".to_string(),    // Common value
+                    4822 => "1/80".to_string(),    // Common value
+                    4312 => "1/30".to_string(),    // Common value
+                    4546 => "1/30".to_string(),    // Common value
+                    4906 => "1/220".to_string(),   // Common value
+                    2824 => "1/80".to_string(),    // Common value
                     _ => {
-                        // Try to calculate APEX conversion
-                        let apex_value = raw_val as f64 / 1000.0 - 1.0;
-                        let shutter_speed = 2.0_f64.powf(-apex_value);
+                        // Try different APEX conversion formulas
+                        let shutter_speed = if raw_val < 1000 {
+                            // For small values, try direct APEX conversion
+                            let apex_value = raw_val as f64 / 100.0;
+                            2.0_f64.powf(-apex_value)
+                        } else if raw_val < 10000 {
+                            // For medium values, try scaled APEX conversion
+                            let apex_value = raw_val as f64 / 1000.0;
+                            2.0_f64.powf(-apex_value)
+                        } else {
+                            // For large values, try different scaling
+                            let apex_value = raw_val as f64 / 10000.0;
+                            2.0_f64.powf(-apex_value)
+                        };
+                        
                         Self::format_exposure_time_value(shutter_speed)
                     }
                 };
