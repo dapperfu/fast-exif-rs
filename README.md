@@ -8,9 +8,9 @@ Fast EXIF Reader solves a simple problem: **reading metadata from images should 
 
 *"I'll just rewrite ExifTool in Rust, it'll be a quick weekend project"* - Famous last words of every developer who thought they could improve on Phil Harvey's masterpiece. 
 
-*Rick Sanchez voice:* "Twenty minutes, Morty. Quick in and out adventure. Just gonna rewrite ExifTool in Rust, in and out, twenty minutes."
+![Rick and Morty 20-minute adventure meme](.img/20-minute-adventure-rick-morty-meme-template-regular-779df9ce.jpg){width=50%}
 
-*Three months later:* Still parsing TIFF headers and debugging endianness issues at 3 AM.
+*Rick Sanchez voice:* "Twenty minutes, Morty. Quick in and out adventure. Just gonna rewrite ExifTool in Rust, in and out, twenty minutes."
 
 Well, here we are, completely vibing with memory safety and zero-copy parsing while ExifTool is still chugging along with Perl like it's 1995. 
 
