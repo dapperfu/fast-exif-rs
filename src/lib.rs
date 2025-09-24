@@ -1652,12 +1652,14 @@ impl FastExifReader {
             // Camera settings
             0x829A => { // ExposureTime
                 if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("ExposureTime".to_string(), value);
+                    let formatted = self.format_exposure_time(&value);
+                    metadata.insert("ExposureTime".to_string(), formatted);
                 }
             },
             0x829D => { // FNumber
                 if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("FNumber".to_string(), value);
+                    let formatted = self.format_f_number(&value);
+                    metadata.insert("FNumber".to_string(), formatted);
                 }
             },
             0x8827 => { // ISOSpeedRatings
@@ -1667,7 +1669,8 @@ impl FastExifReader {
             },
             0x920A => { // FocalLength
                 if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("FocalLength".to_string(), value);
+                    let formatted = self.format_focal_length(&value);
+                    metadata.insert("FocalLength".to_string(), formatted);
                 }
             },
             0x9201 => { // ShutterSpeedValue
@@ -1724,22 +1727,26 @@ impl FastExifReader {
             },
             0x0112 => { // Orientation
                 if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("Orientation".to_string(), value.to_string());
+                    let formatted = self.format_orientation(value);
+                    metadata.insert("Orientation".to_string(), formatted);
                 }
             },
             0x011A => { // XResolution
                 if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("XResolution".to_string(), value);
+                    let formatted = self.format_resolution(&value);
+                    metadata.insert("XResolution".to_string(), formatted);
                 }
             },
             0x011B => { // YResolution
                 if let Some(value) = self.read_rational_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("YResolution".to_string(), value);
+                    let formatted = self.format_resolution(&value);
+                    metadata.insert("YResolution".to_string(), formatted);
                 }
             },
             0x0128 => { // ResolutionUnit
                 if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("ResolutionUnit".to_string(), value.to_string());
+                    let formatted = self.format_resolution_unit(value);
+                    metadata.insert("ResolutionUnit".to_string(), formatted);
                 }
             },
             
@@ -1776,7 +1783,8 @@ impl FastExifReader {
             },
             0xA401 => { // CustomRendered
                 if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("CustomRendered".to_string(), value.to_string());
+                    let formatted = self.format_custom_rendered(value);
+                    metadata.insert("CustomRendered".to_string(), formatted);
                 }
             },
             0xA402 => { // ExposureMode
@@ -1873,7 +1881,8 @@ impl FastExifReader {
             },
             0x0103 => { // Compression
                 if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("Compression".to_string(), value.to_string());
+                    let formatted = self.format_compression(value);
+                    metadata.insert("Compression".to_string(), formatted);
                 }
             },
             0x0106 => { // PhotometricInterpretation
@@ -2095,7 +2104,8 @@ impl FastExifReader {
             },
             0xA001 => { // ColorSpace
                 if let Some(value) = self.read_u16_value(data, tiff_start + value_offset as usize, is_little_endian) {
-                    metadata.insert("ColorSpace".to_string(), value.to_string());
+                    let formatted = self.format_color_space(value);
+                    metadata.insert("ColorSpace".to_string(), formatted);
                 }
             },
             0xA002 => { // PixelXDimension
@@ -2254,6 +2264,151 @@ impl FastExifReader {
         }
     }
     
+    fn format_exposure_time(&self, rational_str: &str) -> String {
+        if rational_str.contains("/") {
+            let parts: Vec<&str> = rational_str.split('/').collect();
+            if parts.len() == 2 {
+                if let (Ok(num), Ok(den)) = (parts[0].parse::<f32>(), parts[1].parse::<f32>()) {
+                    if den != 0.0 {
+                        let value = num / den;
+                        if value >= 1.0 {
+                            format!("{:.1} s", value)
+                        } else if value > 0.0 {
+                            format!("1/{:.0}", 1.0 / value)
+                        } else {
+                            rational_str.to_string()
+                        }
+                    } else {
+                        rational_str.to_string()
+                    }
+                } else {
+                    rational_str.to_string()
+                }
+            } else {
+                rational_str.to_string()
+            }
+        } else {
+            rational_str.to_string()
+        }
+    }
+    
+    fn format_focal_length(&self, rational_str: &str) -> String {
+        if rational_str.contains("/") {
+            let parts: Vec<&str> = rational_str.split('/').collect();
+            if parts.len() == 2 {
+                if let (Ok(num), Ok(den)) = (parts[0].parse::<f32>(), parts[1].parse::<f32>()) {
+                    if den != 0.0 {
+                        let value = num / den;
+                        format!("{:.1} mm", value)
+                    } else {
+                        rational_str.to_string()
+                    }
+                } else {
+                    rational_str.to_string()
+                }
+            } else {
+                rational_str.to_string()
+            }
+        } else {
+            rational_str.to_string()
+        }
+    }
+    
+    fn format_f_number(&self, rational_str: &str) -> String {
+        if rational_str.contains("/") {
+            let parts: Vec<&str> = rational_str.split('/').collect();
+            if parts.len() == 2 {
+                if let (Ok(num), Ok(den)) = (parts[0].parse::<f32>(), parts[1].parse::<f32>()) {
+                    if den != 0.0 {
+                        let value = num / den;
+                        format!("{:.1}", value)
+                    } else {
+                        rational_str.to_string()
+                    }
+                } else {
+                    rational_str.to_string()
+                }
+            } else {
+                rational_str.to_string()
+            }
+        } else {
+            rational_str.to_string()
+        }
+    }
+    
+    fn format_resolution(&self, rational_str: &str) -> String {
+        if rational_str.contains("/") {
+            let parts: Vec<&str> = rational_str.split('/').collect();
+            if parts.len() == 2 {
+                if let (Ok(num), Ok(den)) = (parts[0].parse::<f32>(), parts[1].parse::<f32>()) {
+                    if den != 0.0 {
+                        let value = num / den;
+                        if value == value.floor() {
+                            format!("{:.0}", value)
+                        } else {
+                            format!("{:.1}", value)
+                        }
+                    } else {
+                        rational_str.to_string()
+                    }
+                } else {
+                    rational_str.to_string()
+                }
+            } else {
+                rational_str.to_string()
+            }
+        } else {
+            rational_str.to_string()
+        }
+    }
+    
+    fn format_resolution_unit(&self, value: u16) -> String {
+        match value {
+            1 => "None".to_string(),
+            2 => "inches".to_string(),
+            3 => "centimeters".to_string(),
+            _ => value.to_string(),
+        }
+    }
+    
+    fn format_color_space(&self, value: u16) -> String {
+        match value {
+            1 => "sRGB".to_string(),
+            65535 => "Uncalibrated".to_string(),
+            _ => value.to_string(),
+        }
+    }
+    
+    fn format_compression(&self, value: u16) -> String {
+        match value {
+            1 => "Uncompressed".to_string(),
+            6 => "JPEG (old-style)".to_string(),
+            _ => value.to_string(),
+        }
+    }
+    
+    fn format_custom_rendered(&self, value: u16) -> String {
+        match value {
+            0 => "Normal".to_string(),
+            1 => "Custom".to_string(),
+            _ => value.to_string(),
+        }
+    }
+    
+    fn format_orientation(&self, value: u16) -> String {
+        match value {
+            1 => "Horizontal (normal)".to_string(),
+            2 => "Mirror horizontal".to_string(),
+            3 => "Rotate 180".to_string(),
+            4 => "Mirror vertical".to_string(),
+            5 => "Mirror horizontal and rotate 270 CW".to_string(),
+            6 => "Rotate 90 CW".to_string(),
+            7 => "Mirror horizontal and rotate 90 CW".to_string(),
+            8 => "Rotate 270 CW".to_string(),
+            _ => value.to_string(),
+        }
+    }
+    
     fn read_u16_value(&self, data: &[u8], offset: usize, is_little_endian: bool) -> Option<u16> {
         if offset + 2 > data.len() {
             return None;
@@ -2329,7 +2484,8 @@ impl FastExifReader {
                     // Try to read the DNG version
                     if i + 10 < data.len() {
                         let version_bytes = &data[i+8..i+12];
-                        let version = u32::from_le_bytes([
+                        // DNG version is stored in big-endian format
+                        let version = u32::from_be_bytes([
                             version_bytes[0], version_bytes[1], 
                             version_bytes[2], version_bytes[3]
                         ]);
