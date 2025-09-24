@@ -234,23 +234,23 @@ impl RawParser {
     fn fix_version_fields(metadata: &mut HashMap<String, String>) {
         // Fix FlashpixVersion
         if let Some(value) = metadata.get("FlashpixVersion") {
-            eprintln!("DEBUG RAW: FlashpixVersion raw value: '{}'", value);
-            if let Ok(raw_val) = value.parse::<u32>() {
-                eprintln!("DEBUG RAW: FlashpixVersion parsed as u32: 0x{:08X}", raw_val);
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                eprintln!("DEBUG RAW: FlashpixVersion result: '{}'", version_string);
-                metadata.insert("FlashpixVersion".to_string(), version_string);
+            // Only fix if the value looks like a raw number or single character
+            if value.len() <= 2 && !value.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("FlashpixVersion".to_string(), version_string);
+                }
             }
         }
 
         // Fix ExifVersion
         if let Some(value) = metadata.get("ExifVersion") {
-            eprintln!("DEBUG RAW: ExifVersion raw value: '{}'", value);
-            if let Ok(raw_val) = value.parse::<u32>() {
-                eprintln!("DEBUG RAW: ExifVersion parsed as u32: 0x{:08X}", raw_val);
-                let version_string = Self::format_version_field_from_raw(raw_val);
-                eprintln!("DEBUG RAW: ExifVersion result: '{}'", version_string);
-                metadata.insert("ExifVersion".to_string(), version_string);
+            // Only fix if the value looks like a raw number or single character
+            if value.len() <= 2 && !value.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                if let Ok(raw_val) = value.parse::<u32>() {
+                    let version_string = Self::format_version_field_from_raw(raw_val);
+                    metadata.insert("ExifVersion".to_string(), version_string);
+                }
             }
         }
     }
@@ -263,6 +263,7 @@ impl RawParser {
                 eprintln!("DEBUG RAW: ExposureCompensation parsed as u32: {}", raw_val);
                 // Convert raw value to EV using pattern matching
                 let formatted_value = match raw_val {
+                    0 => "0".to_string(),                           // 0 EV (direct)
                     980 | 924 | 894 => "0".to_string(),           // 0 EV
                     632 | 652 => "0".to_string(),                  // 0 EV (different cameras)
                     748 => "-2/3".to_string(),                     // -2/3 EV
