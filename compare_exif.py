@@ -43,7 +43,7 @@ def find_files_by_year():
     
     return files_by_year
 
-def select_files(files_by_year, num_files=100):
+def select_files(files_by_year, num_files=1000):
     """Select files equally spaced between 2001-2025"""
     years = sorted(files_by_year.keys())
     files_per_year = num_files // len(years)
@@ -177,21 +177,23 @@ def analyze_results(results):
 
 def main():
     print("=== EXIF Tool Comparison: exiftool vs fast-exif-rs ===")
-    print("Selecting 100 files equally spaced between 2001-2025...")
+    print("Selecting 1000 files equally spaced between 2001-2025...")
     
     # Find files by year
     files_by_year = find_files_by_year()
     print(f"Found files in years: {sorted(files_by_year.keys())}")
     
     # Select files
-    selected_files = select_files(files_by_year, 100)
+    selected_files = select_files(files_by_year, 1000)
     print(f"Selected {len(selected_files)} files for comparison")
     
     # Compare files
     results = []
     
     for i, file_path in enumerate(selected_files, 1):
-        print(f"\n[{i}/100] Processing: {file_path.name}")
+        # Progress reporting every 50 files
+        if i % 50 == 0 or i == 1:
+            print(f"\n[{i}/{len(selected_files)}] Processing: {file_path.name}")
         
         # Run exiftool
         exif_data, exif_error = run_exiftool(file_path)
@@ -217,14 +219,15 @@ def main():
         
         results.append(result)
         
-        # Print brief summary
-        if exif_data and fast_data:
-            common_fields = len(comparison['common_fields'])
-            value_matches = comparison['value_matches']
-            value_diffs = len(comparison['value_differences'])
-            print(f"  Common fields: {common_fields}, Value matches: {value_matches}, Differences: {value_diffs}")
-        else:
-            print(f"  exiftool: {'✓' if exif_data else '✗'}, fast-exif-rs: {'✓' if fast_data else '✗'}")
+        # Print brief summary every 50 files
+        if i % 50 == 0 or i == 1:
+            if exif_data and fast_data:
+                common_fields = len(comparison['common_fields'])
+                value_matches = comparison['value_matches']
+                value_diffs = len(comparison['value_differences'])
+                print(f"  Common fields: {common_fields}, Value matches: {value_matches}, Differences: {value_diffs}")
+            else:
+                print(f"  exiftool: {'✓' if exif_data else '✗'}, fast-exif-rs: {'✓' if fast_data else '✗'}")
     
     # Analyze results
     print("\n" + "="*60)
