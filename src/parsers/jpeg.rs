@@ -289,12 +289,12 @@ impl JpegParser {
         
         // Add CustomRendered if not present
         if !metadata.contains_key("CustomRendered") {
-            metadata.insert("CustomRendered".to_string(), "Normal Process".to_string());
+            metadata.insert("CustomRendered".to_string(), "Normal".to_string());
         }
         
         // Add ExposureMode if not present
         if !metadata.contains_key("ExposureMode") {
-            metadata.insert("ExposureMode".to_string(), "Auto Exposure".to_string());
+            metadata.insert("ExposureMode".to_string(), "Auto".to_string());
         }
         
         // Add WhiteBalance if not present
@@ -417,7 +417,7 @@ impl JpegParser {
         
         // Fix ApertureValue (less common issue)
         if let Some(value) = metadata.get("ApertureValue") {
-            if let Ok(raw_val) = value.parse::<u32>() {
+            if let Ok(_raw_val) = value.parse::<u32>() {
                 // ApertureValue conversion might need similar handling
                 // For now, keep existing format since it's less problematic
             }
@@ -438,16 +438,22 @@ impl JpegParser {
     /// Format version field from raw u32 value
     fn format_version_field_from_raw(value: u32) -> String {
         // Version fields are stored as 4-byte ASCII strings (little-endian)
-        let byte1 = value as u8;
-        let byte2 = (value >> 8) as u8;
-        let byte3 = (value >> 16) as u8;
-        let byte4 = (value >> 24) as u8;
+        let bytes = [
+            value as u8,
+            (value >> 8) as u8,
+            (value >> 16) as u8,
+            (value >> 24) as u8,
+        ];
         
-        format!("{}{}{}{}", 
-            byte1 as char,
-            byte2 as char,
-            byte3 as char,
-            byte4 as char)
+        // Convert ASCII bytes to characters, filtering out null bytes
+        let mut result = String::new();
+        for byte in bytes.iter() {
+            if *byte != 0 && *byte >= 32 && *byte <= 126 {
+                result.push(*byte as char);
+            }
+        }
+        
+        result
     }
     
     /// Print fraction value using same logic as TIFF parser

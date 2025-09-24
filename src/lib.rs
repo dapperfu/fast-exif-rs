@@ -1,22 +1,22 @@
+use memmap2::Mmap;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::collections::HashMap;
 use std::fs::File;
-use memmap2::Mmap;
 
 // Module declarations
-mod types;
 mod format_detection;
-mod utils;
-mod parsers;
 mod multiprocessing;
+mod parsers;
+mod types;
+mod utils;
 
 // Re-export commonly used types
-pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use format_detection::FormatDetector;
-pub use utils::ExifUtils;
-pub use parsers::{JpegParser, RawParser, HeifParser, VideoParser};
 pub use multiprocessing::MultiprocessingExifReader;
+pub use parsers::{HeifParser, JpegParser, RawParser, VideoParser};
+pub use types::{ExifError, ExifResult, ProcessingStats};
+pub use utils::ExifUtils;
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
@@ -71,17 +71,17 @@ impl FastExifReader {
     fn read_exif_fast(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
         let file = File::open(file_path)?;
         let mmap = unsafe { Mmap::map(&file)? };
-        
+
         self.read_exif_from_bytes(&mmap)
     }
 
     fn read_exif_from_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
-        
+
         // Detect file format
         let format = FormatDetector::detect_format(data)?;
         metadata.insert("Format".to_string(), format.clone());
-        
+
         // Parse EXIF based on format
         match format.as_str() {
             "JPEG" => JpegParser::parse_jpeg_exif(data, &mut metadata)?,
@@ -93,9 +93,14 @@ impl FastExifReader {
             "MOV" => VideoParser::parse_mov_exif(data, &mut metadata)?,
             "MP4" => VideoParser::parse_mp4_exif(data, &mut metadata)?,
             "3GP" => VideoParser::parse_3gp_exif(data, &mut metadata)?,
-            _ => return Err(ExifError::UnsupportedFormat(format!("Unsupported format: {}", format))),
+            _ => {
+                return Err(ExifError::UnsupportedFormat(format!(
+                    "Unsupported format: {}",
+                    format
+                )))
+            }
         }
-        
+
         Ok(metadata)
     }
 }
@@ -107,7 +112,13 @@ fn fast_exif_reader(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<MultiprocessingExifReader>()?;
     m.add_class::<ExifResult>()?;
     m.add_class::<ProcessingStats>()?;
-    m.add_function(wrap_pyfunction!(multiprocessing::process_files_parallel, m)?)?;
-    m.add_function(wrap_pyfunction!(multiprocessing::process_directory_parallel, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        multiprocessing::process_files_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        multiprocessing::process_directory_parallel,
+        m
+    )?)?;
     Ok(())
 }

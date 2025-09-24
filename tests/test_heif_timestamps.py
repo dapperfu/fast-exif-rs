@@ -86,7 +86,7 @@ def test_heif_timestamp_extraction():
         except Exception as e:
             print(f"✗ Error reading {test_file}: {e}")
     
-    return True
+    assert True
 
 def test_cli_heif_support():
     """Test CLI support for HEIF files"""
