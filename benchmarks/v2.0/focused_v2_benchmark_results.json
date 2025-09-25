@@ -1,0 +1,57 @@
+{
+  "v1_baseline": {
+    "total_files": 1000,
+    "successful_files": 1000,
+    "total_time": 0.051973819732666016,
+    "avg_rate": 19240.456159343834,
+    "memory_delta": 0.1953125,
+    "total_fields": 78677,
+    "avg_fields": 78.677
+  },
+  "v2_optimized": {
+    "total_files": 1000,
+    "successful_files": 1000,
+    "total_time": 0.04878115653991699,
+    "avg_rate": 20499.718967952573,
+    "memory_delta": 0.0,
+    "total_fields": 78677,
+    "avg_fields": 78.677
+  },
+  "selective_extraction": {
+    "basic": {
+      "successful_files": 100,
+      "total_time": 0.005949735641479492,
+      "avg_rate": 16807.469445001003,
+      "avg_fields": 5.0
+    },
+    "camera": {
+      "successful_files": 100,
+      "total_time": 0.005221366882324219,
+      "avg_rate": 19152.07305936073,
+      "avg_fields": 5.0
+    },
+    "gps": {
+      "successful_files": 100,
+      "total_time": 0.0055272579193115234,
+      "avg_rate": 18092.153733339084,
+      "avg_fields": 0.0
+    },
+    "all": {
+      "successful_files": 100,
+      "total_time": 0.004954338073730469,
+      "avg_rate": 20184.331087584214,
+      "avg_fields": 79.32
+    }
+  },
+  "comparison": {
+    "speedup": 1.0654486982106812,
+    "rate_improvement": 1.0654486982106812,
+    "memory_improvement": 0,
+    "v1_time": 0.051973819732666016,
+    "v2_time": 0.04878115653991699,
+    "v1_rate": 19240.456159343834,
+    "v2_rate": 20499.718967952573,
+    "v1_memory": 0.1953125,
+    "v2_memory": 0.0
+  }
+}

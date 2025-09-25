@@ -12,7 +12,6 @@
 //! - Maker Notes: Camera manufacturer specific data
 
 pub mod bmp;
-pub mod cache;
 pub mod heif;
 pub mod jpeg;
 pub mod maker_notes;
@@ -27,7 +26,6 @@ pub mod zero_copy;
 
 // Re-export commonly used parsers
 pub use bmp::BmpParser;
-pub use cache::{ExifCache, CacheStats};
 pub use heif::HeifParser;
 pub use jpeg::JpegParser;
 pub use mkv::MkvParser;
