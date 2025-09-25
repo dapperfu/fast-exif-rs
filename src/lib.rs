@@ -13,6 +13,7 @@ mod multiprocessing;
 mod parsers;
 mod types;
 mod utils;
+mod v2_reader;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -20,6 +21,7 @@ pub use multiprocessing::MultiprocessingExifReader;
 pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
+pub use v2_reader::FastExifReaderV2;
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
