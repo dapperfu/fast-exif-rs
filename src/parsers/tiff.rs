@@ -402,6 +402,13 @@ impl TiffParser {
                         let apex_value = value as i16 as f64 / 1000.0;
                         let ev_value = apex_value - 5.0;
                         metadata.insert(tag_name, format!("{:.2}", ev_value));
+                    } else if tag_id == 0x9201 {
+                        // ShutterSpeedValue as SHORT
+                        // Convert APEX value to shutter speed: 2^(-apex_value/1000) like exiftool
+                        let apex_value = value as f64 / 1000.0;
+                        let shutter_speed = 2.0_f64.powf(-apex_value);
+                        let formatted = Self::format_exposure_time(shutter_speed);
+                        metadata.insert(tag_name, formatted);
                     } else {
                         // Format special fields
                         let formatted_value = Self::format_special_field(tag_id, value);
@@ -523,14 +530,9 @@ impl TiffParser {
                             }
                         } else if tag_id == 0x9201 {
                             // ShutterSpeedValue
-                            // Convert APEX value to shutter speed: 2^(-apex_value) like exiftool
+                            // The raw value is already the shutter speed in seconds, not an APEX value
                             if denominator != 0 {
-                                let apex_value = numerator as f64 / denominator as f64;
-                                let shutter_speed = if apex_value.abs() < 100.0 {
-                                    2.0_f64.powf(-apex_value)
-                                } else {
-                                    0.0
-                                };
+                                let shutter_speed = numerator as f64 / denominator as f64;
                                 let formatted = Self::format_exposure_time(shutter_speed);
                                 metadata.insert(tag_name, formatted);
                             } else {
@@ -1576,8 +1578,14 @@ impl TiffParser {
 
         match tag_id {
             0x0006 => {
-                // GPSAltitude
-                format!("{:.1} m Above Sea Level", value)
+                // GPSAltitude - format like exiftool (no decimal for whole numbers)
+                if value.fract() == 0.0 {
+                    format!("{} m Above Sea Level", value as i32)
+                } else {
+                    // Use floor rounding to match exiftool behavior
+                    let rounded = (value * 10.0).floor() / 10.0;
+                    format!("{:.1} m Above Sea Level", rounded)
+                }
             }
             0x000B => {
                 // GPSDOP

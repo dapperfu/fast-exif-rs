@@ -584,6 +584,18 @@ impl RawParser {
             return 1.5;
         }
 
+        // Samsung phones typically have ~6.0x crop factor
+        if make.contains("samsung") {
+            // Samsung Galaxy S10 (SM-G970U) has ~6.05x crop factor
+            if model.contains("sm-g970u") {
+                return 6.05;
+            }
+            // Generic Samsung phones
+            if model.contains("sm-") {
+                return 6.05;
+            }
+        }
+
         // Fujifilm APS-C cameras typically have 1.5x crop factor
         if make.contains("fujifilm") {
             return 1.5;
