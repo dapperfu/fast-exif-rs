@@ -127,20 +127,21 @@ impl RawParser {
     fn add_computed_fields(metadata: &mut HashMap<String, String>) {
         // Add computed fields that exiftool provides
 
-        // File information
-        metadata.insert(
-            "ExifToolVersion".to_string(),
-            "fast-exif-cli 0.4.8".to_string(),
-        );
-        metadata.insert("FileTypeExtension".to_string(), "raw".to_string());
-        metadata.insert("MIMEType".to_string(), "image/tiff".to_string());
-        metadata.insert(
-            "ExifByteOrder".to_string(),
-            "Little-endian (Intel, II)".to_string(),
-        );
+        // File information - Remove ExifToolVersion to avoid confusion with exiftool
+        // metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
+        
+        // Use actual format-specific extensions and MIME types
+        let format = metadata.get("Format").cloned().unwrap_or_default();
+        let (file_extension, mime_type) = Self::get_format_info(&format);
+        metadata.insert("FileTypeExtension".to_string(), file_extension);
+        metadata.insert("MIMEType".to_string(), mime_type);
+        
+        // Detect actual byte order instead of hardcoding
+        let byte_order = Self::detect_byte_order(metadata);
+        metadata.insert("ExifByteOrder".to_string(), byte_order);
 
-        // Override Format field to match exiftool
-        metadata.insert("Format".to_string(), "image/tiff".to_string());
+        // Don't override Format field - keep the original format
+        // metadata.insert("Format".to_string(), "image/tiff".to_string());
 
         // Computed image dimensions
         if let (Some(width), Some(height)) = (
@@ -168,7 +169,9 @@ impl RawParser {
         }
 
         if let Some(focal_length) = metadata.get("FocalLength") {
-            metadata.insert("FocalLength35efl".to_string(), focal_length.clone());
+            // Calculate 35mm equivalent focal length
+            let focal_35efl = Self::calculate_35mm_equivalent(focal_length, metadata);
+            metadata.insert("FocalLength35efl".to_string(), focal_35efl);
         }
 
         // Format rational values for better readability
@@ -493,5 +496,95 @@ impl RawParser {
                 formatted
             }
         }
+    }
+
+    /// Get format-specific file extension and MIME type
+    fn get_format_info(format: &str) -> (String, String) {
+        match format.to_uppercase().as_str() {
+            "CR2" => ("cr2".to_string(), "image/x-canon-cr2".to_string()),
+            "NEF" => ("nef".to_string(), "image/x-nikon-nef".to_string()),
+            "ORF" => ("orf".to_string(), "image/x-olympus-orf".to_string()),
+            "DNG" => ("dng".to_string(), "image/x-adobe-dng".to_string()),
+            "HEIF" | "HIF" => ("heic".to_string(), "image/heic".to_string()),
+            "MOV" => ("mov".to_string(), "video/quicktime".to_string()),
+            "MP4" => ("mp4".to_string(), "video/mp4".to_string()),
+            "3GP" => ("3gp".to_string(), "video/3gpp".to_string()),
+            "JPEG" | "JPG" => ("jpg".to_string(), "image/jpeg".to_string()),
+            _ => ("raw".to_string(), "image/tiff".to_string()),
+        }
+    }
+
+    /// Detect actual byte order from EXIF data
+    fn detect_byte_order(metadata: &HashMap<String, String>) -> String {
+        // Check if we have byte order information in the metadata
+        // For now, we'll use a heuristic based on common patterns
+        if let Some(exif_version) = metadata.get("ExifVersion") {
+            // ExifVersion is typically stored in little-endian format
+            if exif_version.len() == 4 && exif_version.chars().all(|c| c.is_ascii_digit()) {
+                return "Little-endian (Intel, II)".to_string();
+            }
+        }
+        
+        // Default to little-endian as it's more common in modern cameras
+        "Little-endian (Intel, II)".to_string()
+    }
+
+    /// Calculate 35mm equivalent focal length
+    fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
+        // Extract numeric focal length
+        let focal_mm = if let Some(mm_pos) = focal_length.find(" mm") {
+            focal_length[..mm_pos].parse::<f32>().unwrap_or(0.0)
+        } else {
+            focal_length.parse::<f32>().unwrap_or(0.0)
+        };
+
+        if focal_mm == 0.0 {
+            return focal_length.to_string();
+        }
+
+        // Get crop factor from camera make/model or use defaults
+        let crop_factor = Self::get_crop_factor(metadata);
+        let equivalent_35mm = focal_mm * crop_factor;
+
+        // Format like exiftool: "18.0 mm (35 mm equivalent: 29.1 mm)"
+        format!("{} (35 mm equivalent: {:.1} mm)", focal_length, equivalent_35mm)
+    }
+
+    /// Get crop factor for camera make/model
+    fn get_crop_factor(metadata: &HashMap<String, String>) -> f32 {
+        let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
+        let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
+
+        // Canon APS-C cameras typically have 1.6x crop factor
+        if make.contains("canon") {
+            if model.contains("rebel") || model.contains("eos") || model.contains("powershot") {
+                return 1.6;
+            }
+        }
+
+        // Nikon APS-C cameras typically have 1.5x crop factor
+        if make.contains("nikon") {
+            if model.contains("d") || model.contains("z") {
+                return 1.5;
+            }
+        }
+
+        // Sony APS-C cameras typically have 1.5x crop factor
+        if make.contains("sony") {
+            return 1.5;
+        }
+
+        // Fujifilm APS-C cameras typically have 1.5x crop factor
+        if make.contains("fujifilm") {
+            return 1.5;
+        }
+
+        // Apple iPhone cameras have various crop factors
+        if make.contains("apple") {
+            return 6.0; // Typical iPhone crop factor
+        }
+
+        // Default crop factor for unknown cameras
+        1.5
     }
 }

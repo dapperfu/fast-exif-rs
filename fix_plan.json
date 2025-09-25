@@ -1,0 +1,83 @@
+{
+  "critical_fixes": [
+    {
+      "field": "ExifToolVersion",
+      "issue": "Shows 'fast-exif-cli 0.4.8' instead of exiftool version",
+      "solution": "Remove this field entirely or make it configurable",
+      "priority": "HIGH",
+      "affected_files": 19
+    },
+    {
+      "field": "FocalLength35efl",
+      "issue": "Missing 35mm equivalent calculation",
+      "solution": "Add 35mm equivalent calculation: focal_length * crop_factor",
+      "priority": "HIGH",
+      "affected_files": 14
+    },
+    {
+      "field": "FileTypeExtension",
+      "issue": "Shows 'raw' instead of specific format like 'cr2'",
+      "solution": "Use actual file extension from format detection",
+      "priority": "HIGH",
+      "affected_files": 6
+    },
+    {
+      "field": "MIMEType",
+      "issue": "Shows 'image/tiff' instead of format-specific MIME type",
+      "solution": "Use format-specific MIME types",
+      "priority": "HIGH",
+      "affected_files": 6
+    },
+    {
+      "field": "ExifByteOrder",
+      "issue": "Always shows 'Little-endian' regardless of actual byte order",
+      "solution": "Detect and report actual byte order",
+      "priority": "MEDIUM",
+      "affected_files": 7
+    },
+    {
+      "field": "ShutterSpeedValue",
+      "issue": "APEX conversion not matching exiftool exactly",
+      "solution": "Refine APEX to shutter speed conversion formula",
+      "priority": "MEDIUM",
+      "affected_files": 7
+    },
+    {
+      "field": "BrightnessValue",
+      "issue": "Shows raw APEX value instead of converted brightness",
+      "solution": "Convert APEX brightness value to EV",
+      "priority": "MEDIUM",
+      "affected_files": 6
+    },
+    {
+      "field": "MeteringMode",
+      "issue": "Shows 'Multi-segment' instead of 'Evaluative'",
+      "solution": "Fix metering mode mapping for Canon cameras",
+      "priority": "MEDIUM",
+      "affected_files": 5
+    },
+    {
+      "field": "SubSecDateTimeOriginal",
+      "issue": "Missing timezone information",
+      "solution": "Include timezone offset in datetime fields",
+      "priority": "LOW",
+      "affected_files": 6
+    }
+  ],
+  "missing_fields": [
+    "ScaleFactor35efl",
+    "FocalLengthIn35mmFormat",
+    "MediaDataSize",
+    "BitDepthLuma",
+    "GPSAltitude",
+    "FilePermissions",
+    "EncodingProcess",
+    "ModifyDate"
+  ],
+  "field_count_issues": {
+    "average_exiftool_fields": 150.3,
+    "average_fast_exif_fields": 47.2,
+    "coverage_percentage": 18.7,
+    "target_coverage": 60.0
+  }
+}

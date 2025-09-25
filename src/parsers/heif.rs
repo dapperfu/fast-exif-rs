@@ -562,11 +562,11 @@ impl HeifParser {
             metadata.insert("FlashpixVersion".to_string(), "0100".to_string());
         }
 
-        // File information
-        metadata.insert(
-            "ExifToolVersion".to_string(),
-            "fast-exif-cli 0.4.8".to_string(),
-        );
+        // File information - Remove ExifToolVersion to avoid confusion with exiftool
+        // metadata.insert(
+        //     "ExifToolVersion".to_string(),
+        //     "fast-exif-cli 0.4.8".to_string(),
+        // );
         metadata.insert("FileTypeExtension".to_string(), "heic".to_string());
         metadata.insert("MIMEType".to_string(), "image/heic".to_string());
         metadata.insert(

@@ -292,11 +292,11 @@ impl VideoParser {
     fn add_computed_fields(metadata: &mut HashMap<String, String>) {
         // Add computed fields that exiftool provides
 
-        // File information
-        metadata.insert(
-            "ExifToolVersion".to_string(),
-            "fast-exif-cli 0.4.8".to_string(),
-        );
+        // File information - Remove ExifToolVersion to avoid confusion with exiftool
+        // metadata.insert(
+        //     "ExifToolVersion".to_string(),
+        //     "fast-exif-cli 0.4.8".to_string(),
+        // );
 
         // Determine file type extension based on format
         if let Some(format) = metadata.get("Format") {

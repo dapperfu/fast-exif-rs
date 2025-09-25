@@ -373,6 +373,14 @@ impl TiffParser {
                             formatted_value
                         );
                         metadata.insert(tag_name, formatted_value);
+                    } else if tag_id == 0x9203 {
+                        // BrightnessValue as SHORT
+                        // Convert APEX brightness value to EV
+                        // The value is stored as a signed 16-bit integer in 1/1000 APEX units
+                        // Convert to EV: EV = (APEX - 5) * 1000
+                        let apex_value = value as i16 as f64 / 1000.0;
+                        let ev_value = apex_value - 5.0;
+                        metadata.insert(tag_name, format!("{:.2}", ev_value));
                     } else {
                         // Format special fields
                         let formatted_value = Self::format_special_field(tag_id, value);
@@ -519,11 +527,14 @@ impl TiffParser {
                             }
                         } else if tag_id == 0x9203 {
                             // BrightnessValue
-                            // Format brightness value
+                            // Convert APEX brightness value to EV (like exiftool)
                             if denominator != 0 {
-                                let value = numerator as f64 / denominator as f64;
-                                metadata.insert(tag_name, format!("{:.2}", value));
+                                let apex_value = numerator as f64 / denominator as f64;
+                                // Convert APEX to EV: EV = APEX - 5
+                                let ev_value = apex_value - 5.0;
+                                metadata.insert(tag_name, format!("{:.2}", ev_value));
                             } else {
+                                // If it's a raw value, assume it's already in EV format
                                 metadata.insert(tag_name, numerator.to_string());
                             }
                         } else if tag_id == 0x9204 {
@@ -705,7 +716,7 @@ impl TiffParser {
                     2 => "Center-weighted average".to_string(),
                     3 => "Spot".to_string(),
                     4 => "Multi-segment".to_string(),
-                    5 => "Multi-segment".to_string(),
+                    5 => "Evaluative".to_string(), // Canon uses "Evaluative" for value 5
                     6 => "Partial".to_string(),
                     255 => "Other".to_string(),
                     _ => value.to_string(),
