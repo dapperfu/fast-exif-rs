@@ -644,15 +644,15 @@ impl JpegParser {
             return 1.5;
         }
 
-        // Samsung phones typically have ~6.0x crop factor
+        // Samsung phones typically have ~7.6x crop factor
         if make.contains("samsung") {
-            // Samsung Galaxy S10 (SM-G970U) has ~6.05x crop factor
+            // Samsung Galaxy S10 (SM-G970U) has ~7.6x crop factor
             if model.contains("sm-g970u") {
-                return 6.05;
+                return 7.6;
             }
             // Generic Samsung phones
             if model.contains("sm-") {
-                return 6.05;
+                return 7.6;
             }
         }
 
