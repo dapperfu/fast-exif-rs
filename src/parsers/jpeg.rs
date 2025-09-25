@@ -177,10 +177,7 @@ impl JpegParser {
         // metadata.insert("ExifToolVersion".to_string(), "12.76".to_string());
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
-        metadata.insert(
-            "ExifByteOrder".to_string(),
-            "Little-endian (Intel, II)".to_string(),
-        );
+        // ExifByteOrder is now set by the TIFF parser based on actual byte order detection
 
         // Override Format field to match exiftool
         metadata.insert("Format".to_string(), "image/jpeg".to_string());
