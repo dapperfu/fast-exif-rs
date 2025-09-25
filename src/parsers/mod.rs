@@ -12,20 +12,28 @@
 //! - Maker Notes: Camera manufacturer specific data
 
 pub mod bmp;
+pub mod cache;
 pub mod heif;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;
 pub mod png;
 pub mod raw;
+pub mod selective;
+pub mod simd;
 pub mod tiff;
 pub mod video;
+pub mod zero_copy;
 
 // Re-export commonly used parsers
 pub use bmp::BmpParser;
+pub use cache::{ExifCache, CacheStats};
 pub use heif::HeifParser;
 pub use jpeg::JpegParser;
 pub use mkv::MkvParser;
 pub use png::PngParser;
 pub use raw::RawParser;
+pub use selective::{SelectiveFieldExtractor, FieldExtractors};
+pub use simd::SimdHexParser;
 pub use video::VideoParser;
+pub use zero_copy::ZeroCopyExifParser;
