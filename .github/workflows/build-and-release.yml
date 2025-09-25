@@ -199,8 +199,15 @@ jobs:
       with:
         name: wheels-ubuntu-latest
 
+    - name: Debug downloaded files
+      run: |
+        echo "Current directory structure:"
+        find . -type f -name "*.whl" -exec ls -la {} \;
+
     - name: Install wheel
-      run: pip install dist/*.whl
+      run: |
+        # Find and install the wheel file
+        find . -name "*.whl" -exec pip install {} \;
 
     - name: Test CLI
       run: |

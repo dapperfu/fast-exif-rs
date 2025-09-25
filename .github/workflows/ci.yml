@@ -42,7 +42,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install maturin[patchelf] pytest psutil
+        pip install maturin[patchelf] pytest pytest-cov psutil
 
     - name: Build package
       run: |
@@ -66,12 +66,8 @@ jobs:
         echo "Testing import..."
         python -c "from fast_exif_reader import FastExifReader; print('Import successful')"
         python -c "import fast_exif_reader; print('Version:', fast_exif_reader.__version__)"
-        echo "Running performance tests..."
-        if [ -f "tests/test_performance.py" ]; then
-          python -m pytest tests/test_performance.py -v --tb=short
-        else
-          echo "test_performance.py not found, skipping performance tests"
-        fi
+        echo "Running all tests..."
+        python -m pytest tests/ -v --tb=short
 
     - name: Test CLI
       run: |
