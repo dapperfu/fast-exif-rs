@@ -46,6 +46,29 @@ impl FormatDetector {
             }
         }
 
+        // Check for PNG format
+        if data.len() >= 8 {
+            if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47
+                && data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A
+            {
+                return Ok("PNG".to_string());
+            }
+        }
+
+        // Check for BMP format
+        if data.len() >= 2 {
+            if data[0] == 0x42 && data[1] == 0x4D {
+                return Ok("BMP".to_string());
+            }
+        }
+
+        // Check for MKV format
+        if data.len() >= 4 {
+            if data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3 {
+                return Ok("MKV".to_string());
+            }
+        }
+
         // Check for QuickTime/MOV/MP4/3GP format
         if data.len() >= 8 {
             // QuickTime files start with atom size (4 bytes) followed by atom type

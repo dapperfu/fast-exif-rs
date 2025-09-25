@@ -180,6 +180,19 @@ impl TiffParser {
             );
         }
 
+        // Parse GPS IFD if present
+        if let Some(gps_offset) =
+            Self::find_sub_ifd_offset(data, offset, 0x8825, is_little_endian, tiff_start)
+        {
+            Self::parse_gps_ifd(
+                data,
+                tiff_start + gps_offset as usize,
+                is_little_endian,
+                tiff_start,
+                metadata,
+            )?;
+        }
+
         Ok(())
     }
 
@@ -1102,5 +1115,458 @@ impl TiffParser {
         }
 
         None
+    }
+
+    /// Parse GPS IFD and extract GPS metadata
+    fn parse_gps_ifd(
+        data: &[u8],
+        gps_offset: usize,
+        is_little_endian: bool,
+        tiff_start: usize,
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
+        if gps_offset + 2 > data.len() {
+            return Ok(());
+        }
+
+        let entry_count = if is_little_endian {
+            u16::from_le_bytes([data[gps_offset], data[gps_offset + 1]])
+        } else {
+            u16::from_be_bytes([data[gps_offset], data[gps_offset + 1]])
+        };
+
+        for i in 0..entry_count {
+            let entry_offset = gps_offset + 2 + (i as usize * 12);
+            if entry_offset + 12 > data.len() {
+                continue;
+            }
+
+            Self::parse_gps_entry(data, entry_offset, is_little_endian, tiff_start, metadata)?;
+        }
+
+        Ok(())
+    }
+
+    /// Parse a single GPS IFD entry
+    fn parse_gps_entry(
+        data: &[u8],
+        offset: usize,
+        is_little_endian: bool,
+        tiff_start: usize,
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
+        let tag_id = if is_little_endian {
+            u16::from_le_bytes([data[offset], data[offset + 1]])
+        } else {
+            u16::from_be_bytes([data[offset], data[offset + 1]])
+        };
+
+        let data_type = if is_little_endian {
+            u16::from_le_bytes([data[offset + 2], data[offset + 3]])
+        } else {
+            u16::from_be_bytes([data[offset + 2], data[offset + 3]])
+        };
+
+        let count = if is_little_endian {
+            u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ])
+        } else {
+            u32::from_be_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ])
+        };
+
+        let value_offset = if is_little_endian {
+            u32::from_le_bytes([
+                data[offset + 8],
+                data[offset + 9],
+                data[offset + 10],
+                data[offset + 11],
+            ])
+        } else {
+            u32::from_be_bytes([
+                data[offset + 8],
+                data[offset + 9],
+                data[offset + 10],
+                data[offset + 11],
+            ])
+        };
+
+        let _tag_name = Self::get_gps_tag_name(tag_id);
+        Self::parse_gps_tag_value(
+            data,
+            tag_id,
+            data_type,
+            count,
+            value_offset,
+            is_little_endian,
+            tiff_start,
+            metadata,
+        )?;
+
+        Ok(())
+    }
+
+    /// Get GPS tag name from tag ID
+    fn get_gps_tag_name(tag_id: u16) -> String {
+        match tag_id {
+            0x0000 => "GPSVersionID".to_string(),
+            0x0001 => "GPSLatitudeRef".to_string(),
+            0x0002 => "GPSLatitude".to_string(),
+            0x0003 => "GPSLongitudeRef".to_string(),
+            0x0004 => "GPSLongitude".to_string(),
+            0x0005 => "GPSAltitudeRef".to_string(),
+            0x0006 => "GPSAltitude".to_string(),
+            0x0007 => "GPSTimeStamp".to_string(),
+            0x0008 => "GPSSatellites".to_string(),
+            0x0009 => "GPSStatus".to_string(),
+            0x000A => "GPSMeasureMode".to_string(),
+            0x000B => "GPSDOP".to_string(),
+            0x000C => "GPSSpeedRef".to_string(),
+            0x000D => "GPSSpeed".to_string(),
+            0x000E => "GPSTrackRef".to_string(),
+            0x000F => "GPSTrack".to_string(),
+            0x0010 => "GPSImgDirectionRef".to_string(),
+            0x0011 => "GPSImgDirection".to_string(),
+            0x0012 => "GPSMapDatum".to_string(),
+            0x001D => "GPSDateStamp".to_string(),
+            0x001E => "GPSDifferential".to_string(),
+            _ => format!("GPSUnknown{:04X}", tag_id),
+        }
+    }
+
+    /// Parse GPS tag value based on type and count
+    fn parse_gps_tag_value(
+        data: &[u8],
+        tag_id: u16,
+        data_type: u16,
+        count: u32,
+        value_offset: u32,
+        is_little_endian: bool,
+        tiff_start: usize,
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
+        let tag_name = Self::get_gps_tag_name(tag_id);
+
+        match data_type {
+            1 => {
+                // BYTE
+                if count <= 4 {
+                    let value = if is_little_endian {
+                        value_offset as u8
+                    } else {
+                        (value_offset >> 24) as u8
+                    };
+                    let formatted_value = Self::format_gps_field(tag_id, value as u32);
+                    metadata.insert(tag_name, formatted_value);
+                } else {
+                    let offset = tiff_start + value_offset as usize;
+                    if offset + count as usize <= data.len() {
+                        let bytes = &data[offset..offset + count as usize];
+                        if let Ok(string) = String::from_utf8(bytes.to_vec()) {
+                            let cleaned_string = string.trim_end_matches('\0').trim().to_string();
+                            metadata.insert(tag_name, cleaned_string);
+                        }
+                    }
+                }
+            }
+            2 => {
+                // ASCII
+                if count <= 4 {
+                    let bytes = if is_little_endian {
+                        value_offset.to_le_bytes()
+                    } else {
+                        value_offset.to_be_bytes()
+                    };
+                    if let Ok(string) = String::from_utf8(bytes.to_vec()) {
+                        let cleaned_string = string.trim_end_matches('\0').trim().to_string();
+                        metadata.insert(tag_name, cleaned_string);
+                    }
+                } else {
+                    let offset = tiff_start + value_offset as usize;
+                    if offset + count as usize <= data.len() {
+                        let bytes = &data[offset..offset + count as usize];
+                        if let Ok(string) = String::from_utf8(bytes.to_vec()) {
+                            let cleaned_string = string.trim_end_matches('\0').trim().to_string();
+                            metadata.insert(tag_name, cleaned_string);
+                        }
+                    }
+                }
+            }
+            3 => {
+                // SHORT
+                if count == 1 {
+                    let value = if is_little_endian {
+                        (value_offset & 0xFFFF) as u16
+                    } else {
+                        (value_offset >> 16) as u16
+                    };
+                    let formatted_value = Self::format_gps_field(tag_id, value as u32);
+                    metadata.insert(tag_name, formatted_value);
+                }
+            }
+            4 => {
+                // LONG
+                if count == 1 {
+                    let formatted_value = Self::format_gps_field(tag_id, value_offset);
+                    metadata.insert(tag_name, formatted_value);
+                }
+            }
+            5 => {
+                // RATIONAL
+                if count == 1 {
+                    let offset = tiff_start + value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = if is_little_endian {
+                            u32::from_le_bytes([
+                                data[offset],
+                                data[offset + 1],
+                                data[offset + 2],
+                                data[offset + 3],
+                            ])
+                        } else {
+                            u32::from_be_bytes([
+                                data[offset],
+                                data[offset + 1],
+                                data[offset + 2],
+                                data[offset + 3],
+                            ])
+                        };
+
+                        let denominator = if is_little_endian {
+                            u32::from_le_bytes([
+                                data[offset + 4],
+                                data[offset + 5],
+                                data[offset + 6],
+                                data[offset + 7],
+                            ])
+                        } else {
+                            u32::from_be_bytes([
+                                data[offset + 4],
+                                data[offset + 5],
+                                data[offset + 6],
+                                data[offset + 7],
+                            ])
+                        };
+
+                        let formatted_value = Self::format_gps_rational(tag_id, numerator, denominator);
+                        metadata.insert(tag_name, formatted_value);
+                    }
+                } else if count == 3 {
+                    // GPS coordinates (latitude/longitude) - 3 rationals
+                    let offset = tiff_start + value_offset as usize;
+                    if offset + 24 <= data.len() {
+                        let formatted_value = Self::format_gps_coordinates(
+                            data,
+                            offset,
+                            is_little_endian,
+                            tag_id,
+                        );
+                        metadata.insert(tag_name, formatted_value);
+                    }
+                }
+            }
+            _ => {
+                // For other types, just store the raw value
+                metadata.insert(tag_name, value_offset.to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Format GPS field based on tag ID
+    fn format_gps_field(tag_id: u16, value: u32) -> String {
+        match tag_id {
+            0x0000 => {
+                // GPSVersionID - format as version string
+                format!("{}.{}.{}.{}", 
+                    (value >> 24) & 0xFF,
+                    (value >> 16) & 0xFF,
+                    (value >> 8) & 0xFF,
+                    value & 0xFF
+                )
+            }
+            0x0001 => {
+                // GPSLatitudeRef
+                match value {
+                    0 => "North".to_string(),
+                    1 => "South".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x0003 => {
+                // GPSLongitudeRef
+                match value {
+                    0 => "East".to_string(),
+                    1 => "West".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x0005 => {
+                // GPSAltitudeRef
+                match value {
+                    0 => "Above Sea Level".to_string(),
+                    1 => "Below Sea Level".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x0009 => {
+                // GPSStatus
+                match value {
+                    0 => "Measurement Void".to_string(),
+                    1 => "Measurement Active".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x000A => {
+                // GPSMeasureMode
+                match value {
+                    2 => "2-Dimensional".to_string(),
+                    3 => "3-Dimensional".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x000C => {
+                // GPSSpeedRef
+                match value {
+                    0 => "km/h".to_string(),
+                    1 => "mph".to_string(),
+                    2 => "knots".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x000E => {
+                // GPSTrackRef
+                match value {
+                    0 => "True North".to_string(),
+                    1 => "Magnetic North".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x0010 => {
+                // GPSImgDirectionRef
+                match value {
+                    0 => "True North".to_string(),
+                    1 => "Magnetic North".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            0x001E => {
+                // GPSDifferential
+                match value {
+                    0 => "No Correction".to_string(),
+                    1 => "Differential Corrected".to_string(),
+                    _ => value.to_string(),
+                }
+            }
+            _ => value.to_string(),
+        }
+    }
+
+    /// Format GPS rational value
+    fn format_gps_rational(tag_id: u16, numerator: u32, denominator: u32) -> String {
+        if denominator == 0 {
+            return numerator.to_string();
+        }
+
+        let value = numerator as f64 / denominator as f64;
+
+        match tag_id {
+            0x0006 => {
+                // GPSAltitude
+                format!("{:.1} m", value)
+            }
+            0x000B => {
+                // GPSDOP
+                format!("{:.1}", value)
+            }
+            0x000D => {
+                // GPSSpeed
+                format!("{:.1}", value)
+            }
+            0x000F => {
+                // GPSTrack
+                format!("{:.1} deg", value)
+            }
+            0x0011 => {
+                // GPSImgDirection
+                format!("{:.1} deg", value)
+            }
+            _ => format!("{:.6}", value),
+        }
+    }
+
+    /// Format GPS coordinates (latitude/longitude)
+    fn format_gps_coordinates(
+        data: &[u8],
+        offset: usize,
+        is_little_endian: bool,
+        _tag_id: u16,
+    ) -> String {
+        let mut degrees = 0.0;
+        let mut minutes = 0.0;
+        let mut seconds = 0.0;
+
+        // Parse 3 rational values (degrees, minutes, seconds)
+        for i in 0..3 {
+            let rational_offset = offset + (i * 8);
+            if rational_offset + 8 <= data.len() {
+                let numerator = if is_little_endian {
+                    u32::from_le_bytes([
+                        data[rational_offset],
+                        data[rational_offset + 1],
+                        data[rational_offset + 2],
+                        data[rational_offset + 3],
+                    ])
+                } else {
+                    u32::from_be_bytes([
+                        data[rational_offset],
+                        data[rational_offset + 1],
+                        data[rational_offset + 2],
+                        data[rational_offset + 3],
+                    ])
+                };
+
+                let denominator = if is_little_endian {
+                    u32::from_le_bytes([
+                        data[rational_offset + 4],
+                        data[rational_offset + 5],
+                        data[rational_offset + 6],
+                        data[rational_offset + 7],
+                    ])
+                } else {
+                    u32::from_be_bytes([
+                        data[rational_offset + 4],
+                        data[rational_offset + 5],
+                        data[rational_offset + 6],
+                        data[rational_offset + 7],
+                    ])
+                };
+
+                let value = if denominator != 0 {
+                    numerator as f64 / denominator as f64
+                } else {
+                    numerator as f64
+                };
+
+                match i {
+                    0 => degrees = value,
+                    1 => minutes = value,
+                    2 => seconds = value,
+                    _ => {}
+                }
+            }
+        }
+
+        // Format as degrees, minutes, seconds
+        format!("{} deg {}' {:.2}\"", degrees as i32, minutes as i32, seconds)
     }
 }

@@ -174,6 +174,9 @@ impl RawParser {
             metadata.insert("FocalLength35efl".to_string(), focal_35efl);
         }
 
+        // Compute GPS position from latitude and longitude
+        Self::compute_gps_position(metadata);
+
         // Format rational values for better readability
         if let Some(focal_length) = metadata.get("FocalLength") {
             if let Ok(parsed) = focal_length.parse::<f32>() {
@@ -586,5 +589,73 @@ impl RawParser {
 
         // Default crop factor for unknown cameras
         1.5
+    }
+
+    /// Compute GPS position from latitude and longitude
+    fn compute_gps_position(metadata: &mut HashMap<String, String>) {
+        // Clone the values to avoid borrowing issues
+        let lat = metadata.get("GPSLatitude").cloned();
+        let lat_ref = metadata.get("GPSLatitudeRef").cloned();
+        let lon = metadata.get("GPSLongitude").cloned();
+        let lon_ref = metadata.get("GPSLongitudeRef").cloned();
+
+        if let (Some(lat), Some(lat_ref), Some(lon), Some(lon_ref)) = (lat, lat_ref, lon, lon_ref) {
+            // Parse latitude and longitude
+            let lat_degrees = Self::parse_gps_coordinate(&lat);
+            let lon_degrees = Self::parse_gps_coordinate(&lon);
+
+            // Apply reference directions
+            let lat_sign = if lat_ref == "South" { -1.0 } else { 1.0 };
+            let lon_sign = if lon_ref == "West" { -1.0 } else { 1.0 };
+
+            let _lat_decimal = lat_degrees * lat_sign;
+            let _lon_decimal = lon_degrees * lon_sign;
+
+            // Format as GPSPosition (like exiftool)
+            let gps_position = format!(
+                "{} deg {}' {:.2}\" {}, {} deg {}' {:.2}\" {}",
+                lat_degrees.abs() as i32,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0 - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                lat_ref,
+                lon_degrees.abs() as i32,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0 - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                lon_ref
+            );
+
+            metadata.insert("GPSPosition".to_string(), gps_position);
+
+            // Also add GPSCoordinates in decimal format
+            let gps_coordinates = format!(
+                "{} deg {}' {:.2}\" {}, {} deg {}' {:.2}\" {}",
+                lat_degrees.abs() as i32,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0 - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                lat_ref,
+                lon_degrees.abs() as i32,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0 - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                lon_ref
+            );
+
+            metadata.insert("GPSCoordinates".to_string(), gps_coordinates);
+        }
+    }
+
+    /// Parse GPS coordinate from degrees, minutes, seconds format
+    fn parse_gps_coordinate(coord_str: &str) -> f64 {
+        // Parse format like "37 deg 44' 48.27\""
+        let parts: Vec<&str> = coord_str.split_whitespace().collect();
+        if parts.len() >= 4 {
+            if let (Ok(degrees), Ok(minutes), Ok(seconds)) = (
+                parts[0].parse::<f64>(),
+                parts[2].trim_end_matches('\'').parse::<f64>(),
+                parts[3].trim_end_matches('\"').parse::<f64>(),
+            ) {
+                return degrees + minutes / 60.0 + seconds / 3600.0;
+            }
+        }
+        0.0
     }
 }
