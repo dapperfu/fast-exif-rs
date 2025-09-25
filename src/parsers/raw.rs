@@ -545,13 +545,135 @@ impl RawParser {
             return 1.5;
         }
 
-        // Apple iPhone cameras have various crop factors
-        if make.contains("apple") {
-            return 6.0; // Typical iPhone crop factor
+        // Panasonic Micro Four Thirds cameras have 2.0x crop factor
+        if make.contains("panasonic") {
+            return 2.0;
         }
 
-        // Default crop factor for unknown cameras
-        1.5
+        // Olympus Micro Four Thirds cameras have 2.0x crop factor
+        if make.contains("olympus") {
+            return 2.0;
+        }
+
+        // Pentax APS-C cameras typically have 1.5x crop factor
+        if make.contains("pentax") {
+            return 1.5;
+        }
+
+        // Sigma APS-C cameras typically have 1.5x crop factor
+        if make.contains("sigma") {
+            return 1.5;
+        }
+
+        // Leica cameras - varies by model
+        if make.contains("leica") {
+            // Leica M series are full frame (1.0x)
+            if model.contains("m") && !model.contains("m4/3") {
+                return 1.0;
+            }
+            // Leica T/SL series are APS-C (1.5x)
+            if model.contains("t") || model.contains("sl") {
+                return 1.5;
+            }
+            // Default Leica crop factor
+            return 1.5;
+        }
+
+        // Hasselblad cameras - varies by model
+        if make.contains("hasselblad") {
+            // Medium format cameras have different crop factors
+            if model.contains("x1d") || model.contains("907x") {
+                return 0.79; // Medium format crop factor
+            }
+            return 1.0; // Default to full frame
+        }
+
+        // Phase One cameras - medium format
+        if make.contains("phase one") {
+            return 0.79; // Medium format crop factor
+        }
+
+        // Ricoh cameras - varies by model
+        if make.contains("ricoh") {
+            // GR series are APS-C (1.5x)
+            if model.contains("gr") {
+                return 1.5;
+            }
+            return 1.5; // Default APS-C
+        }
+
+        // Kodak cameras - varies by model
+        if make.contains("kodak") {
+            return 1.5; // Most are APS-C
+        }
+
+        // Casio cameras - typically small sensor
+        if make.contains("casio") {
+            return 5.6; // Typical compact camera crop factor
+        }
+
+        // HP cameras - typically small sensor
+        if make.contains("hp") {
+            return 5.6; // Typical compact camera crop factor
+        }
+
+        // Apple iPhone cameras - varies by model
+        if make.contains("apple") {
+            // iPhone cameras have very small sensors
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // Google Pixel cameras
+        if make.contains("google") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // OnePlus cameras
+        if make.contains("oneplus") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // Xiaomi cameras
+        if make.contains("xiaomi") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // Huawei cameras
+        if make.contains("huawei") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // LG Electronics cameras (including Nexus phones)
+        if make.contains("lge") || make.contains("lg") {
+            // Nexus phones have small sensors
+            if model.contains("nexus") {
+                return 7.2; // Typical smartphone crop factor
+            }
+            return 5.6; // Default compact camera crop factor
+        }
+
+        // Motorola cameras
+        if make.contains("motorola") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // HTC cameras
+        if make.contains("htc") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // BlackBerry cameras
+        if make.contains("blackberry") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // Nokia cameras
+        if make.contains("nokia") {
+            return 7.2; // Typical smartphone crop factor
+        }
+
+        // Default to 1.0x (full frame) if unknown
+        1.0
     }
 
     /// Compute GPS position from latitude and longitude
