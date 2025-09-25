@@ -136,9 +136,7 @@ impl RawParser {
         metadata.insert("FileTypeExtension".to_string(), file_extension);
         metadata.insert("MIMEType".to_string(), mime_type);
         
-        // Detect actual byte order instead of hardcoding
-        let byte_order = Self::detect_byte_order(metadata);
-        metadata.insert("ExifByteOrder".to_string(), byte_order);
+        // ExifByteOrder is now set by the TIFF parser based on actual byte order detection
 
         // Don't override Format field - keep the original format
         // metadata.insert("Format".to_string(), "image/tiff".to_string());

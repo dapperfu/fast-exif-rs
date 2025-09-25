@@ -38,6 +38,14 @@ impl TiffParser {
             ));
         }
 
+        // Set ExifByteOrder field based on detected byte order
+        let byte_order = if is_little_endian {
+            "Little-endian (Intel, II)"
+        } else {
+            "Big-endian (Motorola, MM)"
+        };
+        metadata.insert("ExifByteOrder".to_string(), byte_order.to_string());
+
         // Validate TIFF version (should be 42)
         if tiff_start + 8 > data.len() {
             return Err(ExifError::InvalidExif("TIFF header incomplete".to_string()));
@@ -1259,13 +1267,26 @@ impl TiffParser {
             1 => {
                 // BYTE
                 if count <= 4 {
-                    let value = if is_little_endian {
-                        value_offset as u8
+                    // Special handling for GPSVersionID (4 bytes)
+                    if tag_id == 0x0000 && count == 4 {
+                        // GPSVersionID is stored as 4 bytes in the value_offset
+                        // Read bytes in correct order (little-endian: last byte is major version)
+                        let version = format!("{}.{}.{}.{}", 
+                            (value_offset & 0xFF) as u8,
+                            ((value_offset >> 8) & 0xFF) as u8,
+                            ((value_offset >> 16) & 0xFF) as u8,
+                            ((value_offset >> 24) & 0xFF) as u8
+                        );
+                        metadata.insert(tag_name, version);
                     } else {
-                        (value_offset >> 24) as u8
-                    };
-                    let formatted_value = Self::format_gps_field(tag_id, value as u32);
-                    metadata.insert(tag_name, formatted_value);
+                        let value = if is_little_endian {
+                            value_offset as u8
+                        } else {
+                            (value_offset >> 24) as u8
+                        };
+                        let formatted_value = Self::format_gps_field(tag_id, value as u32);
+                        metadata.insert(tag_name, formatted_value);
+                    }
                 } else {
                     let offset = tiff_start + value_offset as usize;
                     if offset + count as usize <= data.len() {
@@ -1273,8 +1294,9 @@ impl TiffParser {
                         
                         // Special handling for GPSVersionID (4 bytes)
                         if tag_id == 0x0000 && count == 4 {
-                            // GPSVersionID is stored as 4 bytes in big-endian order
-                            let version = format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
+                            // GPSVersionID is stored as 4 bytes in little-endian order
+                            // Read bytes in correct order (little-endian: last byte is major version)
+                            let version = format!("{}.{}.{}.{}", bytes[3], bytes[2], bytes[1], bytes[0]);
                             metadata.insert(tag_name, version);
                         } else if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                             let cleaned_string = string.trim_end_matches('\0').trim().to_string();
@@ -1459,12 +1481,12 @@ impl TiffParser {
         match tag_id {
             0x0000 => {
                 // GPSVersionID - format as version string (like exiftool)
-                // GPSVersionID is stored as 4 bytes: major.minor.revision.build
+                // GPSVersionID is stored as 4 bytes in little-endian order: build.revision.minor.major
                 format!("{}.{}.{}.{}", 
-                    (value >> 24) & 0xFF,
-                    (value >> 16) & 0xFF,
+                    value & 0xFF,
                     (value >> 8) & 0xFF,
-                    value & 0xFF
+                    (value >> 16) & 0xFF,
+                    (value >> 24) & 0xFF
                 )
             }
             0x0001 => {
