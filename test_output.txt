@@ -1,5 +1,0 @@
-✓ fast_exif_reader imported
-Available: ['FastExifReader', 'MultiprocessingExifReader', 'VERSION', 'fast_exif_reader', 'multiprocessing', 'process_directory_parallel', 'process_files_parallel', 'python_extract_exif_batch', 'python_extract_exif_from_directory', 'python_read_directory', 'read_multiple_files']
-✓ MultiprocessingExifReader is available
-✓ MultiprocessingExifReader created
-✓ process_files_parallel is available
