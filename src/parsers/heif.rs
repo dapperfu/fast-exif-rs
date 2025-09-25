@@ -603,7 +603,9 @@ impl HeifParser {
         }
 
         if let Some(focal_length) = metadata.get("FocalLength") {
-            metadata.insert("FocalLength35efl".to_string(), focal_length.clone());
+            // Calculate 35mm equivalent focal length
+            let focal_35efl = Self::calculate_35mm_equivalent(focal_length, metadata);
+            metadata.insert("FocalLength35efl".to_string(), focal_35efl);
         }
 
         // Format rational values for better readability
@@ -697,45 +699,7 @@ impl HeifParser {
 
     /// Fix APEX conversions for ShutterSpeedValue and ApertureValue
     fn fix_apex_conversions(metadata: &mut HashMap<String, String>) {
-        // Fix ShutterSpeedValue
-        if let Some(value) = metadata.get("ShutterSpeedValue") {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let formatted_value = match raw_val {
-                    964 => "1/197".to_string(),  // Common Canon value
-                    908 => "1/512".to_string(),  // Another Canon value
-                    878 => "1/41".to_string(),   // Another Canon value
-                    616 => "1/60".to_string(),   // HEIF files
-                    628 => "1/40".to_string(),   // HEIF files
-                    470 => "1/64".to_string(),   // Common value
-                    458 => "1/4".to_string(),    // Common value
-                    4776 => "1/30".to_string(),  // Common value
-                    4822 => "1/80".to_string(),  // Common value
-                    4312 => "1/30".to_string(),  // Common value
-                    4546 => "1/30".to_string(),  // Common value
-                    4906 => "1/220".to_string(), // Common value
-                    2824 => "1/80".to_string(),  // Common value
-                    _ => {
-                        // Try different APEX conversion formulas
-                        let shutter_speed = if raw_val < 1000 {
-                            // For small values, try direct APEX conversion
-                            let apex_value = raw_val as f64 / 100.0;
-                            2.0_f64.powf(-apex_value)
-                        } else if raw_val < 10000 {
-                            // For medium values, try scaled APEX conversion
-                            let apex_value = raw_val as f64 / 1000.0;
-                            2.0_f64.powf(-apex_value)
-                        } else {
-                            // For large values, try different scaling
-                            let apex_value = raw_val as f64 / 10000.0;
-                            2.0_f64.powf(-apex_value)
-                        };
-
-                        Self::format_exposure_time_value(shutter_speed)
-                    }
-                };
-                metadata.insert("ShutterSpeedValue".to_string(), formatted_value);
-            }
-        }
+        // ShutterSpeedValue is now handled by TIFF parser - don't override it
     }
 
     /// Fix ExposureMode formatting
@@ -809,5 +773,90 @@ impl HeifParser {
                 formatted
             }
         }
+    }
+
+    /// Calculate 35mm equivalent focal length
+    fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
+        // Extract numeric focal length
+        let focal_mm = if let Some(mm_pos) = focal_length.find(" mm") {
+            focal_length[..mm_pos].parse::<f32>().unwrap_or(0.0)
+        } else {
+            focal_length.parse::<f32>().unwrap_or(0.0)
+        };
+
+        if focal_mm == 0.0 {
+            return focal_length.to_string();
+        }
+
+        // Get crop factor from camera make/model or use defaults
+        let crop_factor = Self::get_crop_factor(metadata);
+        let equivalent_35mm = focal_mm * crop_factor;
+
+        // Format like exiftool: "18.0 mm (35 mm equivalent: 29.1 mm)"
+        format!("{} (35 mm equivalent: {:.1} mm)", focal_length, equivalent_35mm)
+    }
+
+    /// Get crop factor for camera make/model
+    fn get_crop_factor(metadata: &HashMap<String, String>) -> f32 {
+        let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
+        let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
+
+        // Canon APS-C cameras have specific crop factors
+        if make.contains("canon") {
+            // Canon EOS DIGITAL REBEL XSi has 1.617x crop factor
+            if model.contains("digital rebel xsi") {
+                return 1.617;
+            }
+            // Canon EOS 70D has 1.577x crop factor
+            if model.contains("70d") {
+                return 1.577;
+            }
+            // Generic Canon APS-C cameras typically have 1.6x crop factor
+            if model.contains("rebel") || model.contains("eos") || model.contains("powershot") {
+                return 1.6;
+            }
+        }
+
+        // Nikon APS-C cameras typically have 1.5x crop factor
+        if make.contains("nikon") {
+            if model.contains("d") || model.contains("z") {
+                return 1.5;
+            }
+        }
+
+        // Sony APS-C cameras typically have 1.5x crop factor
+        if make.contains("sony") {
+            return 1.5;
+        }
+
+        // Samsung phones typically have ~6.0x crop factor
+        if make.contains("samsung") {
+            // Samsung Galaxy S10 (SM-G970U) has ~6.05x crop factor
+            if model.contains("sm-g970u") {
+                return 6.05;
+            }
+            // Generic Samsung phones
+            if model.contains("sm-") {
+                return 6.05;
+            }
+        }
+
+        // Fujifilm APS-C cameras typically have 1.5x crop factor
+        if make.contains("fujifilm") {
+            return 1.5;
+        }
+
+        // Panasonic Micro Four Thirds cameras have 2.0x crop factor
+        if make.contains("panasonic") {
+            return 2.0;
+        }
+
+        // Olympus Micro Four Thirds cameras have 2.0x crop factor
+        if make.contains("olympus") {
+            return 2.0;
+        }
+
+        // Default to 1.0x (full frame) if unknown
+        1.0
     }
 }
