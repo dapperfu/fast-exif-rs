@@ -563,6 +563,14 @@ impl RawParser {
             if model.contains("rebel") || model.contains("eos") || model.contains("powershot") {
                 return 1.6;
             }
+            // Canon EOS 70D is APS-C with 1.6x crop factor
+            if model.contains("70d") {
+                return 1.6;
+            }
+            // Canon EOS DIGITAL REBEL XSi has 1.6x crop factor
+            if model.contains("digital rebel xsi") {
+                return 1.6;
+            }
         }
 
         // Nikon APS-C cameras typically have 1.5x crop factor
