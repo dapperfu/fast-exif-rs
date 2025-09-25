@@ -222,6 +222,14 @@ impl VideoParser {
                     // Movie header atom - may contain creation time
                     metadata.insert("MovieHeader".to_string(), "Present".to_string());
                 }
+                b"udta" => {
+                    // User data atom - may contain manufacturer info
+                    Self::extract_user_data_atom(data, pos + 8, size as usize - 8, metadata);
+                }
+                b"meta" => {
+                    // Meta atom - may contain metadata
+                    Self::extract_meta_atom(data, pos + 8, size as usize - 8, metadata);
+                }
                 _ => {}
             }
 
@@ -234,6 +242,136 @@ impl VideoParser {
         }
         if !metadata.contains_key("Model") {
             metadata.insert("Model".to_string(), "Unknown".to_string());
+        }
+    }
+
+    /// Extract user data atom
+    fn extract_user_data_atom(data: &[u8], start: usize, length: usize, metadata: &mut HashMap<String, String>) {
+        let mut pos = start;
+        let end = start + length;
+
+        while pos + 8 < end {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > (end - pos) as u32 {
+                break;
+            }
+
+            let atom_type = &data[pos + 4..pos + 8];
+
+            match atom_type {
+                b"\xa9mak" => {
+                    // Manufacturer atom
+                    if pos + 8 + 4 < end {
+                        let manufacturer = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(manufacturer_str) = String::from_utf8(manufacturer.to_vec()) {
+                            metadata.insert("Make".to_string(), manufacturer_str);
+                        }
+                    }
+                }
+                b"\xa9mod" => {
+                    // Model atom
+                    if pos + 8 + 4 < end {
+                        let model = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(model_str) = String::from_utf8(model.to_vec()) {
+                            metadata.insert("Model".to_string(), model_str);
+                        }
+                    }
+                }
+                b"\xa9nam" => {
+                    // Name atom
+                    if pos + 8 + 4 < end {
+                        let name = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(name_str) = String::from_utf8(name.to_vec()) {
+                            metadata.insert("Title".to_string(), name_str);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            pos += size as usize;
+        }
+    }
+
+    /// Extract meta atom
+    fn extract_meta_atom(data: &[u8], start: usize, length: usize, metadata: &mut HashMap<String, String>) {
+        let mut pos = start;
+        let end = start + length;
+
+        while pos + 8 < end {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > (end - pos) as u32 {
+                break;
+            }
+
+            let atom_type = &data[pos + 4..pos + 8];
+
+            match atom_type {
+                b"hdlr" => {
+                    // Handler atom
+                    if pos + 8 + 20 < end {
+                        let handler_type = &data[pos + 8 + 8..pos + 8 + 12];
+                        if handler_type == b"mdir" {
+                            metadata.insert("HandlerType".to_string(), "Metadata".to_string());
+                        }
+                    }
+                }
+                b"ilst" => {
+                    // Item list atom
+                    Self::extract_item_list_atom(data, pos + 8, size as usize - 8, metadata);
+                }
+                _ => {}
+            }
+
+            pos += size as usize;
+        }
+    }
+
+    /// Extract item list atom
+    fn extract_item_list_atom(data: &[u8], start: usize, length: usize, metadata: &mut HashMap<String, String>) {
+        let mut pos = start;
+        let end = start + length;
+
+        while pos + 8 < end {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > (end - pos) as u32 {
+                break;
+            }
+
+            let atom_type = &data[pos + 4..pos + 8];
+
+            match atom_type {
+                b"\xa9mak" => {
+                    // Manufacturer atom
+                    if pos + 8 + 4 < end {
+                        let manufacturer = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(manufacturer_str) = String::from_utf8(manufacturer.to_vec()) {
+                            metadata.insert("Make".to_string(), manufacturer_str);
+                        }
+                    }
+                }
+                b"\xa9mod" => {
+                    // Model atom
+                    if pos + 8 + 4 < end {
+                        let model = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(model_str) = String::from_utf8(model.to_vec()) {
+                            metadata.insert("Model".to_string(), model_str);
+                        }
+                    }
+                }
+                b"\xa9nam" => {
+                    // Name atom
+                    if pos + 8 + 4 < end {
+                        let name = &data[pos + 8..pos + 8 + 4];
+                        if let Ok(name_str) = String::from_utf8(name.to_vec()) {
+                            metadata.insert("Title".to_string(), name_str);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            pos += size as usize;
         }
     }
 
