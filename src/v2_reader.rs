@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 use crate::parsers::{
-    cache::{ExifCache, CacheStats},
     selective::{SelectiveFieldExtractor, FieldExtractors},
     simd::SimdHexParser,
     zero_copy::ZeroCopyExifParser,
@@ -13,14 +12,11 @@ use crate::parsers::{
 /// - Zero-copy EXIF parsing
 /// - SIMD-accelerated processing
 /// - Selective field extraction
-/// - Persistent caching
 /// - Parallel processing capabilities
 pub struct FastExifReaderV2 {
     zero_copy_parser: ZeroCopyExifParser,
     simd_parser: SimdHexParser,
-    cache: Option<ExifCache>,
     field_extractor: Option<SelectiveFieldExtractor>,
-    enable_cache: bool,
     enable_simd: bool,
     enable_zero_copy: bool,
 }
@@ -31,37 +27,19 @@ impl FastExifReaderV2 {
         Self {
             zero_copy_parser: ZeroCopyExifParser::new(),
             simd_parser: SimdHexParser::new(),
-            cache: None,
             field_extractor: None,
-            enable_cache: false,
             enable_simd: true,
             enable_zero_copy: true,
         }
     }
     
-    /// Create reader with caching enabled
-    pub fn with_cache<P: AsRef<Path>>(cache_dir: P) -> Result<Self, String> {
-        let cache = ExifCache::new(cache_dir)?;
-        
-        Ok(Self {
-            zero_copy_parser: ZeroCopyExifParser::new(),
-            simd_parser: SimdHexParser::new(),
-            cache: Some(cache),
-            field_extractor: None,
-            enable_cache: true,
-            enable_simd: true,
-            enable_zero_copy: true,
-        })
-    }
     
     /// Create reader with selective field extraction
     pub fn with_fields(fields: &[&str]) -> Self {
         Self {
             zero_copy_parser: ZeroCopyExifParser::new(),
             simd_parser: SimdHexParser::new(),
-            cache: None,
             field_extractor: Some(SelectiveFieldExtractor::with_fields(fields)),
-            enable_cache: false,
             enable_simd: true,
             enable_zero_copy: true,
         }
@@ -72,41 +50,26 @@ impl FastExifReaderV2 {
         Self {
             zero_copy_parser: ZeroCopyExifParser::new(),
             simd_parser: SimdHexParser::new(),
-            cache: None,
             field_extractor: Some(SelectiveFieldExtractor::with_groups(groups)),
-            enable_cache: false,
             enable_simd: true,
             enable_zero_copy: true,
         }
     }
     
     /// Create reader with all optimizations enabled
-    pub fn with_all_optimizations<P: AsRef<Path>>(cache_dir: P) -> Result<Self, String> {
-        let cache = ExifCache::new(cache_dir)?;
-        
-        Ok(Self {
+    pub fn with_all_optimizations() -> Self {
+        Self {
             zero_copy_parser: ZeroCopyExifParser::new(),
             simd_parser: SimdHexParser::new(),
-            cache: Some(cache),
             field_extractor: None,
-            enable_cache: true,
             enable_simd: true,
             enable_zero_copy: true,
-        })
+        }
     }
     
     /// Read EXIF data from a file with all optimizations
     pub fn read_file<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, String> {
         let path = path.as_ref();
-        
-        // Check cache first if enabled
-        if self.enable_cache {
-            if let Some(cache) = &self.cache {
-                if let Some(cached_data) = cache.get(path)? {
-                    return Ok(cached_data);
-                }
-            }
-        }
         
         // Parse EXIF data using zero-copy parser
         let mut metadata = if self.enable_zero_copy {
@@ -119,13 +82,6 @@ impl FastExifReaderV2 {
         // Apply field filtering if enabled
         if let Some(extractor) = &self.field_extractor {
             metadata = extractor.filter_metadata(metadata);
-        }
-        
-        // Store in cache if enabled
-        if self.enable_cache {
-            if let Some(cache) = &self.cache {
-                cache.store(path, metadata.clone())?;
-            }
         }
         
         Ok(metadata)
@@ -188,11 +144,6 @@ impl FastExifReaderV2 {
         Ok(HashMap::new())
     }
     
-    /// Enable or disable caching
-    pub fn set_cache_enabled(&mut self, enabled: bool) {
-        self.enable_cache = enabled;
-    }
-    
     /// Enable or disable SIMD acceleration
     pub fn set_simd_enabled(&mut self, enabled: bool) {
         self.enable_simd = enabled;
@@ -213,40 +164,12 @@ impl FastExifReaderV2 {
         self.field_extractor = None;
     }
     
-    /// Get cache statistics
-    pub fn get_cache_stats(&self) -> Result<Option<CacheStats>, String> {
-        if let Some(cache) = &self.cache {
-            Ok(Some(cache.get_stats()?))
-        } else {
-            Ok(None)
-        }
-    }
-    
-    /// Clear cache
-    pub fn clear_cache(&self) -> Result<(), String> {
-        if let Some(cache) = &self.cache {
-            cache.clear()?;
-        }
-        Ok(())
-    }
-    
-    /// Check if a file is cached
-    pub fn is_cached<P: AsRef<Path>>(&self, path: P) -> Result<bool, String> {
-        if let Some(cache) = &self.cache {
-            cache.is_cached(path)
-        } else {
-            Ok(false)
-        }
-    }
-    
     /// Get performance information
     pub fn get_performance_info(&self) -> PerformanceInfo {
         PerformanceInfo {
-            cache_enabled: self.enable_cache,
             simd_enabled: self.enable_simd,
             zero_copy_enabled: self.enable_zero_copy,
             field_filtering_enabled: self.field_extractor.is_some(),
-            cache_entries: self.cache.as_ref().map(|c| c.get_stats().ok()).flatten().map(|s| s.total_entries).unwrap_or(0),
         }
     }
 }
@@ -254,11 +177,9 @@ impl FastExifReaderV2 {
 /// Performance information for the reader
 #[derive(Debug)]
 pub struct PerformanceInfo {
-    pub cache_enabled: bool,
     pub simd_enabled: bool,
     pub zero_copy_enabled: bool,
     pub field_filtering_enabled: bool,
-    pub cache_entries: usize,
 }
 
 impl Default for FastExifReaderV2 {
@@ -270,17 +191,13 @@ impl Default for FastExifReaderV2 {
 /// Convenience functions for common use cases
 impl FastExifReaderV2 {
     /// Create reader optimized for thumbnail generation
-    pub fn for_thumbnails<P: AsRef<Path>>(cache_dir: P) -> Result<Self, String> {
-        let mut reader = Self::with_cache(cache_dir)?;
-        reader.set_field_extractor(FieldExtractors::thumbnail());
-        Ok(reader)
+    pub fn for_thumbnails() -> Self {
+        Self::with_field_groups(&["thumbnail"])
     }
     
     /// Create reader optimized for file management
-    pub fn for_file_management<P: AsRef<Path>>(cache_dir: P) -> Result<Self, String> {
-        let mut reader = Self::with_cache(cache_dir)?;
-        reader.set_field_extractor(FieldExtractors::file_management());
-        Ok(reader)
+    pub fn for_file_management() -> Self {
+        Self::with_field_groups(&["file"])
     }
     
     /// Create reader optimized for GPS data extraction
