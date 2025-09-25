@@ -17,25 +17,25 @@ impl MakerNoteParser {
 
         // Look for manufacturer identifiers
         if data[offset..offset + 5].windows(5).any(|w| w == b"Canon") {
-            Self::parse_canon_maker_note(data, offset, count, metadata);
+            Self::parse_canon_maker_note(data, metadata);
         } else if data[offset..offset + 5].windows(5).any(|w| w == b"Nikon") {
-            Self::parse_nikon_maker_note(data, offset, count, metadata);
+            Self::parse_nikon_maker_note(data, metadata);
         } else if data[offset..offset + 7].windows(7).any(|w| w == b"OLYMPUS") {
-            Self::parse_olympus_maker_note(data, offset, count, metadata);
+            Self::parse_olympus_maker_note(data, metadata);
         } else if data[offset..offset + 5].windows(5).any(|w| w == b"Sony") {
-            Self::parse_sony_maker_note(data, offset, count, metadata);
+            Self::parse_sony_maker_note(data, metadata);
         } else {
             // Try to detect manufacturer from existing metadata
             if let Some(make) = metadata.get("Make") {
                 let make_lower = make.to_lowercase();
                 if make_lower.contains("canon") {
-                    Self::parse_canon_maker_note(data, offset, count, metadata);
+                    Self::parse_canon_maker_note(data, metadata);
                 } else if make_lower.contains("nikon") {
-                    Self::parse_nikon_maker_note(data, offset, count, metadata);
+                    Self::parse_nikon_maker_note(data, metadata);
                 } else if make_lower.contains("olympus") {
-                    Self::parse_olympus_maker_note(data, offset, count, metadata);
+                    Self::parse_olympus_maker_note(data, metadata);
                 } else if make_lower.contains("sony") {
-                    Self::parse_sony_maker_note(data, offset, count, metadata);
+                    Self::parse_sony_maker_note(data, metadata);
                 }
             }
         }
