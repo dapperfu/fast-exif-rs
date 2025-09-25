@@ -1,4 +1,4 @@
-use crate::parsers::maker_notes::MakerNoteParser;
+use crate::parsers::maker_notes::MakerNotesParser;
 use crate::types::ExifError;
 use std::collections::HashMap;
 
@@ -183,7 +183,7 @@ impl TiffParser {
         if let Some(maker_note_offset) =
             Self::find_sub_ifd_offset(data, offset, 0x927C, is_little_endian, tiff_start)
         {
-            MakerNoteParser::parse_maker_note(
+            MakerNotesParser::parse_maker_note(
                 data,
                 tiff_start + maker_note_offset as usize,
                 0,
