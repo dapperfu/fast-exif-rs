@@ -558,17 +558,18 @@ impl RawParser {
         let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
         let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
 
-        // Canon APS-C cameras typically have 1.6x crop factor
+        // Canon APS-C cameras have specific crop factors
         if make.contains("canon") {
-            if model.contains("rebel") || model.contains("eos") || model.contains("powershot") {
-                return 1.6;
-            }
-            // Canon EOS 70D is APS-C with 1.6x crop factor
-            if model.contains("70d") {
-                return 1.6;
-            }
-            // Canon EOS DIGITAL REBEL XSi has 1.6x crop factor
+            // Canon EOS DIGITAL REBEL XSi has 1.617x crop factor
             if model.contains("digital rebel xsi") {
+                return 1.617;
+            }
+            // Canon EOS 70D has 1.577x crop factor
+            if model.contains("70d") {
+                return 1.577;
+            }
+            // Generic Canon APS-C cameras typically have 1.6x crop factor
+            if model.contains("rebel") || model.contains("eos") || model.contains("powershot") {
                 return 1.6;
             }
         }
