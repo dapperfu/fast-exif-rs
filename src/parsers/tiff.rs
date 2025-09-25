@@ -431,6 +431,13 @@ impl TiffParser {
                         let formatted_value =
                             Self::format_special_field(tag_id, value_offset as u16);
                         metadata.insert(tag_name, formatted_value);
+                    } else if tag_id == 0x9201 {
+                        // ShutterSpeedValue as LONG
+                        // Convert APEX value to shutter speed: 2^(-apex_value/1000) like exiftool
+                        let apex_value = value_offset as f64 / 1000.0;
+                        let shutter_speed = 2.0_f64.powf(-apex_value);
+                        let formatted = Self::format_exposure_time(shutter_speed);
+                        metadata.insert(tag_name, formatted);
                     } else {
                         metadata.insert(tag_name, value_offset.to_string());
                     }
@@ -1027,6 +1034,9 @@ impl TiffParser {
             0x9290 => "SubSecTime".to_string(),
             0x9291 => "SubSecTimeOriginal".to_string(),
             0x9292 => "SubSecTimeDigitized".to_string(),
+            0x9010 => "OffsetTime".to_string(),
+            0x9011 => "OffsetTimeOriginal".to_string(),
+            0x9012 => "OffsetTimeDigitized".to_string(),
             0x013E => "WhitePoint".to_string(),
             0x013F => "PrimaryChromaticities".to_string(),
             0x0211 => "YCbCrCoefficients".to_string(),
@@ -1456,15 +1466,16 @@ impl TiffParser {
                         metadata.insert(tag_name, formatted_value);
                     }
                 } else if count == 3 {
-                    // GPS coordinates (latitude/longitude) - 3 rationals
+                    // GPS coordinates (latitude/longitude) or GPSTimeStamp - 3 rationals
                     let offset = tiff_start + value_offset as usize;
                     if offset + 24 <= data.len() {
-                        let formatted_value = Self::format_gps_coordinates(
-                            data,
-                            offset,
-                            is_little_endian,
-                            tag_id,
-                        );
+                        let formatted_value = if tag_id == 0x0007 {
+                            // GPSTimeStamp - format as HH:MM:SS
+                            Self::format_gps_timestamp(data, offset, is_little_endian)
+                        } else {
+                            // GPS coordinates (latitude/longitude)
+                            Self::format_gps_coordinates(data, offset, is_little_endian, tag_id)
+                        };
                         metadata.insert(tag_name, formatted_value);
                     }
                 }
@@ -1605,6 +1616,67 @@ impl TiffParser {
             }
             _ => format!("{:.6}", value),
         }
+    }
+
+    /// Format GPS timestamp as HH:MM:SS
+    fn format_gps_timestamp(data: &[u8], offset: usize, is_little_endian: bool) -> String {
+        let mut hours = 0.0;
+        let mut minutes = 0.0;
+        let mut seconds = 0.0;
+
+        // Parse 3 rational values (hours, minutes, seconds)
+        for i in 0..3 {
+            let rational_offset = offset + (i * 8);
+            if rational_offset + 8 <= data.len() {
+                let numerator = if is_little_endian {
+                    u32::from_le_bytes([
+                        data[rational_offset],
+                        data[rational_offset + 1],
+                        data[rational_offset + 2],
+                        data[rational_offset + 3],
+                    ])
+                } else {
+                    u32::from_be_bytes([
+                        data[rational_offset],
+                        data[rational_offset + 1],
+                        data[rational_offset + 2],
+                        data[rational_offset + 3],
+                    ])
+                };
+
+                let denominator = if is_little_endian {
+                    u32::from_le_bytes([
+                        data[rational_offset + 4],
+                        data[rational_offset + 5],
+                        data[rational_offset + 6],
+                        data[rational_offset + 7],
+                    ])
+                } else {
+                    u32::from_be_bytes([
+                        data[rational_offset + 4],
+                        data[rational_offset + 5],
+                        data[rational_offset + 6],
+                        data[rational_offset + 7],
+                    ])
+                };
+
+                let value = if denominator != 0 {
+                    numerator as f64 / denominator as f64
+                } else {
+                    numerator as f64
+                };
+
+                match i {
+                    0 => hours = value,
+                    1 => minutes = value,
+                    2 => seconds = value,
+                    _ => {}
+                }
+            }
+        }
+
+        // Format as HH:MM:SS
+        format!("{:02.0}:{:02.0}:{:02.0}", hours, minutes, seconds)
     }
 
     /// Format GPS coordinates (latitude/longitude)

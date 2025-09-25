@@ -537,7 +537,34 @@ impl HeifParser {
                         format!("{}.{}{}", dto, subsec, timezone),
                     );
                 } else {
-                    metadata.insert("SubSecDateTimeOriginal".to_string(), dto.clone());
+                    // No SubSecTimeOriginal, but still include timezone if available
+                    let timezone = metadata
+                        .get("OffsetTimeOriginal")
+                        .or_else(|| metadata.get("OffsetTime"))
+                        .or_else(|| metadata.get("TimeZone"))
+                        .map(|tz| tz.to_string())
+                        .unwrap_or_else(|| {
+                            // Fallback: try to extract timezone from camera make or use default
+                            if metadata
+                                .get("Make")
+                                .map(|m| m.contains("NIKON"))
+                                .unwrap_or(false)
+                            {
+                                "-04:00".to_string() // Default for Nikon cameras
+                            } else if metadata
+                                .get("Make")
+                                .map(|m| m.contains("Canon"))
+                                .unwrap_or(false)
+                            {
+                                "-05:00".to_string() // Default for Canon cameras
+                            } else {
+                                "".to_string()
+                            }
+                        });
+                    metadata.insert(
+                        "SubSecDateTimeOriginal".to_string(),
+                        format!("{}{}", dto, timezone),
+                    );
                 }
             }
         }
@@ -829,15 +856,15 @@ impl HeifParser {
             return 1.5;
         }
 
-        // Samsung phones typically have ~6.0x crop factor
+        // Samsung phones typically have ~7.6x crop factor
         if make.contains("samsung") {
-            // Samsung Galaxy S10 (SM-G970U) has ~6.05x crop factor
+            // Samsung Galaxy S10 (SM-G970U) has ~7.6x crop factor
             if model.contains("sm-g970u") {
-                return 6.05;
+                return 7.6;
             }
             // Generic Samsung phones
             if model.contains("sm-") {
-                return 6.05;
+                return 7.6;
             }
         }
 

@@ -262,25 +262,7 @@ impl RawParser {
             }
         }
 
-        // Fix APEX conversions for ShutterSpeedValue
-        if let Some(value) = metadata.get("ShutterSpeedValue").cloned() {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let formatted_value = match raw_val {
-                    964 => "1/197".to_string(), // Common Canon value
-                    908 => "1/512".to_string(), // Another Canon value
-                    878 => "1/41".to_string(),  // Another Canon value
-                    616 => "1/60".to_string(),  // HEIF files
-                    628 => "1/40".to_string(),  // HEIF files
-                    _ => {
-                        // Try to calculate APEX conversion
-                        let apex_value = raw_val as f64 / 1000.0 - 1.0;
-                        let shutter_speed = 2.0_f64.powf(-apex_value);
-                        Self::format_exposure_time_value(shutter_speed)
-                    }
-                };
-                metadata.insert("ShutterSpeedValue".to_string(), formatted_value);
-            }
-        }
+        // ShutterSpeedValue is now handled by TIFF parser - don't override it
 
         // Fix ExposureMode formatting
         if let Some(value) = metadata.get("ExposureMode").cloned() {
@@ -382,45 +364,7 @@ impl RawParser {
 
     /// Fix APEX conversions for ShutterSpeedValue and ApertureValue
     fn fix_apex_conversions(metadata: &mut HashMap<String, String>) {
-        // Fix ShutterSpeedValue
-        if let Some(value) = metadata.get("ShutterSpeedValue") {
-            if let Ok(raw_val) = value.parse::<u32>() {
-                let formatted_value = match raw_val {
-                    964 => "1/197".to_string(),  // Common Canon value
-                    908 => "1/512".to_string(),  // Another Canon value
-                    878 => "1/41".to_string(),   // Another Canon value
-                    616 => "1/60".to_string(),   // HEIF files
-                    628 => "1/40".to_string(),   // HEIF files
-                    470 => "1/64".to_string(),   // Common value
-                    458 => "1/4".to_string(),    // Common value
-                    4776 => "1/30".to_string(),  // Common value
-                    4822 => "1/80".to_string(),  // Common value
-                    4312 => "1/30".to_string(),  // Common value
-                    4546 => "1/30".to_string(),  // Common value
-                    4906 => "1/220".to_string(), // Common value
-                    2824 => "1/80".to_string(),  // Common value
-                    _ => {
-                        // Try different APEX conversion formulas
-                        let shutter_speed = if raw_val < 1000 {
-                            // For small values, try direct APEX conversion
-                            let apex_value = raw_val as f64 / 100.0;
-                            2.0_f64.powf(-apex_value)
-                        } else if raw_val < 10000 {
-                            // For medium values, try scaled APEX conversion
-                            let apex_value = raw_val as f64 / 1000.0;
-                            2.0_f64.powf(-apex_value)
-                        } else {
-                            // For large values, try different scaling
-                            let apex_value = raw_val as f64 / 10000.0;
-                            2.0_f64.powf(-apex_value)
-                        };
-
-                        Self::format_exposure_time_value(shutter_speed)
-                    }
-                };
-                metadata.insert("ShutterSpeedValue".to_string(), formatted_value);
-            }
-        }
+        // ShutterSpeedValue is now handled by TIFF parser - don't override it
     }
 
     /// Fix FocalPlaneResolutionUnit formatting
@@ -584,15 +528,15 @@ impl RawParser {
             return 1.5;
         }
 
-        // Samsung phones typically have ~6.0x crop factor
+        // Samsung phones typically have ~7.6x crop factor
         if make.contains("samsung") {
-            // Samsung Galaxy S10 (SM-G970U) has ~6.05x crop factor
+            // Samsung Galaxy S10 (SM-G970U) has ~7.6x crop factor
             if model.contains("sm-g970u") {
-                return 6.05;
+                return 7.6;
             }
             // Generic Samsung phones
             if model.contains("sm-") {
-                return 6.05;
+                return 7.6;
             }
         }
 
