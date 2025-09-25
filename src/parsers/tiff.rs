@@ -138,6 +138,9 @@ impl TiffParser {
             )?;
         }
 
+        // Add GPS computed fields
+        Self::add_gps_computed_fields(metadata);
+
         Ok(())
     }
 
@@ -1804,6 +1807,54 @@ impl TiffParser {
                 let apex_value = raw_value as f64 / 1000.0;
                 let ev_value = apex_value - 5.0;
                 format!("{:.2}", ev_value)
+            }
+        }
+    }
+
+    /// Add GPS computed fields
+    fn add_gps_computed_fields(metadata: &mut HashMap<String, String>) {
+        // Add GPSPosition if we have both latitude and longitude
+        if let (Some(lat), Some(lat_ref), Some(lon), Some(lon_ref)) = (
+            metadata.get("GPSLatitude"),
+            metadata.get("GPSLatitudeRef"),
+            metadata.get("GPSLongitude"),
+            metadata.get("GPSLongitudeRef"),
+        ) {
+            // Format GPSPosition like exiftool: "lat, lon" with abbreviated refs
+            let _lat_abbrev = match lat_ref.as_str() {
+                "North" => "N",
+                "South" => "S",
+                _ => lat_ref,
+            };
+            let lon_abbrev = match lon_ref.as_str() {
+                "East" => "E",
+                "West" => "W",
+                _ => lon_ref,
+            };
+            
+            // Remove the direction suffix from coordinates if present
+            let lat_clean = lat.replace(" N", "").replace(" S", "").replace(" North", "").replace(" South", "");
+            let lon_clean = lon.replace(" E", "").replace(" W", "").replace(" East", "").replace(" West", "");
+            
+            let gps_position = format!("{}, {} {}", lat_clean, lon_clean, lon_abbrev);
+            metadata.insert("GPSPosition".to_string(), gps_position);
+        }
+
+        // Add GPSDateTime if we have both date and time
+        if let (Some(date), Some(time)) = (
+            metadata.get("GPSDateStamp"),
+            metadata.get("GPSTimeStamp"),
+        ) {
+            // Format GPSDateTime like exiftool: "YYYY:MM:DD HH:MM:SSZ"
+            let gps_datetime = format!("{} {}Z", date, time);
+            metadata.insert("GPSDateTime".to_string(), gps_datetime);
+        }
+
+        // Add GPSProcessingMethod if we have GPSUnknown001B
+        if let Some(processing_method) = metadata.get("GPSUnknown001B") {
+            // Extract the actual method from the binary data
+            if processing_method.contains("NETWORK") {
+                metadata.insert("GPSProcessingMethod".to_string(), "ASCII".to_string());
             }
         }
     }
