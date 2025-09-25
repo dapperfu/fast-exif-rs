@@ -173,7 +173,8 @@ impl JpegParser {
         // Add computed fields that exiftool provides
 
         // File information
-        metadata.insert("ExifToolVersion".to_string(), "12.76".to_string());
+        // Remove ExifToolVersion to avoid confusion with exiftool
+        // metadata.insert("ExifToolVersion".to_string(), "12.76".to_string());
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
         metadata.insert(
