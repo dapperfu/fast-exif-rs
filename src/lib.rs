@@ -17,7 +17,7 @@ mod utils;
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
 pub use multiprocessing::MultiprocessingExifReader;
-pub use parsers::{HeifParser, JpegParser, RawParser, VideoParser};
+pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
 
@@ -98,6 +98,9 @@ impl FastExifReader {
             "MOV" => VideoParser::parse_mov_exif(data, &mut metadata)?,
             "MP4" => VideoParser::parse_mp4_exif(data, &mut metadata)?,
             "3GP" => VideoParser::parse_3gp_exif(data, &mut metadata)?,
+            "PNG" => PngParser::parse_png_exif(data, &mut metadata)?,
+            "BMP" => BmpParser::parse_bmp_exif(data, &mut metadata)?,
+            "MKV" => MkvParser::parse_mkv_exif(data, &mut metadata)?,
             _ => {
                 return Err(ExifError::UnsupportedFormat(format!(
                     "Unsupported format: {}",
