@@ -206,6 +206,15 @@ except FileNotFoundError:
     print(f"Error reading EXIF: {e}")
 ```
 
+## Documentation
+
+For detailed documentation, performance analysis, and development information, see the [docs/](docs/) directory:
+
+- [Performance Analysis](docs/V2_REAL_IMPROVEMENTS.md) - Detailed V2 performance improvements
+- [Large-Scale Benchmarks](docs/LARGE_SCALE_BENCHMARK_SUMMARY.md) - Benchmark results
+- [Multiprocessing Guide](docs/MULTIPROCESSING.md) - Parallel processing capabilities
+- [Development Roadmap](docs/ROADMAP.md) - Future features and plans
+
 ## License
 
 MIT License - see LICENSE file for details. 
