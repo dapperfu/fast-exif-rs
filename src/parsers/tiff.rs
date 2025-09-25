@@ -1270,9 +1270,37 @@ impl TiffParser {
                     let offset = tiff_start + value_offset as usize;
                     if offset + count as usize <= data.len() {
                         let bytes = &data[offset..offset + count as usize];
-                        if let Ok(string) = String::from_utf8(bytes.to_vec()) {
+                        
+                        // Special handling for GPSVersionID (4 bytes)
+                        if tag_id == 0x0000 && count == 4 {
+                            // GPSVersionID is stored as 4 bytes in big-endian order
+                            let version = format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3]);
+                            metadata.insert(tag_name, version);
+                        } else if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                             let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                            metadata.insert(tag_name, cleaned_string);
+                            
+                            // Special formatting for GPS reference fields
+                            let formatted_string = match tag_id {
+                                0x0001 => {
+                                    // GPSLatitudeRef - convert single char to full word
+                                    match cleaned_string.as_str() {
+                                        "N" => "North".to_string(),
+                                        "S" => "South".to_string(),
+                                        _ => cleaned_string,
+                                    }
+                                }
+                                0x0003 => {
+                                    // GPSLongitudeRef - convert single char to full word
+                                    match cleaned_string.as_str() {
+                                        "E" => "East".to_string(),
+                                        "W" => "West".to_string(),
+                                        _ => cleaned_string,
+                                    }
+                                }
+                                _ => cleaned_string,
+                            };
+                            
+                            metadata.insert(tag_name, formatted_string);
                         }
                     }
                 }
@@ -1287,7 +1315,29 @@ impl TiffParser {
                     };
                     if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                         let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                        metadata.insert(tag_name, cleaned_string);
+                        
+                        // Special formatting for GPS reference fields
+                        let formatted_string = match tag_id {
+                            0x0001 => {
+                                // GPSLatitudeRef - convert single char to full word
+                                match cleaned_string.as_str() {
+                                    "N" => "North".to_string(),
+                                    "S" => "South".to_string(),
+                                    _ => cleaned_string,
+                                }
+                            }
+                            0x0003 => {
+                                // GPSLongitudeRef - convert single char to full word
+                                match cleaned_string.as_str() {
+                                    "E" => "East".to_string(),
+                                    "W" => "West".to_string(),
+                                    _ => cleaned_string,
+                                }
+                            }
+                            _ => cleaned_string,
+                        };
+                        
+                        metadata.insert(tag_name, formatted_string);
                     }
                 } else {
                     let offset = tiff_start + value_offset as usize;
@@ -1295,7 +1345,29 @@ impl TiffParser {
                         let bytes = &data[offset..offset + count as usize];
                         if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                             let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                            metadata.insert(tag_name, cleaned_string);
+                            
+                            // Special formatting for GPS coordinates
+                            let formatted_string = match tag_id {
+                                0x0002 => {
+                                    // GPSLatitude - add N suffix
+                                    if cleaned_string.contains("deg") && !cleaned_string.ends_with("N") && !cleaned_string.ends_with("S") {
+                                        format!("{} N", cleaned_string)
+                                    } else {
+                                        cleaned_string
+                                    }
+                                }
+                                0x0004 => {
+                                    // GPSLongitude - add W suffix
+                                    if cleaned_string.contains("deg") && !cleaned_string.ends_with("E") && !cleaned_string.ends_with("W") {
+                                        format!("{} W", cleaned_string)
+                                    } else {
+                                        cleaned_string
+                                    }
+                                }
+                                _ => cleaned_string,
+                            };
+                            
+                            metadata.insert(tag_name, formatted_string);
                         }
                     }
                 }
@@ -1386,7 +1458,8 @@ impl TiffParser {
     fn format_gps_field(tag_id: u16, value: u32) -> String {
         match tag_id {
             0x0000 => {
-                // GPSVersionID - format as version string
+                // GPSVersionID - format as version string (like exiftool)
+                // GPSVersionID is stored as 4 bytes: major.minor.revision.build
                 format!("{}.{}.{}.{}", 
                     (value >> 24) & 0xFF,
                     (value >> 16) & 0xFF,
@@ -1482,7 +1555,7 @@ impl TiffParser {
         match tag_id {
             0x0006 => {
                 // GPSAltitude
-                format!("{:.1} m", value)
+                format!("{:.1} m Above Sea Level", value)
             }
             0x000B => {
                 // GPSDOP
@@ -1509,7 +1582,7 @@ impl TiffParser {
         data: &[u8],
         offset: usize,
         is_little_endian: bool,
-        _tag_id: u16,
+        tag_id: u16,
     ) -> String {
         let mut degrees = 0.0;
         let mut minutes = 0.0;
@@ -1566,7 +1639,12 @@ impl TiffParser {
             }
         }
 
-        // Format as degrees, minutes, seconds
-        format!("{} deg {}' {:.2}\"", degrees as i32, minutes as i32, seconds)
+        // Format as degrees, minutes, seconds with direction suffix
+        let direction = match tag_id {
+            0x0002 => "N", // GPSLatitude
+            0x0004 => "W", // GPSLongitude
+            _ => "",
+        };
+        format!("{} deg {}' {:.2}\" {}", degrees as i32, minutes as i32, seconds, direction)
     }
 }
