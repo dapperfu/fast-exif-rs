@@ -1,0 +1,371 @@
+{
+  "supported_formats": {
+    "CR2": {
+      "status": "tested",
+      "message": "Tested 5 files",
+      "files_tested": 5,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 69.0,
+      "sample_fields": [
+        [
+          "FocalLength35efl",
+          "18.0 mm (35 mm equivalent: 28.4 mm)"
+        ],
+        [
+          "PixelYDimension",
+          "3648"
+        ],
+        [
+          "ShutterSpeedValue",
+          "9038"
+        ],
+        [
+          "SceneCaptureType",
+          "Standard"
+        ],
+        [
+          "ImageHeight",
+          "3648"
+        ]
+      ]
+    },
+    "HEIC": {
+      "status": "tested",
+      "message": "Tested 10 files",
+      "files_tested": 10,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 62.0,
+      "sample_fields": [
+        [
+          "SubSecDateTimeOriginal",
+          "2021:04:23 08:37:52"
+        ],
+        [
+          "XResolution",
+          "72"
+        ],
+        [
+          "Megapixels",
+          "7.7"
+        ],
+        [
+          "UnknownTag_0001",
+          "N"
+        ],
+        [
+          "ColorSpace",
+          "sRGB"
+        ]
+      ]
+    },
+    "MP4": {
+      "status": "tested",
+      "message": "Tested 5 files",
+      "files_tested": 5,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 7.0,
+      "sample_fields": [
+        [
+          "Format",
+          "MP4"
+        ],
+        [
+          "Model",
+          "Unknown"
+        ],
+        [
+          "ExifByteOrder",
+          "Little-endian (Intel, II)"
+        ],
+        [
+          "FileTypeExtension",
+          "mp4"
+        ],
+        [
+          "Brand",
+          "isom"
+        ]
+      ]
+    },
+    "MOV": {
+      "status": "tested",
+      "message": "Tested 5 files",
+      "files_tested": 5,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 7.0,
+      "sample_fields": [
+        [
+          "FileTypeExtension",
+          "mov"
+        ],
+        [
+          "MIMEType",
+          "video/quicktime"
+        ],
+        [
+          "ExifByteOrder",
+          "Little-endian (Intel, II)"
+        ],
+        [
+          "Format",
+          "MOV"
+        ],
+        [
+          "Make",
+          "Unknown"
+        ]
+      ]
+    },
+    "DNG": {
+      "status": "tested",
+      "message": "Tested 5 files",
+      "files_tested": 5,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 64.0,
+      "sample_fields": [
+        [
+          "UnknownTag_0115",
+          "1"
+        ],
+        [
+          "",
+          "830"
+        ],
+        [
+          "UnknownTag_C616",
+          "0"
+        ],
+        [
+          "ResolutionUnit",
+          "inches"
+        ],
+        [
+          "YResolution",
+          "72"
+        ]
+      ]
+    },
+    "PNG": {
+      "status": "tested",
+      "message": "Tested 2 files",
+      "files_tested": 2,
+      "successful_reads": 2,
+      "failed_reads": 0,
+      "avg_fields": 10.0,
+      "sample_fields": [
+        [
+          "FileTypeExtension",
+          "png"
+        ],
+        [
+          "BitDepth",
+          "1"
+        ],
+        [
+          "ImageSize",
+          "650x650"
+        ],
+        [
+          "Format",
+          "PNG"
+        ],
+        [
+          "ExifByteOrder",
+          "Little-endian (Intel, II)"
+        ]
+      ]
+    },
+    "AVI": {
+      "status": "tested",
+      "message": "Tested 3 files",
+      "files_tested": 3,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 6.0,
+      "sample_fields": [
+        [
+          "FrameRate",
+          "Unknown"
+        ],
+        [
+          "MIMEType",
+          "video/avi"
+        ],
+        [
+          "Codec",
+          "Unknown"
+        ],
+        [
+          "FileType",
+          "AVI"
+        ],
+        [
+          "Format",
+          "AVI"
+        ]
+      ]
+    },
+    "WEBM": {
+      "status": "tested",
+      "message": "Tested 1 files",
+      "files_tested": 1,
+      "successful_reads": 1,
+      "failed_reads": 0,
+      "avg_fields": 4.0,
+      "sample_fields": [
+        [
+          "MIMEType",
+          "video/x-matroska"
+        ],
+        [
+          "FileTypeExtension",
+          "mkv"
+        ],
+        [
+          "ExifByteOrder",
+          "Little-endian (Intel, II)"
+        ],
+        [
+          "Format",
+          "MKV"
+        ]
+      ]
+    },
+    "MKV": {
+      "status": "tested",
+      "message": "Tested 5 files",
+      "files_tested": 5,
+      "successful_reads": 3,
+      "failed_reads": 0,
+      "avg_fields": 4.0,
+      "sample_fields": [
+        [
+          "Format",
+          "MKV"
+        ],
+        [
+          "MIMEType",
+          "video/x-matroska"
+        ],
+        [
+          "ExifByteOrder",
+          "Little-endian (Intel, II)"
+        ],
+        [
+          "FileTypeExtension",
+          "mkv"
+        ]
+      ]
+    }
+  },
+  "unsupported_formats": {
+    "JPEG": {
+      "status": "tested",
+      "message": "Tested 10 files",
+      "files_tested": 10,
+      "successful_reads": 0,
+      "failed_reads": 3,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "GIF": {
+      "status": "no_files",
+      "message": "No GIF files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "WEBP": {
+      "status": "no_files",
+      "message": "No WEBP files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "WMV": {
+      "status": "no_files",
+      "message": "No WMV files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "ARW": {
+      "status": "no_files",
+      "message": "No ARW files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "RAF": {
+      "status": "no_files",
+      "message": "No RAF files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "SRW": {
+      "status": "no_files",
+      "message": "No SRW files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "ORF": {
+      "status": "no_files",
+      "message": "No ORF files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "PEF": {
+      "status": "no_files",
+      "message": "No PEF files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    },
+    "RW2": {
+      "status": "no_files",
+      "message": "No RW2 files found",
+      "files_tested": 0,
+      "successful_reads": 0,
+      "failed_reads": 0,
+      "avg_fields": 0,
+      "sample_fields": []
+    }
+  },
+  "test_summary": {
+    "total_formats_tested": 19,
+    "supported_formats": 9,
+    "unsupported_formats": 10,
+    "support_percentage": 47.368421052631575
+  },
+  "metadata": {
+    "timestamp": "2025-09-27 17:43:26",
+    "python_version": "3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]",
+    "fast_exif_rs_version": "0.4.9+22.gba355cb.dirty",
+    "test_type": "Comprehensive Format Support",
+    "test_directory": "/keg/pictures"
+  }
+}

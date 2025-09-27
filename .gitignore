@@ -75,26 +75,32 @@ logs/
 *.tmp
 *.temp
 
-# Benchmark results
+# Benchmark results (keep in docs/benchmarks/)
 benchmark_results_*.json
 *_benchmark_*.json
 *_results_*.json
 *_output.txt
 *_output.json
 
-# Development scripts and temporary files
-*_test.py
-*_demo.py
-*_analysis.py
-*_comparison.py
-*_validation.py
-*_comprehensive.py
-*_benchmark.py
-*_checklist.txt
-*_plan.json
-*_summary.md
-*_report.md
-*_analysis.md
+# Temporary development files
+*_temp.py
+*_scratch.py
+*_debug.py
+*.tmp
+*.temp
 
 # Test files directory (contains copied media files for testing)
 test_files/
+
+# Generated documentation
+docs/generated/
+
+# Coverage reports
+coverage.xml
+.coverage
+htmlcov/
+
+# Build artifacts
+*.so
+*.dylib
+*.dll
