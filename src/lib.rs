@@ -49,30 +49,30 @@ impl FastExifReader {
     }
 
     /// Read EXIF data from file path
-    fn read_file(&mut self, file_path: &str) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    fn read_file(&mut self, file_path: &str) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let metadata = self.read_exif_fast(file_path)?;
             Ok(metadata.into_pyobject(py)?.into())
         })
     }
 
     /// Read EXIF data from bytes
-    fn read_bytes(&mut self, data: &[u8]) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    fn read_bytes(&mut self, data: &[u8]) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let metadata = self.read_exif_from_bytes(data)?;
             Ok(metadata.into_pyobject(py)?.into())
         })
     }
 
     /// Support for pickle protocol
-    fn __getstate__(&self, py: Python) -> PyResult<PyObject> {
+    fn __getstate__(&self, py: Python) -> PyResult<Py<PyAny>> {
         // Serialize the buffer as bytes
         let buffer_bytes = PyBytes::new(py, &self.buffer);
         Ok(buffer_bytes.into())
     }
 
     /// Support for pickle protocol
-    fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
+    fn __setstate__(&mut self, py: Python, state: Py<PyAny>) -> PyResult<()> {
         // Deserialize the buffer from bytes
         let buffer_bytes: &[u8] = state.bind(py).extract()?;
         self.buffer = buffer_bytes.to_vec();
@@ -291,8 +291,8 @@ impl FastExifCopier {
     }
 
     /// Get high-priority EXIF fields from source image
-    fn get_high_priority_fields(&mut self, source_path: &str) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    fn get_high_priority_fields(&mut self, source_path: &str) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let metadata = self.copier.get_high_priority_fields(source_path)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             
