@@ -26,6 +26,8 @@ mod enhanced_image_parser;
 mod enhanced_cr2_parser;
 mod enhanced_heif_parser;
 mod enhanced_dng_parser;
+mod field_mapping;
+mod computed_fields;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -43,6 +45,7 @@ pub use enhanced_format_detection::EnhancedFormatDetector;
 pub use enhanced_raw_parser::EnhancedRawParser;
 pub use enhanced_video_parser::EnhancedVideoParser;
 pub use enhanced_image_parser::EnhancedImageParser;
+pub use field_mapping::FieldMapper;
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
@@ -63,18 +66,34 @@ impl FastExifReader {
         }
     }
 
-    /// Read EXIF data from file path
+    /// Read EXIF data from file path with 1:1 exiftool compatibility
     fn read_file(&mut self, file_path: &str) -> PyResult<Py<PyAny>> {
         Python::attach(|py| {
-            let metadata = self.read_exif_fast(file_path)?;
+            let mut metadata = self.read_exif_fast(file_path)?;
+            
+            // Add computed fields for 1:1 exiftool compatibility
+            crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
+            
+            // Normalize field names to exiftool standard for 1:1 compatibility
+            let field_mapper = FieldMapper::new();
+            field_mapper.normalize_to_exiftool(&mut metadata);
+            
             Ok(metadata.into_pyobject(py)?.into())
         })
     }
 
-    /// Read EXIF data from bytes
+    /// Read EXIF data from bytes with 1:1 exiftool compatibility
     fn read_bytes(&mut self, data: &[u8]) -> PyResult<Py<PyAny>> {
         Python::attach(|py| {
-            let metadata = self.read_exif_from_bytes(data)?;
+            let mut metadata = self.read_exif_from_bytes(data)?;
+            
+            // Add computed fields for 1:1 exiftool compatibility
+            crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
+            
+            // Normalize field names to exiftool standard for 1:1 compatibility
+            let field_mapper = FieldMapper::new();
+            field_mapper.normalize_to_exiftool(&mut metadata);
+            
             Ok(metadata.into_pyobject(py)?.into())
         })
     }
