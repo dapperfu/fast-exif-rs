@@ -36,17 +36,27 @@ Example:
 try:
     from .fast_exif_reader import (
         FastExifReader,
+        FastExifWriter,
+        FastExifCopier,
         MultiprocessingExifReader as RustMultiprocessingExifReader,
+        BatchExifWriter,
         process_files_parallel as rust_process_files_parallel,
-        process_directory_parallel as rust_process_directory_parallel
+        process_directory_parallel as rust_process_directory_parallel,
+        write_exif_batch_parallel as rust_write_exif_batch_parallel,
+        copy_exif_batch_parallel as rust_copy_exif_batch_parallel
     )
     RUST_AVAILABLE = True
 except ImportError:
     RUST_AVAILABLE = False
     FastExifReader = None
+    FastExifWriter = None
+    FastExifCopier = None
     RustMultiprocessingExifReader = None
+    BatchExifWriter = None
     rust_process_files_parallel = None
     rust_process_directory_parallel = None
+    rust_write_exif_batch_parallel = None
+    rust_copy_exif_batch_parallel = None
 
 # Import Python multiprocessing functions
 from .multiprocessing import (
@@ -72,6 +82,9 @@ __license__ = "MIT"
 __all__ = [
     # Core functionality
     "FastExifReader",
+    "FastExifWriter",
+    "FastExifCopier",
+    "BatchExifWriter",
     
     # Python multiprocessing (default/backward compatible)
     "MultiprocessingExifReader",
@@ -91,6 +104,8 @@ __all__ = [
     "RustMultiprocessingExifReader",
     "rust_process_files_parallel",
     "rust_process_directory_parallel",
+    "rust_write_exif_batch_parallel",
+    "rust_copy_exif_batch_parallel",
     
     # Utility
     "RUST_AVAILABLE"

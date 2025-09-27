@@ -3,7 +3,7 @@
 
 use memmap2::Mmap;
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyDict};
 use std::collections::HashMap;
 use std::fs::File;
 
@@ -14,6 +14,9 @@ mod parsers;
 mod types;
 mod utils;
 mod v2_reader;
+mod writer;
+mod exif_copier;
+mod batch_writer;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -22,6 +25,9 @@ pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawPa
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
 pub use v2_reader::FastExifReaderV2;
+pub use writer::ExifWriter;
+pub use exif_copier::ExifCopier;
+pub use batch_writer::{BatchExifWriter, write_exif_batch_parallel, copy_exif_batch_parallel};
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
@@ -115,11 +121,199 @@ impl FastExifReader {
     }
 }
 
+/// Fast EXIF writer for adding/modifying EXIF metadata
+#[pyclass]
+#[derive(Clone)]
+#[allow(non_local_definitions)]
+pub struct FastExifWriter {
+    writer: ExifWriter,
+}
+
+/// Fast EXIF copier for copying metadata between images
+#[pyclass]
+#[derive(Clone)]
+#[allow(non_local_definitions)]
+pub struct FastExifCopier {
+    copier: ExifCopier,
+}
+
+#[allow(non_local_definitions)]
+#[pymethods]
+impl FastExifWriter {
+    #[new]
+    fn new() -> Self {
+        Self {
+            writer: ExifWriter::new(),
+        }
+    }
+
+    /// Write EXIF metadata to an image file (auto-detects format)
+    fn write_exif(
+        &self,
+        input_path: &str,
+        output_path: &str,
+        metadata: &Bound<'_, PyDict>,
+    ) -> PyResult<()> {
+        let mut exif_metadata = HashMap::new();
+        
+        // Convert Python dict to HashMap
+        for (key, value) in metadata.iter() {
+            let key_str: String = key.extract()?;
+            let value_str: String = value.extract()?;
+            exif_metadata.insert(key_str, value_str);
+        }
+        
+        self.writer.write_exif(input_path, output_path, &exif_metadata)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    /// Write EXIF metadata to a JPEG file (legacy method)
+    fn write_jpeg_exif(
+        &self,
+        input_path: &str,
+        output_path: &str,
+        metadata: &Bound<'_, PyDict>,
+    ) -> PyResult<()> {
+        self.write_exif(input_path, output_path, metadata)
+    }
+
+    /// Write EXIF metadata to image bytes (auto-detects format)
+    fn write_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &Bound<'_, PyDict>,
+    ) -> PyResult<Vec<u8>> {
+        let mut exif_metadata = HashMap::new();
+        
+        // Convert Python dict to HashMap
+        for (key, value) in metadata.iter() {
+            let key_str: String = key.extract()?;
+            let value_str: String = value.extract()?;
+            exif_metadata.insert(key_str, value_str);
+        }
+        
+        self.writer.write_exif_to_bytes(input_data, &exif_metadata)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Write EXIF metadata to JPEG bytes (legacy method)
+    fn write_jpeg_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &Bound<'_, PyDict>,
+    ) -> PyResult<Vec<u8>> {
+        self.write_exif_to_bytes(input_data, metadata)
+    }
+
+    /// Copy high-priority EXIF fields from source to target image
+    fn copy_high_priority_exif(
+        &self,
+        source_path: &str,
+        target_path: &str,
+        output_path: &str,
+    ) -> PyResult<()> {
+        self.writer.copy_high_priority_exif(source_path, target_path, output_path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Copy high-priority EXIF fields from source bytes to target bytes
+    fn copy_high_priority_exif_to_bytes(
+        &self,
+        source_data: &[u8],
+        target_data: &[u8],
+    ) -> PyResult<Vec<u8>> {
+        self.writer.copy_high_priority_exif_to_bytes(source_data, target_data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+}
+
+#[allow(non_local_definitions)]
+#[pymethods]
+impl FastExifCopier {
+    #[new]
+    fn new() -> Self {
+        Self {
+            copier: ExifCopier::new(),
+        }
+    }
+
+    /// Copy high-priority EXIF fields from source to target image
+    fn copy_high_priority_exif(
+        &mut self,
+        source_path: &str,
+        target_path: &str,
+        output_path: &str,
+    ) -> PyResult<()> {
+        self.copier.copy_high_priority_exif(source_path, target_path, output_path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Copy high-priority EXIF fields from source bytes to target bytes
+    fn copy_high_priority_exif_to_bytes(
+        &mut self,
+        source_data: &[u8],
+        target_data: &[u8],
+    ) -> PyResult<Vec<u8>> {
+        self.copier.copy_high_priority_exif_to_bytes(source_data, target_data)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Copy all EXIF fields from source to target image
+    fn copy_all_exif(
+        &mut self,
+        source_path: &str,
+        target_path: &str,
+        output_path: &str,
+    ) -> PyResult<()> {
+        self.copier.copy_all_exif(source_path, target_path, output_path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Copy specific EXIF fields from source to target image
+    fn copy_specific_exif(
+        &mut self,
+        source_path: &str,
+        target_path: &str,
+        output_path: &str,
+        field_names: Vec<String>,
+    ) -> PyResult<()> {
+        let field_refs: Vec<&str> = field_names.iter().map(|s| s.as_str()).collect();
+        self.copier.copy_specific_exif(source_path, target_path, output_path, &field_refs)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Get available EXIF fields from source image
+    fn get_available_fields(&mut self, source_path: &str) -> PyResult<Vec<String>> {
+        self.copier.get_available_fields(source_path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Get high-priority EXIF fields from source image
+    fn get_high_priority_fields(&mut self, source_path: &str) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let metadata = self.copier.get_high_priority_fields(source_path)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            
+            let dict = PyDict::new(py);
+            for (key, value) in metadata {
+                dict.set_item(key, value)?;
+            }
+            
+            Ok(dict.into())
+        })
+    }
+}
+
 /// Python module definition
 #[pymodule]
 fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FastExifReader>()?;
+    m.add_class::<FastExifWriter>()?;
+    m.add_class::<FastExifCopier>()?;
     m.add_class::<MultiprocessingExifReader>()?;
+    m.add_class::<BatchExifWriter>()?;
     m.add_class::<ExifResult>()?;
     m.add_class::<ProcessingStats>()?;
     m.add_function(wrap_pyfunction!(
@@ -128,6 +322,14 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(
         multiprocessing::process_directory_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        batch_writer::write_exif_batch_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        batch_writer::copy_exif_batch_parallel,
         m
     )?)?;
     Ok(())
