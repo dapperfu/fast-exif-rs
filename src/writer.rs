@@ -76,6 +76,10 @@ impl ExifWriter {
             "HEIF" | "HIF" => self.write_heif_exif_to_bytes(input_data, metadata),
             "PNG" => self.write_png_exif_to_bytes(input_data, metadata),
             "CR2" | "NEF" | "ORF" | "DNG" => self.write_raw_exif_to_bytes(input_data, metadata),
+            "MP4" => self.write_mp4_exif_to_bytes(input_data, metadata),
+            "MOV" => self.write_mov_exif_to_bytes(input_data, metadata),
+            "3GP" => self.write_3gp_exif_to_bytes(input_data, metadata),
+            "MKV" => self.write_mkv_exif_to_bytes(input_data, metadata),
             _ => Err(ExifError::UnsupportedFormat(format!(
                 "EXIF writing not yet supported for format: {}",
                 format
@@ -833,6 +837,243 @@ impl ExifWriter {
         }
         
         Err(ExifError::InvalidExif(format!("Invalid signed rational value: {}", value)))
+    }
+    
+    /// Write EXIF metadata to MP4 bytes
+    pub fn write_mp4_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // MP4 files use ISO Base Media File Format
+        // We need to add metadata atoms to the MP4 structure
+        
+        // Validate MP4 format
+        if input_data.len() < 8 {
+            return Err(ExifError::InvalidExif("Invalid MP4 format".to_string()));
+        }
+        
+        // Check for MP4 signature (ftyp atom)
+        if input_data.len() < 8 || &input_data[4..8] != b"ftyp" {
+            return Err(ExifError::InvalidExif("Not a valid MP4 file".to_string()));
+        }
+        
+        // For MP4, we'll add metadata atoms (udta, meta, etc.)
+        // This is a simplified implementation that preserves the file structure
+        self.add_mp4_metadata_atoms(input_data, metadata)
+    }
+    
+    /// Write EXIF metadata to MOV bytes
+    pub fn write_mov_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // MOV files use QuickTime container format
+        // Similar to MP4 but with some differences in atom structure
+        
+        // Validate MOV format
+        if input_data.len() < 8 {
+            return Err(ExifError::InvalidExif("Invalid MOV format".to_string()));
+        }
+        
+        // Check for QuickTime signature
+        if input_data.len() < 8 || &input_data[4..8] != b"ftyp" {
+            return Err(ExifError::InvalidExif("Not a valid MOV file".to_string()));
+        }
+        
+        // For MOV, we'll add metadata atoms similar to MP4
+        self.add_mov_metadata_atoms(input_data, metadata)
+    }
+    
+    /// Write EXIF metadata to 3GP bytes
+    pub fn write_3gp_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // 3GP files use the same structure as MP4
+        self.write_mp4_exif_to_bytes(input_data, metadata)
+    }
+    
+    /// Write EXIF metadata to MKV bytes
+    pub fn write_mkv_exif_to_bytes(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // MKV files use Matroska container format (EBML)
+        // This is more complex than MP4/MOV
+        
+        // Validate MKV format
+        if input_data.len() < 4 {
+            return Err(ExifError::InvalidExif("Invalid MKV format".to_string()));
+        }
+        
+        // Check for Matroska signature (EBML header)
+        if input_data.len() < 4 || &input_data[0..4] != b"\x1A\x45\xDF\xA3" {
+            return Err(ExifError::InvalidExif("Not a valid MKV file".to_string()));
+        }
+        
+        // For MKV, we'll add metadata elements to the EBML structure
+        self.add_mkv_metadata_elements(input_data, metadata)
+    }
+    
+    /// Add MP4 metadata atoms
+    fn add_mp4_metadata_atoms(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // Create metadata atoms for MP4
+        let mut result = Vec::new();
+        
+        // For now, we'll implement a basic approach that preserves the file
+        // and adds a simple metadata atom
+        result.extend_from_slice(input_data);
+        
+        // Add udta (user data) atom with metadata
+        let udta_atom = self.create_mp4_udta_atom(metadata)?;
+        result.extend_from_slice(&udta_atom);
+        
+        Ok(result)
+    }
+    
+    /// Add MOV metadata atoms
+    fn add_mov_metadata_atoms(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // Similar to MP4 but with QuickTime-specific atoms
+        let mut result = Vec::new();
+        result.extend_from_slice(input_data);
+        
+        // Add udta atom with metadata
+        let udta_atom = self.create_mov_udta_atom(metadata)?;
+        result.extend_from_slice(&udta_atom);
+        
+        Ok(result)
+    }
+    
+    /// Add MKV metadata elements
+    fn add_mkv_metadata_elements(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // MKV uses EBML format, which is more complex
+        // For now, we'll implement a basic approach
+        let mut result = Vec::new();
+        result.extend_from_slice(input_data);
+        
+        // Add metadata elements to MKV
+        let metadata_elements = self.create_mkv_metadata_elements(metadata)?;
+        result.extend_from_slice(&metadata_elements);
+        
+        Ok(result)
+    }
+    
+    /// Create MP4 udta (user data) atom
+    fn create_mp4_udta_atom(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
+        let mut atom = Vec::new();
+        
+        // udta atom header (size + type)
+        atom.write_u32::<BigEndian>(0)?; // Size (will be calculated)
+        atom.extend_from_slice(b"udta");
+        
+        // Add metadata atoms within udta
+        if let Some(title) = metadata.get("Title") {
+            let title_atom = self.create_mp4_text_atom(b"\xa9nam", title)?;
+            atom.extend_from_slice(&title_atom);
+        }
+        
+        if let Some(artist) = metadata.get("Artist") {
+            let artist_atom = self.create_mp4_text_atom(b"\xa9ART", artist)?;
+            atom.extend_from_slice(&artist_atom);
+        }
+        
+        if let Some(description) = metadata.get("Description") {
+            let desc_atom = self.create_mp4_text_atom(b"\xa9des", description)?;
+            atom.extend_from_slice(&desc_atom);
+        }
+        
+        if let Some(comment) = metadata.get("Comment") {
+            let comment_atom = self.create_mp4_text_atom(b"\xa9cmt", comment)?;
+            atom.extend_from_slice(&comment_atom);
+        }
+        
+        if let Some(copyright) = metadata.get("Copyright") {
+            let copyright_atom = self.create_mp4_text_atom(b"\xa9cpy", copyright)?;
+            atom.extend_from_slice(&copyright_atom);
+        }
+        
+        // Update size field
+        let size = atom.len() as u32;
+        atom[0..4].copy_from_slice(&size.to_be_bytes());
+        
+        Ok(atom)
+    }
+    
+    /// Create MOV udta atom
+    fn create_mov_udta_atom(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
+        // Similar to MP4 but with QuickTime-specific text atoms
+        self.create_mp4_udta_atom(metadata)
+    }
+    
+    /// Create MKV metadata elements
+    fn create_mkv_metadata_elements(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
+        // MKV uses EBML format
+        let mut elements = Vec::new();
+        
+        // Add metadata elements (simplified implementation)
+        if let Some(title) = metadata.get("Title") {
+            let title_element = self.create_mkv_text_element(0x7BA9, title)?;
+            elements.extend_from_slice(&title_element);
+        }
+        
+        if let Some(artist) = metadata.get("Artist") {
+            let artist_element = self.create_mkv_text_element(0x5F91, artist)?;
+            elements.extend_from_slice(&artist_element);
+        }
+        
+        Ok(elements)
+    }
+    
+    /// Create MP4 text atom
+    fn create_mp4_text_atom(&self, atom_type: &[u8; 4], text: &str) -> Result<Vec<u8>, ExifError> {
+        let mut atom = Vec::new();
+        
+        // Atom header
+        let text_bytes = text.as_bytes();
+        let size = 8 + text_bytes.len() as u32;
+        atom.write_u32::<BigEndian>(size)?;
+        atom.extend_from_slice(atom_type);
+        
+        // Text data
+        atom.extend_from_slice(text_bytes);
+        
+        Ok(atom)
+    }
+    
+    /// Create MKV text element
+    fn create_mkv_text_element(&self, element_id: u32, text: &str) -> Result<Vec<u8>, ExifError> {
+        let mut element = Vec::new();
+        
+        // EBML element header (simplified)
+        let text_bytes = text.as_bytes();
+        let size = text_bytes.len() as u32;
+        
+        // Element ID (variable length)
+        element.write_u32::<BigEndian>(element_id)?;
+        
+        // Element size (variable length)
+        element.write_u32::<BigEndian>(size)?;
+        
+        // Text data
+        element.extend_from_slice(text_bytes);
+        
+        Ok(element)
     }
 }
 
