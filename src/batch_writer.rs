@@ -33,14 +33,14 @@ pub struct BatchWriteResult {
     pub fields_written: usize,
 }
 
-impl IntoPyObject for BatchWriteResult {
-    fn into_pyobject(self, py: Python) -> PyObject {
-        let dict = PyDict::new(py);
-        dict.set_item("input_path", self.input_path).unwrap();
-        dict.set_item("output_path", self.output_path).unwrap();
+impl BatchWriteResult {
+    fn to_python_dict(&self, py: Python) -> Py<PyAny> {
+        let dict = pyo3::types::PyDict::new(py);
+        dict.set_item("input_path", &self.input_path).unwrap();
+        dict.set_item("output_path", &self.output_path).unwrap();
         dict.set_item("success", self.success).unwrap();
         dict.set_item("processing_time", self.processing_time).unwrap();
-        dict.set_item("error", self.error).unwrap();
+        dict.set_item("error", &self.error).unwrap();
         dict.set_item("fields_written", self.fields_written).unwrap();
         dict.into()
     }
@@ -69,25 +69,25 @@ impl BatchExifWriter {
     /// Write EXIF metadata to multiple files in parallel
     fn write_exif_batch(
         &self,
-        operations: Vec<PyObject>,
-    ) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+        operations: Vec<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             // Convert Python objects to batch operations
             let mut batch_ops = Vec::new();
             for op in operations {
                 let dict = op.bind(py).downcast::<pyo3::types::PyDict>()?;
                 
-                let input_path: String = dict.get_item("input_path")
+                let input_path: String = dict.get_item("input_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing input_path"))?
                     .extract()?;
                 
-                let output_path: String = dict.get_item("output_path")
+                let output_path: String = dict.get_item("output_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing output_path"))?
                     .extract()?;
                 
-                let metadata_dict = dict.get_item("metadata")
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing metadata"))?
-                    .downcast::<pyo3::types::PyDict>()?;
+                let metadata_item = dict.get_item("metadata")?
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing metadata"))?;
+                let metadata_dict = metadata_item.downcast::<pyo3::types::PyDict>()?;
                 
                 let mut metadata = HashMap::new();
                 for (key, value) in metadata_dict.iter() {
@@ -104,30 +104,34 @@ impl BatchExifWriter {
             }
             
             let results = self.process_write_batch(batch_ops)?;
-            Ok(results.into_pyobject(py)?.into())
+            let py_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in results {
+                py_dict.set_item(k, v).unwrap();
+            }
+            Ok(py_dict.into())
         })
     }
 
     /// Copy EXIF metadata between multiple file pairs in parallel
     fn copy_exif_batch(
-        &self,
-        operations: Vec<PyObject>,
-    ) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+        &mut self,
+        operations: Vec<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             // Convert Python objects to batch copy operations
             let mut batch_ops = Vec::new();
             for op in operations {
                 let dict = op.bind(py).downcast::<pyo3::types::PyDict>()?;
                 
-                let source_path: String = dict.get_item("source_path")
+                let source_path: String = dict.get_item("source_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing source_path"))?
                     .extract()?;
                 
-                let target_path: String = dict.get_item("target_path")
+                let target_path: String = dict.get_item("target_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing target_path"))?
                     .extract()?;
                 
-                let output_path: String = dict.get_item("output_path")
+                let output_path: String = dict.get_item("output_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing output_path"))?
                     .extract()?;
                 
@@ -139,32 +143,36 @@ impl BatchExifWriter {
             }
             
             let results = self.process_copy_batch(batch_ops)?;
-            Ok(results.into_pyobject(py)?.into())
+            let py_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in results {
+                py_dict.set_item(k, v).unwrap();
+            }
+            Ok(py_dict.into())
         })
     }
 
     /// Write EXIF metadata to multiple files with high-priority field filtering
     fn write_high_priority_exif_batch(
         &self,
-        operations: Vec<PyObject>,
-    ) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+        operations: Vec<Py<PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             // Convert Python objects to batch operations
             let mut batch_ops = Vec::new();
             for op in operations {
                 let dict = op.bind(py).downcast::<pyo3::types::PyDict>()?;
                 
-                let input_path: String = dict.get_item("input_path")
+                let input_path: String = dict.get_item("input_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing input_path"))?
                     .extract()?;
                 
-                let output_path: String = dict.get_item("output_path")
+                let output_path: String = dict.get_item("output_path")?
                     .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing output_path"))?
                     .extract()?;
                 
-                let metadata_dict = dict.get_item("metadata")
-                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing metadata"))?
-                    .downcast::<pyo3::types::PyDict>()?;
+                let metadata_item = dict.get_item("metadata")?
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>("Missing metadata"))?;
+                let metadata_dict = metadata_item.downcast::<pyo3::types::PyDict>()?;
                 
                 let mut metadata = HashMap::new();
                 for (key, value) in metadata_dict.iter() {
@@ -181,7 +189,11 @@ impl BatchExifWriter {
             }
             
             let results = self.process_write_batch_high_priority(batch_ops)?;
-            Ok(results.into_pyobject(py)?.into())
+            let py_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in results {
+                py_dict.set_item(k, v).unwrap();
+            }
+            Ok(py_dict.into())
         })
     }
 }
@@ -191,7 +203,7 @@ impl BatchExifWriter {
     fn process_write_batch(
         &self,
         operations: Vec<BatchWriteOperation>,
-    ) -> Result<HashMap<String, PyObject>, ExifError> {
+    ) -> Result<HashMap<String, Py<PyAny>>, ExifError> {
         let start_time = Instant::now();
 
         // Configure rayon thread pool if max_workers is specified
@@ -245,22 +257,29 @@ impl BatchExifWriter {
         };
 
         // Convert results to Python objects
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut result_map = HashMap::new();
 
             // Add statistics
             result_map.insert(
                 "stats".to_string(),
-                stats
-                    .into_pyobject(py)
-                    .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                    .into(),
+                {
+                    let dict = pyo3::types::PyDict::new(py);
+                    dict.set_item("total_files", stats.total_files).unwrap();
+                    dict.set_item("success_count", stats.success_count).unwrap();
+                    dict.set_item("error_count", stats.error_count).unwrap();
+                    dict.set_item("success_rate", stats.success_rate).unwrap();
+                    dict.set_item("total_time", stats.total_time).unwrap();
+                    dict.set_item("avg_processing_time", stats.avg_processing_time).unwrap();
+                    dict.set_item("files_per_second", stats.files_per_second).unwrap();
+                    dict.into()
+                },
             );
 
             // Add field statistics
             result_map.insert(
                 "total_fields_written".to_string(),
-                total_fields_written.into_py(py).into(),
+                total_fields_written.into_pyobject(py).unwrap().into(),
             );
 
             // Add individual results
@@ -271,10 +290,7 @@ impl BatchExifWriter {
                 );
                 result_map.insert(
                     file_key,
-                    result
-                        .into_pyobject(py)
-                        .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                        .into(),
+                    result.to_python_dict(py),
                 );
             }
 
@@ -284,9 +300,9 @@ impl BatchExifWriter {
 
     /// Process batch copy operations in parallel
     fn process_copy_batch(
-        &self,
+        &mut self,
         operations: Vec<BatchCopyOperation>,
-    ) -> Result<HashMap<String, PyObject>, ExifError> {
+    ) -> Result<HashMap<String, Py<PyAny>>, ExifError> {
         let start_time = Instant::now();
 
         // Configure rayon thread pool if max_workers is specified
@@ -297,10 +313,11 @@ impl BatchExifWriter {
         }
 
         // Process operations in parallel
-        let results: Vec<BatchWriteResult> = operations
-            .par_iter()
-            .map(|op| self.process_single_copy(op))
-            .collect();
+        // Since we need mutable access, we'll process sequentially for now
+        let mut results = Vec::new();
+        for op in operations {
+            results.push(self.process_single_copy(&op));
+        }
 
         let total_time = start_time.elapsed().as_secs_f64();
 
@@ -336,16 +353,23 @@ impl BatchExifWriter {
         };
 
         // Convert results to Python objects
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut result_map = HashMap::new();
 
             // Add statistics
             result_map.insert(
                 "stats".to_string(),
-                stats
-                    .into_pyobject(py)
-                    .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                    .into(),
+                {
+                    let dict = pyo3::types::PyDict::new(py);
+                    dict.set_item("total_files", stats.total_files).unwrap();
+                    dict.set_item("success_count", stats.success_count).unwrap();
+                    dict.set_item("error_count", stats.error_count).unwrap();
+                    dict.set_item("success_rate", stats.success_rate).unwrap();
+                    dict.set_item("total_time", stats.total_time).unwrap();
+                    dict.set_item("avg_processing_time", stats.avg_processing_time).unwrap();
+                    dict.set_item("files_per_second", stats.files_per_second).unwrap();
+                    dict.into()
+                },
             );
 
             // Add individual results
@@ -356,10 +380,7 @@ impl BatchExifWriter {
                 );
                 result_map.insert(
                     file_key,
-                    result
-                        .into_pyobject(py)
-                        .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                        .into(),
+                    result.to_python_dict(py),
                 );
             }
 
@@ -371,7 +392,7 @@ impl BatchExifWriter {
     fn process_write_batch_high_priority(
         &self,
         operations: Vec<BatchWriteOperation>,
-    ) -> Result<HashMap<String, PyObject>, ExifError> {
+    ) -> Result<HashMap<String, Py<PyAny>>, ExifError> {
         let start_time = Instant::now();
 
         // Configure rayon thread pool if max_workers is specified
@@ -425,22 +446,29 @@ impl BatchExifWriter {
         };
 
         // Convert results to Python objects
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut result_map = HashMap::new();
 
             // Add statistics
             result_map.insert(
                 "stats".to_string(),
-                stats
-                    .into_pyobject(py)
-                    .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                    .into(),
+                {
+                    let dict = pyo3::types::PyDict::new(py);
+                    dict.set_item("total_files", stats.total_files).unwrap();
+                    dict.set_item("success_count", stats.success_count).unwrap();
+                    dict.set_item("error_count", stats.error_count).unwrap();
+                    dict.set_item("success_rate", stats.success_rate).unwrap();
+                    dict.set_item("total_time", stats.total_time).unwrap();
+                    dict.set_item("avg_processing_time", stats.avg_processing_time).unwrap();
+                    dict.set_item("files_per_second", stats.files_per_second).unwrap();
+                    dict.into()
+                },
             );
 
             // Add field statistics
             result_map.insert(
                 "total_fields_written".to_string(),
-                total_fields_written.into_py(py).into(),
+                total_fields_written.into_pyobject(py).unwrap().into(),
             );
 
             // Add individual results
@@ -451,10 +479,7 @@ impl BatchExifWriter {
                 );
                 result_map.insert(
                     file_key,
-                    result
-                        .into_pyobject(py)
-                        .map_err(|e| ExifError::InvalidExif(e.to_string()))?
-                        .into(),
+                    result.to_python_dict(py),
                 );
             }
 
@@ -497,7 +522,7 @@ impl BatchExifWriter {
     }
 
     /// Process a single copy operation
-    fn process_single_copy(&self, operation: &BatchCopyOperation) -> BatchWriteResult {
+    fn process_single_copy(&mut self, operation: &BatchCopyOperation) -> BatchWriteResult {
         let start_time = Instant::now();
 
         match self.copier.copy_high_priority_exif(
@@ -577,29 +602,29 @@ impl Default for BatchExifWriter {
 /// Standalone function for batch EXIF writing
 #[pyfunction]
 pub fn write_exif_batch_parallel(
-    operations: Vec<PyObject>,
+    operations: Vec<Py<PyAny>>,
     max_workers: Option<usize>,
-) -> PyResult<PyObject> {
-    Python::with_gil(|py| {
+) -> PyResult<Py<PyAny>> {
+    Python::attach(|py| {
         let writer = BatchExifWriter::new(max_workers);
         let results = writer
             .write_exif_batch(operations)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(results.into_pyobject(py)?.into())
+        Ok(results)
     })
 }
 
 /// Standalone function for batch EXIF copying
 #[pyfunction]
 pub fn copy_exif_batch_parallel(
-    operations: Vec<PyObject>,
+    operations: Vec<Py<PyAny>>,
     max_workers: Option<usize>,
-) -> PyResult<PyObject> {
-    Python::with_gil(|py| {
-        let writer = BatchExifWriter::new(max_workers);
+) -> PyResult<Py<PyAny>> {
+    Python::attach(|py| {
+        let mut writer = BatchExifWriter::new(max_workers);
         let results = writer
             .copy_exif_batch(operations)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(results.into_pyobject(py)?.into())
+        Ok(results)
     })
 }

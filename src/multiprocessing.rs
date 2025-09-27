@@ -28,8 +28,8 @@ impl MultiprocessingExifReader {
     }
 
     /// Read EXIF data from multiple files using Rust parallel processing
-    fn read_files(&self, file_paths: Vec<String>) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    fn read_files(&self, file_paths: Vec<String>) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let results = self.process_files_parallel(file_paths)?;
             Ok(results.into_pyobject(py)?.into())
         })
@@ -41,8 +41,8 @@ impl MultiprocessingExifReader {
         directory: String,
         extensions: Option<Vec<String>>,
         max_files: Option<usize>,
-    ) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    ) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let file_paths = self.scan_directory(directory, extensions, max_files)?;
             let results = self.process_files_parallel(file_paths)?;
             Ok(results.into_pyobject(py)?.into())
@@ -54,7 +54,7 @@ impl MultiprocessingExifReader {
     fn process_files_parallel(
         &self,
         file_paths: Vec<String>,
-    ) -> Result<HashMap<String, PyObject>, ExifError> {
+    ) -> Result<HashMap<String, Py<PyAny>>, ExifError> {
         let start_time = Instant::now();
 
         // Configure rayon thread pool if max_workers is specified
@@ -107,7 +107,7 @@ impl MultiprocessingExifReader {
         };
 
         // Convert results to Python objects
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let mut result_map = HashMap::new();
 
             // Add statistics
@@ -256,8 +256,8 @@ impl MultiprocessingExifReader {
 pub fn process_files_parallel(
     file_paths: Vec<String>,
     max_workers: Option<usize>,
-) -> PyResult<PyObject> {
-    Python::with_gil(|py| {
+) -> PyResult<Py<PyAny>> {
+    Python::attach(|py| {
         let reader = MultiprocessingExifReader::new(max_workers);
         let results = reader
             .process_files_parallel(file_paths)
@@ -273,8 +273,8 @@ pub fn process_directory_parallel(
     extensions: Option<Vec<String>>,
     max_files: Option<usize>,
     max_workers: Option<usize>,
-) -> PyResult<PyObject> {
-    Python::with_gil(|_py| {
+) -> PyResult<Py<PyAny>> {
+    Python::attach(|_py| {
         let reader = MultiprocessingExifReader::new(max_workers);
         let results = reader
             .read_directory(directory, extensions, max_files)
