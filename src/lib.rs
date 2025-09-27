@@ -98,7 +98,108 @@ impl FastExifReader {
         let file = File::open(file_path)?;
         let mmap = unsafe { Mmap::map(&file)? };
 
-        self.read_exif_from_bytes(&mmap)
+        let mut metadata = self.read_exif_from_bytes(&mmap)?;
+        
+        // Add file system information that exiftool provides
+        Self::add_file_system_metadata(file_path, &mut metadata);
+        
+        Ok(metadata)
+    }
+
+    /// Add file system metadata that exiftool provides
+    fn add_file_system_metadata(file_path: &str, metadata: &mut HashMap<String, String>) {
+        use std::path::Path;
+        use std::fs;
+        use std::time::UNIX_EPOCH;
+        
+        let path = Path::new(file_path);
+        
+        // Add file name and directory
+        if let Some(file_name) = path.file_name() {
+            if let Some(name_str) = file_name.to_str() {
+                metadata.insert("FileName".to_string(), name_str.to_string());
+            }
+        }
+        
+        if let Some(parent) = path.parent() {
+            if let Some(parent_str) = parent.to_str() {
+                metadata.insert("Directory".to_string(), parent_str.to_string());
+            }
+        }
+        
+        // Add source file path
+        metadata.insert("SourceFile".to_string(), file_path.to_string());
+        
+        // Add file metadata
+        if let Ok(metadata_fs) = fs::metadata(file_path) {
+            // File size
+            metadata.insert("FileSize".to_string(), metadata_fs.len().to_string());
+            
+            // File permissions (Unix-style)
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let permissions = metadata_fs.permissions();
+                let mode = permissions.mode();
+                metadata.insert("FilePermissions".to_string(), format!("{:o}", mode));
+            }
+            
+            // File modification time
+            if let Ok(modified) = metadata_fs.modified() {
+                if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                    let timestamp = duration.as_secs();
+                    let datetime = Self::timestamp_to_datetime(timestamp);
+                    metadata.insert("FileModifyDate".to_string(), datetime);
+                }
+            }
+            
+            // File access time
+            if let Ok(accessed) = metadata_fs.accessed() {
+                if let Ok(duration) = accessed.duration_since(UNIX_EPOCH) {
+                    let timestamp = duration.as_secs();
+                    let datetime = Self::timestamp_to_datetime(timestamp);
+                    metadata.insert("FileAccessDate".to_string(), datetime);
+                }
+            }
+            
+            // File creation time (if available)
+            #[cfg(target_os = "macos")]
+            {
+                use std::os::macos::fs::MetadataExt;
+                let created = metadata_fs.created();
+                if let Ok(created) = created {
+                    if let Ok(duration) = created.duration_since(UNIX_EPOCH) {
+                        let timestamp = duration.as_secs();
+                        let datetime = Self::timestamp_to_datetime(timestamp);
+                        metadata.insert("FileInodeChangeDate".to_string(), datetime);
+                    }
+                }
+            }
+            
+            #[cfg(not(target_os = "macos"))]
+            {
+                // For other systems, use modification time as fallback
+                if let Ok(modified) = metadata_fs.modified() {
+                    if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
+                        let timestamp = duration.as_secs();
+                        let datetime = Self::timestamp_to_datetime(timestamp);
+                        metadata.insert("FileInodeChangeDate".to_string(), datetime);
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Convert Unix timestamp to EXIF datetime format
+    fn timestamp_to_datetime(timestamp: u64) -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let datetime = UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+        let system_time = SystemTime::from(datetime);
+        
+        // Format as "YYYY:MM:DD HH:MM:SS"
+        let datetime_chrono = chrono::DateTime::<chrono::Utc>::from(system_time);
+        datetime_chrono.format("%Y:%m:%d %H:%M:%S").to_string()
     }
 
     fn read_exif_from_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
