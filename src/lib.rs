@@ -28,6 +28,7 @@ mod enhanced_heif_parser;
 mod enhanced_dng_parser;
 mod field_mapping;
 mod computed_fields;
+mod value_formatter;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -77,6 +78,9 @@ impl FastExifReader {
             // Normalize field names to exiftool standard for 1:1 compatibility
             FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
             
+            // Normalize values to match PyExifTool raw format
+            crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
+            
             Ok(metadata.into_pyobject(py)?.into())
         })
     }
@@ -91,6 +95,9 @@ impl FastExifReader {
             
             // Normalize field names to exiftool standard for 1:1 compatibility
             FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
+            
+            // Normalize values to match PyExifTool raw format
+            crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
             
             Ok(metadata.into_pyobject(py)?.into())
         })
