@@ -350,6 +350,12 @@ impl FieldMapper {
             .unwrap_or_else(|| field_name.to_string())
     }
     
+    /// Normalize field names to exiftool standard (static method)
+    pub fn normalize_metadata_to_exiftool(metadata: &mut HashMap<String, String>) {
+        let mapper = FieldMapper::new();
+        mapper.normalize_to_exiftool(metadata);
+    }
+    
     /// Normalize field names to exiftool standard
     pub fn normalize_to_exiftool(&self, metadata: &mut HashMap<String, String>) {
         let mut normalized = HashMap::new();
