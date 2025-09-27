@@ -18,6 +18,12 @@ mod writer;
 mod exif_copier;
 mod batch_writer;
 
+// Enhanced format support modules
+mod enhanced_format_detection;
+mod enhanced_raw_parser;
+mod enhanced_video_parser;
+mod enhanced_image_parser;
+
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
 pub use multiprocessing::MultiprocessingExifReader;
@@ -28,6 +34,12 @@ pub use v2_reader::FastExifReaderV2;
 pub use writer::ExifWriter;
 pub use exif_copier::ExifCopier;
 pub use batch_writer::{BatchExifWriter, write_exif_batch_parallel, copy_exif_batch_parallel};
+
+// Re-export enhanced parsers
+pub use enhanced_format_detection::EnhancedFormatDetector;
+pub use enhanced_raw_parser::EnhancedRawParser;
+pub use enhanced_video_parser::EnhancedVideoParser;
+pub use enhanced_image_parser::EnhancedImageParser;
 
 /// Fast EXIF reader optimized for Canon 70D and Nikon Z50 II
 #[pyclass]
@@ -92,7 +104,7 @@ impl FastExifReader {
         let mut metadata = HashMap::new();
 
         // Detect file format
-        let format = FormatDetector::detect_format(data)?;
+        let format = EnhancedFormatDetector::detect_format(data)?;
         metadata.insert("Format".to_string(), format.clone());
 
         // Parse EXIF based on format
@@ -100,14 +112,54 @@ impl FastExifReader {
             "JPEG" => JpegParser::parse_jpeg_exif(data, &mut metadata)?,
             "CR2" => RawParser::parse_cr2_exif(data, &mut metadata)?,
             "NEF" => RawParser::parse_nef_exif(data, &mut metadata)?,
+            "ARW" => {
+                let arw_metadata = EnhancedRawParser::parse_sony_arw(data)?;
+                metadata.extend(arw_metadata);
+            },
+            "RAF" => {
+                let raf_metadata = EnhancedRawParser::parse_fuji_raf(data)?;
+                metadata.extend(raf_metadata);
+            },
+            "SRW" => {
+                let srw_metadata = EnhancedRawParser::parse_samsung_srw(data)?;
+                metadata.extend(srw_metadata);
+            },
+            "PEF" => {
+                let pef_metadata = EnhancedRawParser::parse_pentax_pef(data)?;
+                metadata.extend(pef_metadata);
+            },
+            "RW2" => {
+                let rw2_metadata = EnhancedRawParser::parse_panasonic_rw2(data)?;
+                metadata.extend(rw2_metadata);
+            },
             "ORF" => RawParser::parse_orf_exif(data, &mut metadata)?,
             "DNG" => RawParser::parse_dng_exif(data, &mut metadata)?,
             "HEIF" | "HIF" => HeifParser::parse_heif_exif(data, &mut metadata)?,
             "MOV" => VideoParser::parse_mov_exif(data, &mut metadata)?,
             "MP4" => VideoParser::parse_mp4_exif(data, &mut metadata)?,
             "3GP" => VideoParser::parse_3gp_exif(data, &mut metadata)?,
+            "AVI" => {
+                let avi_metadata = EnhancedVideoParser::parse_avi(data)?;
+                metadata.extend(avi_metadata);
+            },
+            "WMV" => {
+                let wmv_metadata = EnhancedVideoParser::parse_wmv(data)?;
+                metadata.extend(wmv_metadata);
+            },
+            "WEBM" => {
+                let webm_metadata = EnhancedVideoParser::parse_webm(data)?;
+                metadata.extend(webm_metadata);
+            },
             "PNG" => PngParser::parse_png_exif(data, &mut metadata)?,
             "BMP" => BmpParser::parse_bmp_exif(data, &mut metadata)?,
+            "GIF" => {
+                let gif_metadata = EnhancedImageParser::parse_gif(data)?;
+                metadata.extend(gif_metadata);
+            },
+            "WEBP" => {
+                let webp_metadata = EnhancedImageParser::parse_webp(data)?;
+                metadata.extend(webp_metadata);
+            },
             "MKV" => MkvParser::parse_mkv_exif(data, &mut metadata)?,
             _ => {
                 return Err(ExifError::UnsupportedFormat(format!(

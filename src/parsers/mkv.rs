@@ -66,11 +66,14 @@ impl MkvParser {
         let first_byte = data[offset];
         let length = first_byte.leading_zeros() as usize + 1;
         
-        if offset + length > data.len() {
+        if offset + length > data.len() || length > 4 {
             return None;
         }
 
-        let mut value = (first_byte & (0xFF >> length)) as u32;
+        // Safe mask calculation to avoid overflow
+        let mask = if length == 8 { 0xFF } else { (1u8 << (8 - length)) - 1 };
+        let mut value = (first_byte & mask) as u32;
+        
         for i in 1..length {
             value = (value << 8) | data[offset + i] as u32;
         }
