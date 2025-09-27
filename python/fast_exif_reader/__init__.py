@@ -36,6 +36,7 @@ Example:
 try:
     from .fast_exif_reader import (
         FastExifReader,
+        FastFieldMapper,
         FastExifWriter,
         FastExifCopier,
         MultiprocessingExifReader as RustMultiprocessingExifReader,
@@ -49,6 +50,7 @@ try:
 except ImportError:
     RUST_AVAILABLE = False
     FastExifReader = None
+    FastFieldMapper = None
     FastExifWriter = None
     FastExifCopier = None
     RustMultiprocessingExifReader = None
@@ -82,6 +84,7 @@ __license__ = "MIT"
 __all__ = [
     # Core functionality
     "FastExifReader",
+    "FastFieldMapper",
     "FastExifWriter",
     "FastExifCopier",
     "BatchExifWriter",

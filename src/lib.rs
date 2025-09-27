@@ -297,6 +297,40 @@ impl FastExifReader {
 }
 
 /// Fast EXIF writer for adding/modifying EXIF metadata
+/// Field mapper for 1:1 exiftool compatibility
+#[pyclass]
+#[derive(Clone)]
+#[allow(non_local_definitions)]
+pub struct FastFieldMapper {
+    mapper: FieldMapper,
+}
+
+#[allow(non_local_definitions)]
+#[pymethods]
+impl FastFieldMapper {
+    #[new]
+    fn new() -> Self {
+        Self {
+            mapper: FieldMapper::new(),
+        }
+    }
+    
+    /// Convert fast-exif-rs field name to exiftool field name
+    fn fast_to_exiftool(&self, field_name: &str) -> String {
+        self.mapper.fast_to_exiftool(field_name)
+    }
+    
+    /// Convert exiftool field name to fast-exif-rs field name
+    fn exiftool_to_fast(&self, field_name: &str) -> String {
+        self.mapper.exiftool_to_fast(field_name)
+    }
+    
+    /// Get all field mappings
+    fn get_all_mappings(&self) -> Vec<(String, String)> {
+        self.mapper.get_all_mappings()
+    }
+}
+
 #[pyclass]
 #[derive(Clone)]
 #[allow(non_local_definitions)]
@@ -485,6 +519,7 @@ impl FastExifCopier {
 #[pymodule]
 fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<FastExifReader>()?;
+    m.add_class::<FastFieldMapper>()?;
     m.add_class::<FastExifWriter>()?;
     m.add_class::<FastExifCopier>()?;
     m.add_class::<MultiprocessingExifReader>()?;

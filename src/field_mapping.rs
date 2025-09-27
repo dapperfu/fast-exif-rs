@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 /// Field mapping between fast-exif-rs and exiftool
+#[derive(Clone)]
 pub struct FieldMapper {
     /// Mapping from fast-exif-rs field names to exiftool field names
     fast_to_exiftool: HashMap<String, String>,
