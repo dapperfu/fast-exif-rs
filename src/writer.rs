@@ -132,49 +132,35 @@ impl ExifWriter {
             return Err(ExifError::InvalidExif("Invalid HEIF format".to_string()));
         }
         
-        // Check for HEIF signature
-        let is_heif = input_data.starts_with(b"ftyp") || 
-                     input_data[4..8] == *b"heic" ||
-                     input_data[4..8] == *b"heix" ||
-                     input_data[4..8] == *b"heim" ||
-                     input_data[4..8] == *b"heis" ||
-                     input_data[4..8] == *b"hevc" ||
-                     input_data[4..8] == *b"hevx" ||
-                     input_data[4..8] == *b"hevm" ||
-                     input_data[4..8] == *b"hevs";
+        // Check for HEIF signature - HEIF files start with ftyp box
+        let is_heif = input_data.len() >= 8 && &input_data[4..8] == b"ftyp";
         
         if !is_heif {
             return Err(ExifError::InvalidExif("Not a valid HEIF file".to_string()));
         }
         
-        // For HEIF files, we need to be more careful about preserving the structure
-        // This is a simplified implementation that focuses on the most common case
-        
-        // Create EXIF segment similar to JPEG
-        let exif_segment = self.create_exif_segment(metadata)?;
-        
-        // Find a suitable location to insert EXIF data
-        // HEIF files have a different structure, so we'll insert after the ftyp box
-        let mut result = Vec::new();
-        
-        // Copy the file type box (first 8 bytes + size)
-        if input_data.len() >= 8 {
-            let box_size = u32::from_be_bytes([input_data[0], input_data[1], input_data[2], input_data[3]]);
-            let copy_size = std::cmp::min(box_size as usize, input_data.len());
-            result.extend_from_slice(&input_data[..copy_size]);
-            
-            // Insert EXIF data after the ftyp box
-            result.extend_from_slice(&exif_segment);
-            
-            // Copy the rest of the file
-            if copy_size < input_data.len() {
-                result.extend_from_slice(&input_data[copy_size..]);
-            }
-        } else {
-            return Err(ExifError::InvalidExif("HEIF file too small".to_string()));
+        // Check for HEIF brand identifiers
+        let mut is_heif_brand = false;
+        if input_data.len() >= 12 {
+            // Check major brand (bytes 8-12)
+            let major_brand = &input_data[8..12];
+            is_heif_brand = major_brand == b"heic" || 
+                           major_brand == b"heix" || 
+                           major_brand == b"heim" || 
+                           major_brand == b"heis" ||
+                           major_brand == b"hevc" || 
+                           major_brand == b"hevx" || 
+                           major_brand == b"hevm" || 
+                           major_brand == b"hevs";
         }
         
-        Ok(result)
+        if !is_heif_brand {
+            return Err(ExifError::InvalidExif("Not a valid HEIF brand".to_string()));
+        }
+        
+        // For HEIF files, we need to preserve the container structure
+        // and add metadata in a HEIF-compliant way
+        self.add_heif_metadata_atoms(input_data, metadata)
     }
 
     /// Write EXIF metadata to PNG bytes (placeholder - not yet implemented)
@@ -1074,6 +1060,152 @@ impl ExifWriter {
         element.extend_from_slice(text_bytes);
         
         Ok(element)
+    }
+    
+    /// Add HEIF metadata atoms
+    fn add_heif_metadata_atoms(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // HEIF files use ISO Base Media File Format
+        // We need to properly integrate metadata into the HEIF structure
+        
+        // For now, we'll implement a simplified approach that preserves the file
+        // and adds metadata in a way that can be read back
+        let mut result = Vec::new();
+        result.extend_from_slice(input_data);
+        
+        // Add metadata as a custom atom at the end
+        // This is a simplified approach - in a full implementation,
+        // we would need to properly parse and modify the HEIF structure
+        let metadata_atom = self.create_heif_metadata_atom(metadata)?;
+        result.extend_from_slice(&metadata_atom);
+        
+        Ok(result)
+    }
+    
+    /// Check if HEIF file has meta box
+    fn has_meta_box(&self, data: &[u8]) -> bool {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = u32::from_be_bytes(data[pos..pos+4].try_into().unwrap_or([0; 4])) as usize;
+            if size == 0 || size > data.len() {
+                break;
+            }
+            
+            let box_type = &data[pos + 4..pos + 8];
+            if box_type == b"meta" {
+                return true;
+            }
+            
+            pos += size;
+        }
+        false
+    }
+    
+    /// Create HEIF meta box with metadata
+    fn create_heif_meta_box(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
+        let mut meta_box = Vec::new();
+        
+        // Meta box header
+        meta_box.write_u32::<BigEndian>(0)?; // Size (will be calculated)
+        meta_box.extend_from_slice(b"meta");
+        
+        // Meta box version and flags
+        meta_box.write_u32::<BigEndian>(0)?; // Version and flags
+        
+        // Add metadata atoms within meta box
+        if let Some(title) = metadata.get("Title") {
+            let title_atom = self.create_heif_text_atom(b"titl", title)?;
+            meta_box.extend_from_slice(&title_atom);
+        }
+        
+        if let Some(artist) = metadata.get("Artist") {
+            let artist_atom = self.create_heif_text_atom(b"auth", artist)?;
+            meta_box.extend_from_slice(&artist_atom);
+        }
+        
+        if let Some(description) = metadata.get("Description") {
+            let desc_atom = self.create_heif_text_atom(b"desc", description)?;
+            meta_box.extend_from_slice(&desc_atom);
+        }
+        
+        if let Some(comment) = metadata.get("Comment") {
+            let comment_atom = self.create_heif_text_atom(b"cmnt", comment)?;
+            meta_box.extend_from_slice(&comment_atom);
+        }
+        
+        if let Some(copyright) = metadata.get("Copyright") {
+            let copyright_atom = self.create_heif_text_atom(b"cprt", copyright)?;
+            meta_box.extend_from_slice(&copyright_atom);
+        }
+        
+        // Update size field
+        let size = meta_box.len() as u32;
+        meta_box[0..4].copy_from_slice(&size.to_be_bytes());
+        
+        Ok(meta_box)
+    }
+    
+    /// Update existing HEIF meta box
+    fn update_heif_meta_box(
+        &self,
+        input_data: &[u8],
+        metadata: &HashMap<String, String>,
+    ) -> Result<Vec<u8>, ExifError> {
+        // For now, we'll implement a simple approach that preserves the file
+        // and adds metadata atoms at the end
+        let mut result = Vec::new();
+        result.extend_from_slice(input_data);
+        
+        // Add metadata atoms
+        let meta_box = self.create_heif_meta_box(metadata)?;
+        result.extend_from_slice(&meta_box);
+        
+        Ok(result)
+    }
+    
+    /// Create HEIF text atom
+    fn create_heif_text_atom(&self, atom_type: &[u8; 4], text: &str) -> Result<Vec<u8>, ExifError> {
+        let mut atom = Vec::new();
+        
+        // Atom header
+        let text_bytes = text.as_bytes();
+        let size = 8 + text_bytes.len() as u32;
+        atom.write_u32::<BigEndian>(size)?;
+        atom.extend_from_slice(atom_type);
+        
+        // Text data
+        atom.extend_from_slice(text_bytes);
+        
+        Ok(atom)
+    }
+    
+    /// Create HEIF metadata atom
+    fn create_heif_metadata_atom(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
+        let mut atom = Vec::new();
+        
+        // Create a custom metadata atom with our data
+        // This is a simplified approach for demonstration
+        let mut metadata_bytes = Vec::new();
+        
+        for (key, value) in metadata {
+            metadata_bytes.extend_from_slice(key.as_bytes());
+            metadata_bytes.push(0); // null separator
+            metadata_bytes.extend_from_slice(value.as_bytes());
+            metadata_bytes.push(0); // null separator
+        }
+        
+        // Atom header
+        let size = 8 + metadata_bytes.len() as u32;
+        atom.write_u32::<BigEndian>(size)?;
+        atom.extend_from_slice(b"meta"); // Custom metadata atom type
+        
+        // Metadata data
+        atom.extend_from_slice(&metadata_bytes);
+        
+        Ok(atom)
     }
 }
 
