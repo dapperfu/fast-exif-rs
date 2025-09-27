@@ -1,11 +1,11 @@
 [package]
 name = "fast-exif-reader"
-version = "0.5.2"
+version = "0.6.0"
 edition = "2021"
-description = "Fast EXIF reader optimized for Canon 70D and Nikon Z50 II"
+description = "Fast EXIF reader and writer with comprehensive multimedia support"
 license = "MIT"
 repository = "https://github.com/dapperfu/fast-exif-rs"
-keywords = ["exif", "metadata", "image", "canon", "nikon", "rust", "performance"]
+keywords = ["exif", "metadata", "image", "video", "canon", "nikon", "rust", "performance"]
 categories = ["multimedia", "development-tools"]
 
 [lib]
