@@ -81,6 +81,44 @@ impl EnhancedCr2Parser {
         if let Some(battery) = Self::extract_canon_battery_level(data) {
             metadata.insert("BatteryLevel".to_string(), battery);
         }
+        
+        // AE Bracket settings (missing fields from analysis)
+        if let Some(ae_auto_cancel) = Self::extract_ae_auto_cancel(data) {
+            metadata.insert("AEBAutoCancel".to_string(), ae_auto_cancel);
+        }
+        
+        if let Some(ae_bracket_value) = Self::extract_ae_bracket_value(data) {
+            metadata.insert("AEBBracketValue".to_string(), ae_bracket_value);
+        }
+        
+        if let Some(ae_b_sequence) = Self::extract_aeb_sequence(data) {
+            metadata.insert("AEBSequence".to_string(), ae_b_sequence);
+        }
+        
+        if let Some(ae_b_shot_count) = Self::extract_aeb_shot_count(data) {
+            metadata.insert("AEBShotCount".to_string(), ae_b_shot_count);
+        }
+        
+        // Additional camera settings
+        if let Some(macro_mode) = Self::extract_macro_mode(data) {
+            metadata.insert("MacroMode".to_string(), macro_mode);
+        }
+        
+        if let Some(camera_type) = Self::extract_camera_type(data) {
+            metadata.insert("CameraType".to_string(), camera_type);
+        }
+        
+        if let Some(sensor_right_border) = Self::extract_sensor_right_border(data) {
+            metadata.insert("SensorRightBorder".to_string(), sensor_right_border);
+        }
+        
+        if let Some(interop_version) = Self::extract_interop_version(data) {
+            metadata.insert("InteropVersion".to_string(), interop_version);
+        }
+        
+        if let Some(lens_drive_no_af) = Self::extract_lens_drive_no_af(data) {
+            metadata.insert("LensDriveNoAF".to_string(), lens_drive_no_af);
+        }
     }
     
     /// Extract Canon AF (Auto Focus) settings
@@ -579,6 +617,24 @@ impl EnhancedCr2Parser {
     fn extract_canon_lens_model(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_lens_serial_number(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_lens_firmware_version(_data: &[u8]) -> Option<String> { None }
+    
+    // Additional missing extraction methods for comprehensive Canon support
+    fn extract_ae_auto_cancel(_data: &[u8]) -> Option<String> { None }
+    fn extract_ae_bracket_value(_data: &[u8]) -> Option<String> { None }
+    fn extract_aeb_sequence(_data: &[u8]) -> Option<String> { None }
+    fn extract_aeb_shot_count(_data: &[u8]) -> Option<String> { None }
+    fn extract_macro_mode(_data: &[u8]) -> Option<String> { None }
+    fn extract_camera_type(_data: &[u8]) -> Option<String> { None }
+    fn extract_sensor_right_border(_data: &[u8]) -> Option<String> { None }
+    fn extract_interop_version(_data: &[u8]) -> Option<String> { None }
+    fn extract_lens_drive_no_af(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_area_heights(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_area_widths(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_area_x_positions(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_area_y_positions(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_area_select_method(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_points_used(_data: &[u8]) -> Option<String> { None }
+    fn extract_af_point(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_lens_type(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_min_focal_length(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_max_focal_length(_data: &[u8]) -> Option<String> { None }

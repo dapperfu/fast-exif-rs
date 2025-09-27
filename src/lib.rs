@@ -24,6 +24,8 @@ mod enhanced_raw_parser;
 mod enhanced_video_parser;
 mod enhanced_image_parser;
 mod enhanced_cr2_parser;
+mod enhanced_heif_parser;
+mod enhanced_dng_parser;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -235,8 +237,8 @@ impl FastExifReader {
                 metadata.extend(rw2_metadata);
             },
             "ORF" => RawParser::parse_orf_exif(data, &mut metadata)?,
-            "DNG" => RawParser::parse_dng_exif(data, &mut metadata)?,
-            "HEIF" | "HIF" => HeifParser::parse_heif_exif(data, &mut metadata)?,
+            "DNG" => enhanced_dng_parser::EnhancedDngParser::parse_dng_exif(data, &mut metadata)?,
+            "HEIF" | "HIF" => enhanced_heif_parser::EnhancedHeifParser::parse_heif_exif(data, &mut metadata)?,
             "MOV" => VideoParser::parse_mov_exif(data, &mut metadata)?,
             "MP4" => VideoParser::parse_mp4_exif(data, &mut metadata)?,
             "3GP" => VideoParser::parse_3gp_exif(data, &mut metadata)?,
