@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use crate::format_detection::FormatDetector;
 use crate::parsers::{HeifParser, JpegParser, RawParser, VideoParser};
+use crate::enhanced_cr2_parser::EnhancedCr2Parser;
 use crate::types::{ExifError, ExifResult, ProcessingStats};
 
 /// Multiprocessing EXIF reader using Rayon for parallel processing
@@ -182,7 +183,7 @@ impl MultiprocessingExifReader {
         // Parse EXIF based on format
         match format.as_str() {
             "JPEG" => JpegParser::parse_jpeg_exif(data, &mut metadata)?,
-            "CR2" => RawParser::parse_cr2_exif(data, &mut metadata)?,
+            "CR2" => EnhancedCr2Parser::parse_cr2_exif(data, &mut metadata)?,
             "NEF" => RawParser::parse_nef_exif(data, &mut metadata)?,
             "ORF" => RawParser::parse_orf_exif(data, &mut metadata)?,
             "DNG" => RawParser::parse_dng_exif(data, &mut metadata)?,

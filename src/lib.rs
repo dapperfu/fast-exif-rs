@@ -23,6 +23,7 @@ mod enhanced_format_detection;
 mod enhanced_raw_parser;
 mod enhanced_video_parser;
 mod enhanced_image_parser;
+mod enhanced_cr2_parser;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -110,7 +111,7 @@ impl FastExifReader {
         // Parse EXIF based on format
         match format.as_str() {
             "JPEG" => JpegParser::parse_jpeg_exif(data, &mut metadata)?,
-            "CR2" => RawParser::parse_cr2_exif(data, &mut metadata)?,
+            "CR2" => enhanced_cr2_parser::EnhancedCr2Parser::parse_cr2_exif(data, &mut metadata)?,
             "NEF" => RawParser::parse_nef_exif(data, &mut metadata)?,
             "ARW" => {
                 let arw_metadata = EnhancedRawParser::parse_sony_arw(data)?;
