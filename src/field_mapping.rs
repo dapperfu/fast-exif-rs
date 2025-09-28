@@ -19,7 +19,7 @@ impl FieldMapper {
         let mappings = vec![
             // Date/Time fields
             ("DateTime", "ModifyDate"),
-            ("DateTimeOriginal", "CreateDate"),
+            ("DateTimeOriginal", "DateTimeOriginal"),
             ("DateTimeDigitized", "DateTimeCreated"),
             
             // ISO fields
@@ -328,6 +328,72 @@ impl FieldMapper {
         for (fast_field, exiftool_field) in mappings {
             fast_to_exiftool.insert(fast_field.to_string(), exiftool_field.to_string());
             exiftool_to_fast.insert(exiftool_field.to_string(), fast_field.to_string());
+        }
+        
+        // Add EXIF namespace mappings for PyExifTool compatibility
+        let exif_namespace_mappings = vec![
+            ("ColorSpace", "EXIF:ColorSpace"),
+            ("ComponentsConfiguration", "EXIF:ComponentsConfiguration"),
+            ("CompositeImage", "EXIF:CompositeImage"),
+            ("CompressedBitsPerPixel", "EXIF:CompressedBitsPerPixel"),
+            ("Contrast", "EXIF:Contrast"),
+            ("Copyright", "EXIF:Copyright"),
+            ("CreateDate", "EXIF:CreateDate"),
+            ("CustomRendered", "EXIF:CustomRendered"),
+            ("DateTimeOriginal", "EXIF:DateTimeOriginal"),
+            ("ExifImageHeight", "EXIF:ExifImageHeight"),
+            ("ExifImageWidth", "EXIF:ExifImageWidth"),
+            ("ExifVersion", "EXIF:ExifVersion"),
+            ("ExposureCompensation", "EXIF:ExposureCompensation"),
+            ("ExposureMode", "EXIF:ExposureMode"),
+            ("ExposureProgram", "EXIF:ExposureProgram"),
+            ("ExposureTime", "EXIF:ExposureTime"),
+            ("FNumber", "EXIF:FNumber"),
+            ("FileSource", "EXIF:FileSource"),
+            ("Flash", "EXIF:Flash"),
+            ("FlashpixVersion", "EXIF:FlashpixVersion"),
+            ("FocalLength", "EXIF:FocalLength"),
+            ("FocalLengthIn35mmFormat", "EXIF:FocalLengthIn35mmFormat"),
+            ("GainControl", "EXIF:GainControl"),
+            ("ISO", "EXIF:ISO"),
+            ("ImageDescription", "EXIF:ImageDescription"),
+            ("LensInfo", "EXIF:LensInfo"),
+            ("LensMake", "EXIF:LensMake"),
+            ("LensModel", "EXIF:LensModel"),
+            ("LensSerialNumber", "EXIF:LensSerialNumber"),
+            ("LightSource", "EXIF:LightSource"),
+            ("Make", "EXIF:Make"),
+            ("MeteringMode", "EXIF:MeteringMode"),
+            ("Model", "EXIF:Model"),
+            ("ModifyDate", "EXIF:ModifyDate"),
+            ("OffsetTime", "EXIF:OffsetTime"),
+            ("OffsetTimeDigitized", "EXIF:OffsetTimeDigitized"),
+            ("OffsetTimeOriginal", "EXIF:OffsetTimeOriginal"),
+            ("Orientation", "EXIF:Orientation"),
+            ("Rating", "EXIF:Rating"),
+            ("RecommendedExposureIndex", "EXIF:RecommendedExposureIndex"),
+            ("ResolutionUnit", "EXIF:ResolutionUnit"),
+            ("Saturation", "EXIF:Saturation"),
+            ("SceneCaptureType", "EXIF:SceneCaptureType"),
+            ("SceneType", "EXIF:SceneType"),
+            ("SensitivityType", "EXIF:SensitivityType"),
+            ("SerialNumber", "EXIF:SerialNumber"),
+            ("Sharpness", "EXIF:Sharpness"),
+            ("Software", "EXIF:Software"),
+            ("SubSecTime", "EXIF:SubSecTime"),
+            ("SubSecTimeDigitized", "EXIF:SubSecTimeDigitized"),
+            ("SubSecTimeOriginal", "EXIF:SubSecTimeOriginal"),
+            ("SubjectDistanceRange", "EXIF:SubjectDistanceRange"),
+            ("WhiteBalance", "EXIF:WhiteBalance"),
+            ("XResolution", "EXIF:XResolution"),
+            ("YCbCrPositioning", "EXIF:YCbCrPositioning"),
+            ("YResolution", "EXIF:YResolution"),
+        ];
+        
+        // Add EXIF namespace mappings
+        for (fast_field, exif_field) in exif_namespace_mappings {
+            fast_to_exiftool.insert(fast_field.to_string(), exif_field.to_string());
+            exiftool_to_fast.insert(exif_field.to_string(), fast_field.to_string());
         }
         
         Self {

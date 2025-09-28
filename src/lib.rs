@@ -33,7 +33,7 @@ mod value_formatter;
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
 pub use multiprocessing::MultiprocessingExifReader;
-pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
+pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser, SimdJpegParser, SimdHeicParser, GpuExifParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
 pub use v2_reader::FastExifReaderV2;

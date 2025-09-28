@@ -9,6 +9,8 @@ pub enum ExifError {
     FileNotFound(String),
     #[error("Invalid EXIF data: {0}")]
     InvalidExif(String),
+    #[error("Parse error: {0}")]
+    ParseError(String),
     #[error("Unsupported format: {0}")]
     UnsupportedFormat(String),
     #[error("IO error: {0}")]
