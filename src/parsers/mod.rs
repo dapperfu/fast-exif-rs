@@ -14,6 +14,7 @@
 pub mod bmp;
 pub mod gpu;
 pub mod heif;
+pub mod hybrid;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;
@@ -31,6 +32,7 @@ pub mod zero_copy;
 pub use bmp::BmpParser;
 pub use gpu::GpuExifParser;
 pub use heif::HeifParser;
+pub use hybrid::{HybridExifParser, PerformanceAwareParser};
 pub use jpeg::JpegParser;
 pub use mkv::MkvParser;
 pub use png::PngParser;

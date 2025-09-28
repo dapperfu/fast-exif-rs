@@ -29,11 +29,12 @@ mod enhanced_dng_parser;
 mod field_mapping;
 mod computed_fields;
 mod value_formatter;
+mod hybrid_reader;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
 pub use multiprocessing::MultiprocessingExifReader;
-pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser, SimdJpegParser, SimdHeicParser, GpuExifParser};
+pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser, SimdJpegParser, SimdHeicParser, GpuExifParser, HybridExifParser, PerformanceAwareParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
 pub use v2_reader::FastExifReaderV2;
@@ -496,6 +497,7 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<BatchExifWriter>()?;
     m.add_class::<ExifResult>()?;
     m.add_class::<ProcessingStats>()?;
+    m.add_class::<hybrid_reader::HybridExifReader>()?;
     m.add_function(wrap_pyfunction!(
         multiprocessing::process_files_parallel,
         m
@@ -510,6 +512,10 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(
         batch_writer::copy_exif_batch_parallel,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        hybrid_reader::benchmark_hybrid_vs_standard,
         m
     )?)?;
     Ok(())
