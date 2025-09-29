@@ -359,6 +359,30 @@ impl EnhancedHeifParser {
         
         // Add missing core fields that exiftool provides
         Self::add_missing_core_fields(metadata);
+        
+        // Add datetime fields that exiftool provides
+        Self::add_datetime_fields(metadata);
+    }
+    
+    /// Add datetime fields that exiftool provides
+    fn add_datetime_fields(metadata: &mut HashMap<String, String>) {
+        // CreateDate - often same as DateTimeOriginal
+        if !metadata.contains_key("CreateDate") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("CreateDate".to_string(), dto.clone());
+            } else if let Some(dt) = metadata.get("DateTime") {
+                metadata.insert("CreateDate".to_string(), dt.clone());
+            }
+        }
+        
+        // ModifyDate - often same as DateTimeOriginal or CreateDate
+        if !metadata.contains_key("ModifyDate") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("ModifyDate".to_string(), dto.clone());
+            } else if let Some(create_date) = metadata.get("CreateDate") {
+                metadata.insert("ModifyDate".to_string(), create_date.clone());
+            }
+        }
     }
     
     /// Add missing core fields that exiftool provides

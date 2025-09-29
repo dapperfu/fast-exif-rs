@@ -10,7 +10,7 @@ categories = ["multimedia", "development-tools"]
 
 [lib]
 name = "fast_exif_reader"
-crate-type = ["cdylib"]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 # Core parsing

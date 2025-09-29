@@ -19,7 +19,6 @@ impl FieldMapper {
         let mappings = vec![
             // Date/Time fields
             ("DateTime", "ModifyDate"),
-            ("DateTimeOriginal", "DateTimeOriginal"),
             ("DateTimeDigitized", "DateTimeCreated"),
             
             // ISO fields
