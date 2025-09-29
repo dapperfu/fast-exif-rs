@@ -276,8 +276,6 @@ impl RawParser {
 
     /// Post-process problematic fields to match exiftool output
     fn post_process_problematic_fields(metadata: &mut HashMap<String, String>) {
-        println!("DEBUG: Post-processing starting");
-
         // Fix version fields that are showing raw integer values
         Self::fix_version_fields(metadata);
 
@@ -289,8 +287,6 @@ impl RawParser {
 
         // Fix FocalPlaneResolutionUnit formatting
         Self::fix_focal_plane_resolution_unit(metadata);
-
-        println!("DEBUG: Post-processing complete");
     }
 
     /// Fix version fields (FlashpixVersion, ExifVersion) showing raw values

@@ -388,14 +388,8 @@ impl TiffParser {
                         // Convert SHORT value to EV using APEX conversion
                         // The value is stored as a signed 16-bit integer in 1/1000 EV units
                         // So 0 = 0 EV, 1000 = +1 EV, -1000 = -1 EV
-                        eprintln!("DEBUG: ExposureCompensation SHORT value: {}", value);
                         let ev_value = value as i16 as f64 / 1000.0;
-                        eprintln!("DEBUG: ExposureCompensation EV value: {}", ev_value);
                         let formatted_value = Self::print_fraction(ev_value);
-                        eprintln!(
-                            "DEBUG: ExposureCompensation formatted: '{}'",
-                            formatted_value
-                        );
                         metadata.insert(tag_name, formatted_value);
                     } else if tag_id == 0x9203 {
                         // BrightnessValue as SHORT
@@ -517,9 +511,7 @@ impl TiffParser {
                             // Format exposure time to match exiftool's algorithm
                             if denominator != 0 {
                                 let value = numerator as f64 / denominator as f64;
-                                eprintln!("DEBUG: ExposureTime raw: {}/{} = {}", numerator, denominator, value);
                                 let formatted = Self::format_exposure_time(value);
-                                eprintln!("DEBUG: ExposureTime formatted: {}", formatted);
                                 metadata.insert(tag_name, formatted);
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());

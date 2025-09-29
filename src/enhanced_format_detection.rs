@@ -23,7 +23,6 @@ impl EnhancedFormatDetector {
         // Check for HEIF/HIF variants
         if data.len() >= 12 {
             let header = &data[4..12];
-            println!("DEBUG: Checking HEIF header: {:?}", header);
             if header == b"ftypheic"
                 || header == b"ftypheix"
                 || header == b"ftypmif1"
@@ -33,7 +32,6 @@ impl EnhancedFormatDetector {
                 || header == b"ftypavcs"
                 || header == b"ftyphif1"  // Hasselblad HIF
             {
-                println!("DEBUG: Detected HEIF format with header: {:?}", header);
                 return Ok("HEIF".to_string());
             }
         }
