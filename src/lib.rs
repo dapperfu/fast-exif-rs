@@ -30,6 +30,7 @@ mod field_mapping;
 mod computed_fields;
 mod value_formatter;
 mod hybrid_reader;
+mod memory_optimization;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -498,6 +499,7 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ExifResult>()?;
     m.add_class::<ProcessingStats>()?;
     m.add_class::<hybrid_reader::HybridExifReader>()?;
+    m.add_class::<multiprocessing::MultiprocessingExifReader>()?;
     m.add_function(wrap_pyfunction!(
         multiprocessing::process_files_parallel,
         m

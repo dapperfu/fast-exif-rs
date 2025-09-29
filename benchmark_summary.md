@@ -27,3 +27,4 @@
 ## Conclusion
 
 fast-exif-rs excels at RAW files but struggles with JPEG/HEIC. PyExifTool is faster overall for mixed formats.
+

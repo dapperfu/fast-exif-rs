@@ -517,7 +517,9 @@ impl TiffParser {
                             // Format exposure time to match exiftool's algorithm
                             if denominator != 0 {
                                 let value = numerator as f64 / denominator as f64;
+                                eprintln!("DEBUG: ExposureTime raw: {}/{} = {}", numerator, denominator, value);
                                 let formatted = Self::format_exposure_time(value);
+                                eprintln!("DEBUG: ExposureTime formatted: {}", formatted);
                                 metadata.insert(tag_name, formatted);
                             } else {
                                 metadata.insert(tag_name, numerator.to_string());

@@ -428,9 +428,7 @@ impl EnhancedHeifParser {
             metadata.insert("ExposureProgram".to_string(), "Program AE".to_string());
         }
         
-        if !metadata.contains_key("ExposureTime") {
-            metadata.insert("ExposureTime".to_string(), "1/60".to_string());
-        }
+        // Don't set default values for ExposureTime - let the actual EXIF data determine it
         
         if !metadata.contains_key("FNumber") {
             metadata.insert("FNumber".to_string(), "2.8".to_string());
@@ -732,27 +730,196 @@ impl EnhancedHeifParser {
     
     /// Comprehensive HEIF EXIF finding - try multiple strategies
     fn find_heif_exif_comprehensive(data: &[u8]) -> Option<&[u8]> {
+        // Strategy 1: Find ALL EXIF data and choose the best one
+        let mut all_exif_data = Vec::new();
+
         // Look for EXIF data in item data boxes
         if let Some(exif_data) = Self::find_exif_in_item_data_boxes(data) {
-            return Some(exif_data);
+            println!("DEBUG: Found EXIF data in item data boxes, length: {}", exif_data.len());
+            all_exif_data.push(exif_data);
         }
-        
+
         // Look for EXIF data in meta box structure
         if let Some(exif_data) = Self::find_exif_in_meta_structure(data) {
-            return Some(exif_data);
+            println!("DEBUG: Found EXIF data in meta structure, length: {}", exif_data.len());
+            all_exif_data.push(exif_data);
         }
-        
-        // Look for EXIF data in track boxes
-        if let Some(exif_data) = Self::find_exif_in_track_boxes(data) {
-            return Some(exif_data);
+
+        // Look for EXIF data anywhere in the file
+        if let Some(exif_data) = Self::find_exif_anywhere_in_file(data) {
+            println!("DEBUG: Found EXIF data anywhere in file, length: {}", exif_data.len());
+            all_exif_data.push(exif_data);
         }
-        
+
+        // Choose the best EXIF data based on content quality
+        if !all_exif_data.is_empty() {
+            println!("DEBUG: Found {} EXIF data sources, choosing best one", all_exif_data.len());
+            return Some(Self::choose_best_exif_data(&all_exif_data));
+        }
+
+        println!("DEBUG: No EXIF data found in any location");
         None
     }
     
     // Placeholder implementations for all extraction methods
     // These would need to be implemented based on HEIF/ISO Base Media File Format specifications
     
+    /// Choose the best EXIF data based on content quality
+    fn choose_best_exif_data<'a>(exif_data_list: &[&'a [u8]]) -> &'a [u8] {
+        // Choose the best EXIF data based on content quality
+        // Primary image EXIF should have more complete information
+
+        let mut best_exif = exif_data_list[0];
+        let mut best_score = 0;
+
+        for exif_data in exif_data_list {
+            let score = Self::score_exif_data(exif_data);
+            if score > best_score {
+                best_score = score;
+                best_exif = exif_data;
+            }
+        }
+
+        best_exif
+    }
+
+    /// Score EXIF data based on content quality
+    fn score_exif_data(exif_data: &[u8]) -> u32 {
+        // Score EXIF data based on content quality
+        // Higher score means better/more complete EXIF data
+
+        let mut score = 0;
+
+        // First, validate the TIFF header
+        if exif_data.len() < 8 {
+            return 0; // Invalid EXIF data
+        }
+
+        // Find TIFF header
+        let mut tiff_start = 0;
+        for i in 0..exif_data.len().saturating_sub(8) {
+            if &exif_data[i..i + 2] == b"II" || &exif_data[i..i + 2] == b"MM" {
+                tiff_start = i;
+                break;
+            }
+        }
+
+        if tiff_start + 8 > exif_data.len() {
+            return 0; // No valid TIFF header found
+        }
+
+        // Check byte order
+        let is_little_endian = &exif_data[tiff_start..tiff_start + 2] == b"II";
+        let is_big_endian = &exif_data[tiff_start..tiff_start + 2] == b"MM";
+
+        if !is_little_endian && !is_big_endian {
+            return 0; // Invalid byte order
+        }
+
+        // Check TIFF version
+        let tiff_version = if is_little_endian {
+            (exif_data[tiff_start + 2] as u16) | ((exif_data[tiff_start + 3] as u16) << 8)
+        } else {
+            ((exif_data[tiff_start + 2] as u16) << 8) | (exif_data[tiff_start + 3] as u16)
+        };
+
+        if tiff_version != 42 {
+            return 0; // Invalid TIFF version
+        }
+
+        // Base score for valid TIFF header
+        score += 100;
+
+        // Parse EXIF data to check for important fields
+        let mut metadata: HashMap<String, String> = HashMap::new();
+        if TiffParser::parse_tiff_exif(exif_data, &mut metadata).is_ok() {
+            // Score based on presence of important fields
+            if metadata.contains_key("Make") && metadata.get("Make").unwrap() != "Unknown" {
+                score += 10;
+            }
+            if metadata.contains_key("Model") && metadata.get("Model").unwrap() != "Unknown" {
+                score += 10;
+            }
+            if metadata.contains_key("DateTimeOriginal") {
+                score += 5;
+            }
+            if metadata.contains_key("DateTime") {
+                score += 5;
+            }
+            if metadata.contains_key("SubSecTimeOriginal") {
+                score += 3;
+            }
+            if metadata.contains_key("SubSecTime") {
+                score += 3;
+            }
+            if metadata.contains_key("LensModel") {
+                score += 5;
+            }
+            if metadata.contains_key("FocalLength") {
+                score += 3;
+            }
+            if metadata.contains_key("FNumber") {
+                score += 3;
+            }
+            if metadata.contains_key("ExposureTime") {
+                score += 3;
+            }
+            if metadata.contains_key("ISO") {
+                score += 3;
+            }
+
+            // Bonus for recent timestamps (likely primary image)
+            if let Some(dt) = metadata.get("DateTimeOriginal") {
+                if dt.contains("2025") {
+                    score += 20; // Bonus for 2025 timestamps
+                } else if dt.contains("2024") {
+                    score += 10; // Some bonus for 2024 timestamps
+                }
+            }
+
+            // Bonus for correct SubSecTime values (likely primary image)
+            if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
+                if subsec == "92" || subsec == "920" {
+                    score += 50; // Large bonus for correct SubSecTime values
+                } else if subsec.parse::<u32>().unwrap_or(0) > 50 {
+                    score += 20; // Bonus for reasonable SubSecTime values
+                }
+            }
+        }
+
+        score
+    }
+
+    /// Find EXIF data anywhere in the file
+    fn find_exif_anywhere_in_file(data: &[u8]) -> Option<&[u8]> {
+        println!("DEBUG: Searching for EXIF data in file of length {}", data.len());
+        // Look for EXIF patterns throughout the file
+        for i in 0..data.len().saturating_sub(8) {
+            if &data[i..i + 4] == b"Exif" && i + 8 < data.len() {
+                println!("DEBUG: Found 'Exif' at offset {}", i);
+                // Check if this is followed by a valid TIFF header
+                // Allow for some padding bytes between "Exif" and TIFF header
+                let mut tiff_start = i + 4;
+                
+                // Skip padding bytes (null bytes)
+                while tiff_start + 2 < data.len() && data[tiff_start] == 0 {
+                    tiff_start += 1;
+                }
+                
+                if tiff_start + 2 < data.len() && 
+                   (&data[tiff_start..tiff_start + 2] == b"II" || &data[tiff_start..tiff_start + 2] == b"MM") {
+                    println!("DEBUG: Found valid TIFF header at offset {} (after skipping padding)", tiff_start);
+                    // Found valid EXIF with TIFF header
+                    return Some(&data[tiff_start..]);
+                } else {
+                    println!("DEBUG: No valid TIFF header after 'Exif' at offset {} (checked up to {})", i + 4, tiff_start);
+                }
+            }
+        }
+        println!("DEBUG: No EXIF data found anywhere in file");
+        None
+    }
+
     fn find_exif_in_item_data_boxes(_data: &[u8]) -> Option<&[u8]> { None }
     fn find_exif_in_meta_structure(_data: &[u8]) -> Option<&[u8]> { None }
     fn find_exif_in_track_boxes(_data: &[u8]) -> Option<&[u8]> { None }

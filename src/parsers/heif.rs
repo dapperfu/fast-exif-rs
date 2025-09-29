@@ -21,7 +21,26 @@ impl HeifParser {
 
         // Look for EXIF data using a comprehensive approach
         if let Some(exif_data) = Self::find_heif_exif_comprehensive(data) {
-            TiffParser::parse_tiff_exif(exif_data, metadata)?;
+            println!("DEBUG: Found EXIF data, length: {}", exif_data.len());
+            println!("DEBUG: EXIF data starts with: {:?}", &exif_data[..std::cmp::min(20, exif_data.len())]);
+            
+            let mut temp_metadata = HashMap::new();
+            match TiffParser::parse_tiff_exif(exif_data, &mut temp_metadata) {
+                Ok(_) => {
+                    println!("DEBUG: TIFF parsing succeeded, got {} fields", temp_metadata.len());
+                    println!("DEBUG: DateTimeOriginal: {:?}", temp_metadata.get("DateTimeOriginal"));
+                    println!("DEBUG: SubSecTimeOriginal: {:?}", temp_metadata.get("SubSecTimeOriginal"));
+                    // Copy all fields to main metadata
+                    for (k, v) in temp_metadata {
+                        metadata.insert(k, v);
+                    }
+                }
+                Err(e) => {
+                    println!("DEBUG: TIFF parsing failed: {:?}", e);
+                }
+            }
+        } else {
+            println!("DEBUG: No EXIF data found");
         }
 
         // Add computed fields that exiftool provides
@@ -254,9 +273,14 @@ impl HeifParser {
     /// Find EXIF data anywhere in the file
     fn find_exif_anywhere_in_file(data: &[u8]) -> Option<&[u8]> {
         // Look for EXIF patterns throughout the file
-        for i in 0..data.len().saturating_sub(4) {
-            if &data[i..i + 4] == b"Exif" && i + 4 < data.len() {
-                return Some(&data[i + 4..]);
+        for i in 0..data.len().saturating_sub(8) {
+            if &data[i..i + 4] == b"Exif" && i + 8 < data.len() {
+                // Check if this is followed by a valid TIFF header
+                let tiff_start = i + 4;
+                if &data[tiff_start..tiff_start + 2] == b"II" || &data[tiff_start..tiff_start + 2] == b"MM" {
+                    // Found valid EXIF with TIFF header
+                    return Some(&data[tiff_start..]);
+                }
             }
         }
         None
@@ -310,12 +334,15 @@ impl HeifParser {
         // Look for EXIF data in item data box
         let mut pos = 4; // Skip version/flags
 
-        while pos + 4 < data_box.len() {
+        while pos + 8 < data_box.len() {
             if &data_box[pos..pos + 4] == b"Exif" {
-                // Found EXIF identifier
+                // Found EXIF identifier, check for valid TIFF header
                 let exif_start = pos + 4;
-                if exif_start < data_box.len() {
-                    return Some(&data_box[exif_start..]);
+                if exif_start + 2 < data_box.len() {
+                    if &data_box[exif_start..exif_start + 2] == b"II" || 
+                       &data_box[exif_start..exif_start + 2] == b"MM" {
+                        return Some(&data_box[exif_start..]);
+                    }
                 }
             }
             pos += 1;
