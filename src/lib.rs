@@ -31,6 +31,7 @@ mod computed_fields;
 mod value_formatter;
 mod hybrid_reader;
 mod memory_optimization;
+mod ultra_fast_jpeg_reader;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
@@ -499,6 +500,7 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ExifResult>()?;
     m.add_class::<ProcessingStats>()?;
     m.add_class::<hybrid_reader::HybridExifReader>()?;
+    m.add_class::<ultra_fast_jpeg_reader::UltraFastJpegReader>()?;
     m.add_class::<multiprocessing::MultiprocessingExifReader>()?;
     m.add_function(wrap_pyfunction!(
         multiprocessing::process_files_parallel,
@@ -518,6 +520,14 @@ fn fast_exif_reader(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     m.add_function(wrap_pyfunction!(
         hybrid_reader::benchmark_hybrid_vs_standard,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        ultra_fast_jpeg_reader::benchmark_ultra_fast_jpeg,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        ultra_fast_jpeg_reader::profile_ultra_fast_jpeg,
         m
     )?)?;
     Ok(())
