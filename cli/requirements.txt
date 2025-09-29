@@ -1,2 +1,0 @@
-# Fast EXIF CLI Dependencies
-click>=8.0

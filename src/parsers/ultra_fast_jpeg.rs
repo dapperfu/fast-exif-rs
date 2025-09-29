@@ -2,6 +2,9 @@ use crate::format_detection::FormatDetector;
 use crate::parsers::tiff::TiffParser;
 use crate::types::ExifError;
 use std::collections::HashMap;
+use rayon::prelude::*;
+use std::fs::File;
+use memmap2::Mmap;
 
 /// Ultra-fast JPEG EXIF parser with completely rewritten algorithms
 pub struct UltraFastJpegParser {
@@ -397,30 +400,28 @@ impl UltraFastBatchProcessor {
         }
     }
     
-    /// Process JPEG files with ultra-fast batch processing
+    /// Process JPEG files with ultra-fast PARALLEL batch processing
     pub fn process_jpeg_files_ultra_fast(
         &mut self,
         file_paths: &[String],
     ) -> Result<Vec<HashMap<String, String>>, ExifError> {
-        let mut results = Vec::with_capacity(file_paths.len());
-        
-        for chunk in file_paths.chunks(self.batch_size) {
-            self.batch_buffer.clear();
-            
-            for file_path in chunk {
-                let file = std::fs::File::open(file_path)?;
-                let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        // Use Rayon for true parallel processing
+        let results: Result<Vec<_>, _> = file_paths
+            .par_iter()
+            .map(|file_path| {
+                let file = File::open(file_path)?;
+                let mmap = unsafe { Mmap::map(&file)? };
                 
                 let mut metadata = HashMap::with_capacity(200);
-                self.parser.parse_jpeg_exif_ultra_fast(&mmap, &mut metadata)?;
+                // Create a temporary parser for this thread
+                let mut temp_parser = UltraFastJpegParser::new();
+                temp_parser.parse_jpeg_exif_ultra_fast(&mmap, &mut metadata)?;
                 
-                self.batch_buffer.push(metadata);
-            }
-            
-            results.extend(self.batch_buffer.drain(..));
-        }
+                Ok(metadata)
+            })
+            .collect();
         
-        Ok(results)
+        results
     }
     
     /// Get ultra-fast processor statistics

@@ -1,4 +1,3 @@
-use pyo3::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -17,15 +16,9 @@ pub enum ExifError {
     IoError(#[from] std::io::Error),
 }
 
-impl From<ExifError> for PyErr {
-    fn from(err: ExifError) -> PyErr {
-        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(err.to_string())
-    }
-}
 
 /// Result structure for multiprocessing operations
 #[derive(Debug, Clone)]
-#[pyclass]
 pub struct ExifResult {
     pub file_path: String,
     pub metadata: HashMap<String, String>,
@@ -36,7 +29,6 @@ pub struct ExifResult {
 
 /// Statistics for multiprocessing operations
 #[derive(Debug, Clone)]
-#[pyclass]
 pub struct ProcessingStats {
     pub total_files: usize,
     pub success_count: usize,

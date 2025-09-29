@@ -1,6 +1,6 @@
-# 🚀 Fast EXIF Reader
+# 🚀 Fast EXIF Reader v0.7.0
 
-**The fastest EXIF metadata reader on the planet** - Built in Rust with Python bindings. Extract camera information, timestamps, GPS data, and technical settings from photos and videos with **55.6x speedup** on large datasets.
+**The fastest EXIF metadata reader on the planet** - Built in pure Rust with automatic parallelization. Extract camera information, timestamps, GPS data, and technical settings from photos and videos with **55.6x speedup** on large datasets.
 
 [![Performance](https://img.shields.io/badge/Performance-55.6x%20faster-blue)](https://github.com/dapperfu/fast-exif-rs)
 [![Memory](https://img.shields.io/badge/Memory-2MB%20RAM-green)](https://github.com/dapperfu/fast-exif-rs)
@@ -34,10 +34,6 @@ Fast EXIF Reader solves a simple problem: **reading metadata from images should 
 
 *"I'll just rewrite ExifTool in Rust, it'll be a quick weekend project"* - Famous last words of every developer who thought they could improve on Phil Harvey's masterpiece. 
 
-![Rick and Morty 20-minute adventure meme](.img/20-minute-adventure-rick-morty-meme-template-regular-779df9ce.jpg){width=50%}
-
-*Rick Sanchez voice:* "Twenty minutes, Morty. Quick in and out adventure. Just gonna rewrite ExifTool in Rust, in and out, twenty minutes."
-
 Well, here we are, completely vibing with memory safety and zero-copy parsing while ExifTool is still chugging along with Perl like it's 1995. 
 
 **Perfect for:**
@@ -68,7 +64,7 @@ Works with all major camera manufacturers including Canon, Nikon, GoPro, Samsung
 
 **Speed:** Up to **55.6x faster** than V1 on large datasets, 2,675x faster than ExifTool
 **Memory:** Uses only ~2MB RAM vs 50MB+ for other tools  
-**Dependencies:** Zero external dependencies (pure Rust + Python bindings)
+**Dependencies:** Zero external dependencies (pure Rust)
 **Reliability:** Memory-safe Rust code with comprehensive error handling
 **Scale Performance:** Optimized for large photo libraries (19,000+ files processed in 1.19 seconds)
 
@@ -84,8 +80,6 @@ Works with all major camera manufacturers including Canon, Nikon, GoPro, Samsung
 *Single file processing (5MB JPEG):*
 - fast-exif-reader: 0.0001s (completely vibing)
 - ExifTool: 0.2300s (still parsing with Perl like a champ)
-- Pillow: 0.0450s (Python doing Python things)
-- exifread: 0.0120s (pure Python, bless its heart)
 
 ## Fast-EXIF-RS 2.0: Performance Revolution
 
@@ -137,83 +131,140 @@ Works with all major camera manufacturers including Canon, Nikon, GoPro, Samsung
 
 ## Installation
 
-**Requirements:** Python 3.8+ and Rust 1.70+ (because apparently we're not satisfied with just one language)
+**Requirements:** Rust 1.70+ 
 
-```bash
-# Install Rust (if not already installed)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+Add this to your `Cargo.toml`:
 
-# Clone and install
-git clone https://github.com/dapperfu/fast-exif-rs.git
-cd fast-exif-rs
-pip install maturin
-maturin develop
+```toml
+[dependencies]
+fast-exif-reader = "0.6.2"
 ```
 
-**That's it!** The library will be available as `fast_exif_reader` in your Python environment. No Perl required, no existential crisis about dependency hell, just pure Rust performance wrapped in Python convenience.
+Then run:
+
+```bash
+cargo build
+```
+
+**That's it!** The library will be available as `fast_exif_reader` in your Rust project. No Perl required, no existential crisis about dependency hell, just pure Rust performance.
 
 ## Usage
 
 ### Basic Usage
 
-```python
-from fast_exif_reader import FastExifReader
+```rust
+use fast_exif_reader::FastExifReader;
+use std::collections::HashMap;
 
-reader = FastExifReader()
-metadata = reader.read_file("photo.jpg")
+let mut reader = FastExifReader::new();
+let metadata = reader.read_file("photo.jpg")?;
 
-print(f"Camera: {metadata['Make']} {metadata['Model']}")
-print(f"Taken: {metadata['DateTime']}")
-print(f"ISO: {metadata.get('ISOSpeedRatings', 'N/A')}")
+println!("Camera: {} {}", 
+    metadata.get("Make").unwrap_or(&"Unknown".to_string()),
+    metadata.get("Model").unwrap_or(&"Unknown".to_string())
+);
+println!("Taken: {}", metadata.get("DateTime").unwrap_or(&"Unknown".to_string()));
+println!("ISO: {}", metadata.get("ISOSpeedRatings").unwrap_or(&"N/A".to_string()));
 ```
 
 ### Process Multiple Images
 
-```python
-from fast_exif_reader import FastExifReader
-from pathlib import Path
+```rust
+use fast_exif_reader::FastExifReader;
+use std::fs;
+use std::path::Path;
 
-reader = FastExifReader()
+let mut reader = FastExifReader::new();
 
-# Process all images in a directory
-for image_file in Path("photos").glob("*.jpg"):
-    try:
-        metadata = reader.read_file(str(image_file))
-        print(f"{image_file.name}: {metadata['Make']} {metadata['Model']}")
-    except Exception as e:
-        print(f"Error reading {image_file}: {e}")
+// Process all images in a directory
+if let Ok(entries) = fs::read_dir("photos") {
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if let Some(extension) = path.extension() {
+            if extension == "jpg" || extension == "jpeg" {
+                match reader.read_file(path.to_str().unwrap()) {
+                    Ok(metadata) => {
+                        println!("{}: {} {}", 
+                            path.file_name().unwrap().to_str().unwrap(),
+                            metadata.get("Make").unwrap_or(&"Unknown".to_string()),
+                            metadata.get("Model").unwrap_or(&"Unknown".to_string())
+                        );
+                    }
+                    Err(e) => println!("Error reading {:?}: {}", path, e),
+                }
+            }
+        }
+    }
+}
 ```
 
 ### Read from Memory
 
-```python
-# Useful for web applications or streaming
-with open("photo.jpg", "rb") as f:
-    image_data = f.read()
-
-metadata = reader.read_bytes(image_data)
+```rust
+// Useful for web applications or streaming
+let image_data = std::fs::read("photo.jpg")?;
+let metadata = reader.read_bytes(&image_data)?;
 ```
 
 ### Error Handling
 
-```python
-try:
-    metadata = reader.read_file("photo.jpg")
-    print(f"Camera: {metadata['Make']} {metadata['Model']}")
-except FileNotFoundError:
-    print("File not found")
-            except Exception as e:
-    print(f"Error reading EXIF: {e}")
+```rust
+use fast_exif_reader::{FastExifReader, ExifError};
+
+let mut reader = FastExifReader::new();
+match reader.read_file("photo.jpg") {
+    Ok(metadata) => {
+        println!("Camera: {} {}", 
+            metadata.get("Make").unwrap_or(&"Unknown".to_string()),
+            metadata.get("Model").unwrap_or(&"Unknown".to_string())
+        );
+    }
+    Err(ExifError::FileNotFound(path)) => {
+        println!("File not found: {}", path);
+    }
+    Err(e) => {
+        println!("Error reading EXIF: {}", e);
+    }
+}
 ```
 
-## Documentation
+## API Reference
 
-For detailed documentation, performance analysis, and development information, see the [docs/](docs/) directory:
+### FastExifReader
 
-- [Performance Analysis](docs/V2_REAL_IMPROVEMENTS.md) - Detailed V2 performance improvements
-- [Large-Scale Benchmarks](docs/LARGE_SCALE_BENCHMARK_SUMMARY.md) - Benchmark results
-- [Multiprocessing Guide](docs/MULTIPROCESSING.md) - Parallel processing capabilities
-- [Development Roadmap](docs/ROADMAP.md) - Future features and plans
+The main struct for reading EXIF metadata from files and bytes.
+
+```rust
+impl FastExifReader {
+    pub fn new() -> Self;
+    pub fn read_file(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError>;
+    pub fn read_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError>;
+}
+```
+
+### FastExifWriter
+
+For writing EXIF metadata to files and bytes.
+
+```rust
+impl FastExifWriter {
+    pub fn new() -> Self;
+    pub fn write_exif(&self, input_path: &str, output_path: &str, metadata: &HashMap<String, String>) -> Result<(), ExifError>;
+    pub fn write_exif_to_bytes(&self, input_data: &[u8], metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError>;
+}
+```
+
+### FastExifCopier
+
+For copying EXIF metadata between images.
+
+```rust
+impl FastExifCopier {
+    pub fn new() -> Self;
+    pub fn copy_high_priority_exif(&mut self, source_path: &str, target_path: &str, output_path: &str) -> Result<(), ExifError>;
+    pub fn copy_all_exif(&mut self, source_path: &str, target_path: &str, output_path: &str) -> Result<(), ExifError>;
+}
+```
 
 ## License
 
