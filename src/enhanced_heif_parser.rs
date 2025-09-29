@@ -30,24 +30,7 @@ impl EnhancedHeifParser {
 
         // Look for EXIF data using a comprehensive approach
         if let Some(exif_data) = Self::find_heif_exif_comprehensive(data) {
-            println!("DEBUG: Parsing EXIF data with TIFF parser");
-            let mut temp_metadata = HashMap::new();
-            match TiffParser::parse_tiff_exif(exif_data, &mut temp_metadata) {
-                Ok(_) => {
-                    println!("DEBUG: TIFF parsing succeeded, got {} fields", temp_metadata.len());
-                    println!("DEBUG: DateTimeOriginal: {:?}", temp_metadata.get("DateTimeOriginal"));
-                    println!("DEBUG: SubSecTimeOriginal: {:?}", temp_metadata.get("SubSecTimeOriginal"));
-                    // Copy all fields to main metadata
-                    for (k, v) in temp_metadata {
-                        metadata.insert(k, v);
-                    }
-                }
-                Err(e) => {
-                    println!("DEBUG: TIFF parsing failed: {:?}", e);
-                }
-            }
-        } else {
-            println!("DEBUG: No EXIF data found");
+            TiffParser::parse_tiff_exif(exif_data, metadata)?;
         }
 
         // Add computed fields that exiftool provides
@@ -752,29 +735,24 @@ impl EnhancedHeifParser {
 
         // Look for EXIF data in item data boxes
         if let Some(exif_data) = Self::find_exif_in_item_data_boxes(data) {
-            println!("DEBUG: Found EXIF data in item data boxes, length: {}", exif_data.len());
             all_exif_data.push(exif_data);
         }
 
         // Look for EXIF data in meta box structure
         if let Some(exif_data) = Self::find_exif_in_meta_structure(data) {
-            println!("DEBUG: Found EXIF data in meta structure, length: {}", exif_data.len());
             all_exif_data.push(exif_data);
         }
 
         // Look for EXIF data anywhere in the file
         if let Some(exif_data) = Self::find_exif_anywhere_in_file(data) {
-            println!("DEBUG: Found EXIF data anywhere in file, length: {}", exif_data.len());
             all_exif_data.push(exif_data);
         }
 
         // Choose the best EXIF data based on content quality
         if !all_exif_data.is_empty() {
-            println!("DEBUG: Found {} EXIF data sources, choosing best one", all_exif_data.len());
             return Some(Self::choose_best_exif_data(&all_exif_data));
         }
 
-        println!("DEBUG: No EXIF data found in any location");
         None
     }
     
@@ -909,11 +887,9 @@ impl EnhancedHeifParser {
 
     /// Find EXIF data anywhere in the file
     fn find_exif_anywhere_in_file(data: &[u8]) -> Option<&[u8]> {
-        println!("DEBUG: Searching for EXIF data in file of length {}", data.len());
         // Look for EXIF patterns throughout the file
         for i in 0..data.len().saturating_sub(8) {
             if &data[i..i + 4] == b"Exif" && i + 8 < data.len() {
-                println!("DEBUG: Found 'Exif' at offset {}", i);
                 // Check if this is followed by a valid TIFF header
                 // Allow for some padding bytes between "Exif" and TIFF header
                 let mut tiff_start = i + 4;
@@ -925,15 +901,11 @@ impl EnhancedHeifParser {
                 
                 if tiff_start + 2 < data.len() && 
                    (&data[tiff_start..tiff_start + 2] == b"II" || &data[tiff_start..tiff_start + 2] == b"MM") {
-                    println!("DEBUG: Found valid TIFF header at offset {} (after skipping padding)", tiff_start);
                     // Found valid EXIF with TIFF header
                     return Some(&data[tiff_start..]);
-                } else {
-                    println!("DEBUG: No valid TIFF header after 'Exif' at offset {} (checked up to {})", i + 4, tiff_start);
                 }
             }
         }
-        println!("DEBUG: No EXIF data found anywhere in file");
         None
     }
 
