@@ -30,7 +30,24 @@ impl EnhancedHeifParser {
 
         // Look for EXIF data using a comprehensive approach
         if let Some(exif_data) = Self::find_heif_exif_comprehensive(data) {
-            TiffParser::parse_tiff_exif(exif_data, metadata)?;
+            println!("DEBUG: Parsing EXIF data with TIFF parser");
+            let mut temp_metadata = HashMap::new();
+            match TiffParser::parse_tiff_exif(exif_data, &mut temp_metadata) {
+                Ok(_) => {
+                    println!("DEBUG: TIFF parsing succeeded, got {} fields", temp_metadata.len());
+                    println!("DEBUG: DateTimeOriginal: {:?}", temp_metadata.get("DateTimeOriginal"));
+                    println!("DEBUG: SubSecTimeOriginal: {:?}", temp_metadata.get("SubSecTimeOriginal"));
+                    // Copy all fields to main metadata
+                    for (k, v) in temp_metadata {
+                        metadata.insert(k, v);
+                    }
+                }
+                Err(e) => {
+                    println!("DEBUG: TIFF parsing failed: {:?}", e);
+                }
+            }
+        } else {
+            println!("DEBUG: No EXIF data found");
         }
 
         // Add computed fields that exiftool provides
