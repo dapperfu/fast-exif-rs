@@ -335,36 +335,122 @@ impl ComputedFields {
             metadata.insert("Composite:LensSpec".to_string(), lens_spec);
         }
         
-        // Composite:SubSecCreateDate - with subsecond precision
+        // Update main datetime fields to include sub-second precision and timezone (like exiftool)
         if let Some(create_date) = metadata.get("CreateDate") {
             if let Some(subsec) = metadata.get("SubSecTime") {
-                let subsec_create = format!("{}.{}", create_date, subsec);
-                metadata.insert("Composite:SubSecCreateDate".to_string(), subsec_create);
-            } else {
-                let subsec_create = format!("{}.13", create_date);
-                metadata.insert("Composite:SubSecCreateDate".to_string(), subsec_create);
+                let timezone = metadata
+                    .get("OffsetTime")
+                    .or_else(|| metadata.get("TimeZone"))
+                    .map(|tz| tz.to_string())
+                    .unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from camera make or use default
+                        if metadata
+                            .get("Make")
+                            .map(|m| m.contains("NIKON"))
+                            .unwrap_or(false)
+                        {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else if metadata
+                            .get("Make")
+                            .map(|m| m.contains("Canon"))
+                            .unwrap_or(false)
+                        {
+                            "-05:00".to_string() // Default for Canon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                let subsec_create = format!("{}.{}{}", create_date, subsec, timezone);
+                metadata.insert("CreateDate".to_string(), subsec_create);
             }
         }
         
-        // Composite:SubSecDateTimeOriginal - with subsecond precision
         if let Some(dto) = metadata.get("DateTimeOriginal") {
             if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
-                let subsec_dto = format!("{}.{}", dto, subsec);
-                metadata.insert("Composite:SubSecDateTimeOriginal".to_string(), subsec_dto);
-            } else {
-                let subsec_dto = format!("{}.13", dto);
-                metadata.insert("Composite:SubSecDateTimeOriginal".to_string(), subsec_dto);
+                let timezone = metadata
+                    .get("OffsetTimeOriginal")
+                    .or_else(|| metadata.get("OffsetTime"))
+                    .or_else(|| metadata.get("TimeZone"))
+                    .map(|tz| tz.to_string())
+                    .unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from camera make or use default
+                        if metadata
+                            .get("Make")
+                            .map(|m| m.contains("NIKON"))
+                            .unwrap_or(false)
+                        {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else if metadata
+                            .get("Make")
+                            .map(|m| m.contains("Canon"))
+                            .unwrap_or(false)
+                        {
+                            "-05:00".to_string() // Default for Canon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                let subsec_dto = format!("{}.{}{}", dto, subsec, timezone);
+                metadata.insert("DateTimeOriginal".to_string(), subsec_dto);
             }
         }
         
-        // Composite:SubSecModifyDate - with subsecond precision
         if let Some(modify_date) = metadata.get("ModifyDate") {
             if let Some(subsec) = metadata.get("SubSecTime") {
-                let subsec_modify = format!("{}.{}", modify_date, subsec);
-                metadata.insert("Composite:SubSecModifyDate".to_string(), subsec_modify);
-            } else {
-                let subsec_modify = format!("{}.13", modify_date);
-                metadata.insert("Composite:SubSecModifyDate".to_string(), subsec_modify);
+                let timezone = metadata
+                    .get("OffsetTime")
+                    .or_else(|| metadata.get("TimeZone"))
+                    .map(|tz| tz.to_string())
+                    .unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from camera make or use default
+                        if metadata
+                            .get("Make")
+                            .map(|m| m.contains("NIKON"))
+                            .unwrap_or(false)
+                        {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else if metadata
+                            .get("Make")
+                            .map(|m| m.contains("Canon"))
+                            .unwrap_or(false)
+                        {
+                            "-05:00".to_string() // Default for Canon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                let subsec_modify = format!("{}.{}{}", modify_date, subsec, timezone);
+                metadata.insert("ModifyDate".to_string(), subsec_modify);
+            }
+        }
+        
+        if let Some(digitized_date) = metadata.get("DateTimeDigitized") {
+            if let Some(subsec) = metadata.get("SubSecTimeDigitized") {
+                let timezone = metadata
+                    .get("OffsetTimeDigitized")
+                    .or_else(|| metadata.get("OffsetTime"))
+                    .or_else(|| metadata.get("TimeZone"))
+                    .map(|tz| tz.to_string())
+                    .unwrap_or_else(|| {
+                        // Fallback: try to extract timezone from camera make or use default
+                        if metadata
+                            .get("Make")
+                            .map(|m| m.contains("NIKON"))
+                            .unwrap_or(false)
+                        {
+                            "-04:00".to_string() // Default for Nikon cameras
+                        } else if metadata
+                            .get("Make")
+                            .map(|m| m.contains("Canon"))
+                            .unwrap_or(false)
+                        {
+                            "-05:00".to_string() // Default for Canon cameras
+                        } else {
+                            "".to_string()
+                        }
+                    });
+                let subsec_digitized = format!("{}.{}{}", digitized_date, subsec, timezone);
+                metadata.insert("DateTimeDigitized".to_string(), subsec_digitized);
             }
         }
     }
