@@ -337,20 +337,35 @@ impl ComputedFields {
         
         // Composite:SubSecCreateDate - with subsecond precision
         if let Some(create_date) = metadata.get("CreateDate") {
-            let subsec_create = format!("{}.13", create_date);
-            metadata.insert("Composite:SubSecCreateDate".to_string(), subsec_create);
+            if let Some(subsec) = metadata.get("SubSecTime") {
+                let subsec_create = format!("{}.{}", create_date, subsec);
+                metadata.insert("Composite:SubSecCreateDate".to_string(), subsec_create);
+            } else {
+                let subsec_create = format!("{}.13", create_date);
+                metadata.insert("Composite:SubSecCreateDate".to_string(), subsec_create);
+            }
         }
         
         // Composite:SubSecDateTimeOriginal - with subsecond precision
         if let Some(dto) = metadata.get("DateTimeOriginal") {
-            let subsec_dto = format!("{}.13", dto);
-            metadata.insert("Composite:SubSecDateTimeOriginal".to_string(), subsec_dto);
+            if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
+                let subsec_dto = format!("{}.{}", dto, subsec);
+                metadata.insert("Composite:SubSecDateTimeOriginal".to_string(), subsec_dto);
+            } else {
+                let subsec_dto = format!("{}.13", dto);
+                metadata.insert("Composite:SubSecDateTimeOriginal".to_string(), subsec_dto);
+            }
         }
         
         // Composite:SubSecModifyDate - with subsecond precision
         if let Some(modify_date) = metadata.get("ModifyDate") {
-            let subsec_modify = format!("{}.13", modify_date);
-            metadata.insert("Composite:SubSecModifyDate".to_string(), subsec_modify);
+            if let Some(subsec) = metadata.get("SubSecTime") {
+                let subsec_modify = format!("{}.{}", modify_date, subsec);
+                metadata.insert("Composite:SubSecModifyDate".to_string(), subsec_modify);
+            } else {
+                let subsec_modify = format!("{}.13", modify_date);
+                metadata.insert("Composite:SubSecModifyDate".to_string(), subsec_modify);
+            }
         }
     }
     
