@@ -1,6 +1,5 @@
 use crate::types::ExifError;
 use std::collections::HashMap;
-use nom::IResult;
 
 /// Enhanced video format parser supporting additional video formats
 pub struct EnhancedVideoParser;
@@ -73,7 +72,7 @@ impl EnhancedVideoParser {
     }
 
     /// Parse AVI header
-    fn parse_avi_header(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_avi_header(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Basic AVI metadata
@@ -85,7 +84,7 @@ impl EnhancedVideoParser {
     }
 
     /// Parse ASF header
-    fn parse_asf_header(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_asf_header(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Basic ASF metadata
@@ -97,7 +96,7 @@ impl EnhancedVideoParser {
     }
 
     /// Parse WEBM header
-    fn parse_webm_header(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_webm_header(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Basic WEBM metadata

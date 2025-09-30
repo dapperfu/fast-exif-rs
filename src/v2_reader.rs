@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use crate::parsers::{
-    selective::{SelectiveFieldExtractor, FieldExtractors},
+    selective::SelectiveFieldExtractor,
     simd::SimdHexParser,
     zero_copy::ZeroCopyExifParser,
 };

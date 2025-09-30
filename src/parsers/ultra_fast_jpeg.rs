@@ -365,13 +365,6 @@ impl UltraFastJpegParser {
         stats
     }
     
-    /// Clear caches for memory management
-    pub fn clear_caches(&mut self) {
-        self.marker_positions.clear();
-        self.segment_data.clear();
-        self.segment_cache.clear();
-        self.marker_table = [None; 256];
-    }
 }
 
 impl Default for UltraFastJpegParser {

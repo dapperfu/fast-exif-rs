@@ -426,7 +426,7 @@ impl ComputedFields {
         
         // Update CreateDate to match the updated DateTimeOriginal
         if let Some(dto) = metadata.get("DateTimeOriginal") {
-            if let Some(create_date) = metadata.get("CreateDate") {
+            if let Some(_create_date) = metadata.get("CreateDate") {
                 // Update CreateDate to match DateTimeOriginal format
                 metadata.insert("CreateDate".to_string(), dto.clone());
             }

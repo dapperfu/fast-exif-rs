@@ -77,14 +77,11 @@ impl SimdHexParser {
         let mut results = Vec::with_capacity(patterns.len());
         
         for pattern in patterns {
-            let mut matches = Vec::new();
-            
-            #[cfg(target_arch = "x86_64")]
-            if self.avx2_supported && pattern.len() >= 4 {
-                matches = self.find_pattern_avx2(data, pattern);
+            let matches = if cfg!(target_arch = "x86_64") && self.avx2_supported && pattern.len() >= 4 {
+                self.find_pattern_avx2(data, pattern)
             } else {
-                matches = self.find_pattern_scalar(data, pattern);
-            }
+                self.find_pattern_scalar(data, pattern)
+            };
             
             #[cfg(target_arch = "aarch64")]
             if self.neon_supported && pattern.len() >= 4 {

@@ -8,7 +8,7 @@ impl MakerNoteParser {
     pub fn parse_maker_note(
         data: &[u8],
         offset: usize,
-        count: usize,
+        _count: usize,
         metadata: &mut HashMap<String, String>,
     ) {
         if offset + 10 > data.len() {

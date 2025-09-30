@@ -1,7 +1,6 @@
 use crate::types::ExifError;
 use crate::utils::ExifUtils;
 use crate::format_detection::FormatDetector;
-use crate::parsers::{JpegParser, HeifParser, RawParser, PngParser, BmpParser};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -249,10 +248,10 @@ impl ExifWriter {
     }
 
     /// Read EXIF metadata from file using existing parser infrastructure
-    fn read_exif_metadata(&self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
+    fn read_exif_metadata(&self, _file_path: &str) -> Result<HashMap<String, String>, ExifError> {
         // This is a simplified implementation that would use the existing parser
         // For now, return empty metadata - this would be replaced with actual parsing
-        let mut metadata = HashMap::new();
+        let metadata = HashMap::new();
         
         // TODO: Integrate with existing EXIF reading infrastructure
         // This would use the same parsers as FastExifReader

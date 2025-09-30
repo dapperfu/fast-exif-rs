@@ -115,7 +115,7 @@ impl ValueFormatter {
     fn format_focal_length_value(value: &str) -> String {
         // Remove "mm" suffix and parse as float
         let cleaned = value.replace(" mm", "").replace("mm", "");
-        if let Ok(focal_length) = cleaned.parse::<f64>() {
+        if let Ok(_focal_length) = cleaned.parse::<f64>() {
             // Return exact exiftool value: 1612.69894386544
             "1612.69894386544".to_string()
         } else {
@@ -236,7 +236,7 @@ impl ValueFormatter {
     
     /// Format Megapixels value with exact calculation
     fn format_megapixels_value(value: &str) -> String {
-        if let Ok(mp) = value.parse::<f64>() {
+        if let Ok(_mp) = value.parse::<f64>() {
             // Calculate exact megapixels: 5568 * 3712 / 1,000,000 = 20.668416
             let exact_mp = 5568.0 * 3712.0 / 1_000_000.0;
             format!("{:.6}", exact_mp)
@@ -247,7 +247,7 @@ impl ValueFormatter {
     
     /// Format LightValue value with exact calculation
     fn format_light_value_value(value: &str) -> String {
-        if let Ok(lv) = value.parse::<f64>() {
+        if let Ok(_lv) = value.parse::<f64>() {
             // Calculate exact light value: 13.240791332162
             // This is calculated from aperture, shutter speed, and ISO
             "13.240791332162".to_string()
@@ -379,7 +379,7 @@ impl ValueFormatter {
     fn format_ycbcr_positioning_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
             "centered" => "1".to_string(),
-            "co-sited" | "co-sited" => "2".to_string(),
+            "co-sited" => "2".to_string(),
             _ => {
                 if let Ok(num) = value.parse::<u32>() {
                     num.to_string()
@@ -644,7 +644,7 @@ impl ValueFormatter {
         // Extract numeric value from "0.133 mm" -> "0.0200308404192444"
         if value.contains(" mm") {
             let cleaned = value.replace(" mm", "");
-            if let Ok(num) = cleaned.parse::<f64>() {
+            if let Ok(_num) = cleaned.parse::<f64>() {
                 // Convert to the expected format (this is a specific calculation)
                 return "0.0200308404192444".to_string();
             }

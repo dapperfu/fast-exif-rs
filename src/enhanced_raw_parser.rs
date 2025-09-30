@@ -1,6 +1,5 @@
 use crate::types::ExifError;
 use std::collections::HashMap;
-use nom::IResult;
 
 /// Enhanced RAW format parser supporting additional camera manufacturers
 pub struct EnhancedRawParser;
@@ -137,7 +136,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse IFD entries
-    fn parse_ifd_entries(data: &[u8], is_little_endian: bool) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_ifd_entries(data: &[u8], _is_little_endian: bool) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // This is a simplified IFD parser - in a real implementation,
@@ -154,7 +153,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse Sony maker notes
-    fn parse_sony_maker_notes(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_sony_maker_notes(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Sony-specific tags
@@ -165,7 +164,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse Fuji maker notes
-    fn parse_fuji_maker_notes(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_fuji_maker_notes(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Fuji-specific tags
@@ -176,7 +175,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse Samsung maker notes
-    fn parse_samsung_maker_notes(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_samsung_maker_notes(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Samsung-specific tags
@@ -187,7 +186,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse Pentax maker notes
-    fn parse_pentax_maker_notes(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_pentax_maker_notes(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Pentax-specific tags
@@ -198,7 +197,7 @@ impl EnhancedRawParser {
     }
 
     /// Parse Panasonic maker notes
-    fn parse_panasonic_maker_notes(data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
+    fn parse_panasonic_maker_notes(_data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = HashMap::new();
         
         // Panasonic-specific tags

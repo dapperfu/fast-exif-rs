@@ -1,6 +1,5 @@
 use crate::types::ExifError;
 use std::collections::HashMap;
-use nom::IResult;
 
 /// Enhanced image format parser supporting additional image formats
 pub struct EnhancedImageParser;

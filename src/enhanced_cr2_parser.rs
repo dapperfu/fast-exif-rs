@@ -948,7 +948,7 @@ impl EnhancedCr2Parser {
     }
     
     /// Calculate 35mm equivalent focal length
-    fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
+    fn calculate_35mm_equivalent(focal_length: &str, _metadata: &HashMap<String, String>) -> String {
         // Extract numeric focal length
         let focal_mm = if let Some(mm_pos) = focal_length.find(" mm") {
             focal_length[..mm_pos].parse::<f32>().unwrap_or(0.0)
@@ -1039,13 +1039,6 @@ impl EnhancedCr2Parser {
     fn extract_sensor_right_border(_data: &[u8]) -> Option<String> { None }
     fn extract_interop_version(_data: &[u8]) -> Option<String> { None }
     fn extract_lens_drive_no_af(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_area_heights(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_area_widths(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_area_x_positions(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_area_y_positions(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_area_select_method(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_points_used(_data: &[u8]) -> Option<String> { None }
-    fn extract_af_point(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_lens_type(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_min_focal_length(_data: &[u8]) -> Option<String> { None }
     fn extract_canon_max_focal_length(_data: &[u8]) -> Option<String> { None }

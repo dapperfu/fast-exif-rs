@@ -1,6 +1,5 @@
 use crate::parsers::tiff::TiffParser;
 use crate::types::ExifError;
-use crate::utils::ExifUtils;
 use std::collections::HashMap;
 
 /// Enhanced HEIF/HIF format parser for comprehensive field extraction
@@ -587,7 +586,7 @@ impl EnhancedHeifParser {
     }
     
     /// Calculate 35mm equivalent focal length
-    fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
+    fn calculate_35mm_equivalent(focal_length: &str, _metadata: &HashMap<String, String>) -> String {
         // Extract numeric focal length
         let focal_mm = if let Some(mm_pos) = focal_length.find(" mm") {
             focal_length[..mm_pos].parse::<f32>().unwrap_or(0.0)
@@ -935,7 +934,6 @@ impl EnhancedHeifParser {
 
     fn find_exif_in_item_data_boxes(_data: &[u8]) -> Option<&[u8]> { None }
     fn find_exif_in_meta_structure(_data: &[u8]) -> Option<&[u8]> { None }
-    fn find_exif_in_track_boxes(_data: &[u8]) -> Option<&[u8]> { None }
     
     fn extract_heif_version(_data: &[u8]) -> Option<String> { None }
     fn extract_compatible_brands(_data: &[u8]) -> Option<String> { None }

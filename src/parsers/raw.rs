@@ -359,7 +359,7 @@ impl RawParser {
     }
 
     /// Fix APEX conversions for ShutterSpeedValue and ApertureValue
-    fn fix_apex_conversions(metadata: &mut HashMap<String, String>) {
+    fn fix_apex_conversions(_metadata: &mut HashMap<String, String>) {
         // ShutterSpeedValue is now handled by TIFF parser - don't override it
     }
 
@@ -425,19 +425,6 @@ impl RawParser {
         }
     }
 
-    /// Format exposure time value using same logic as TIFF parser
-    fn format_exposure_time_value(secs: f64) -> String {
-        if secs < 0.25001 && secs > 0.0 {
-            format!("1/{}", (0.5 + 1.0 / secs) as i32)
-        } else {
-            let formatted = format!("{:.1}", secs);
-            if formatted.ends_with(".0") {
-                formatted.trim_end_matches(".0").to_string()
-            } else {
-                formatted
-            }
-        }
-    }
 
     /// Get format-specific file extension and MIME type
     fn get_format_info(format: &str) -> (String, String) {
@@ -455,20 +442,6 @@ impl RawParser {
         }
     }
 
-    /// Detect actual byte order from EXIF data
-    fn detect_byte_order(metadata: &HashMap<String, String>) -> String {
-        // Check if we have byte order information in the metadata
-        // For now, we'll use a heuristic based on common patterns
-        if let Some(exif_version) = metadata.get("ExifVersion") {
-            // ExifVersion is typically stored in little-endian format
-            if exif_version.len() == 4 && exif_version.chars().all(|c| c.is_ascii_digit()) {
-                return "Little-endian (Intel, II)".to_string();
-            }
-        }
-        
-        // Default to little-endian as it's more common in modern cameras
-        "Little-endian (Intel, II)".to_string()
-    }
 
     /// Calculate 35mm equivalent focal length
     fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {

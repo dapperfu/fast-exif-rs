@@ -126,9 +126,9 @@ impl SimdJpegParser {
     /// Parse IFD using AVX2
     fn parse_ifd_avx2(
         &self,
-        data: &[u8],
-        offset: usize,
-        metadata: &mut HashMap<String, String>,
+        _data: &[u8],
+        _offset: usize,
+        _metadata: &mut HashMap<String, String>,
     ) -> Result<(), ExifError> {
         // Implementation for AVX2 IFD parsing
         // This would contain the actual EXIF tag parsing logic

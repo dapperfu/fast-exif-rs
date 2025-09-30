@@ -744,7 +744,7 @@ impl HeifParser {
     }
 
     /// Fix APEX conversions for ShutterSpeedValue and ApertureValue
-    fn fix_apex_conversions(metadata: &mut HashMap<String, String>) {
+    fn fix_apex_conversions(_metadata: &mut HashMap<String, String>) {
         // ShutterSpeedValue is now handled by TIFF parser - don't override it
     }
 
@@ -807,19 +807,6 @@ impl HeifParser {
         }
     }
 
-    /// Format exposure time value using same logic as TIFF parser
-    fn format_exposure_time_value(secs: f64) -> String {
-        if secs < 0.25001 && secs > 0.0 {
-            format!("1/{}", (0.5 + 1.0 / secs) as i32)
-        } else {
-            let formatted = format!("{:.1}", secs);
-            if formatted.ends_with(".0") {
-                formatted.trim_end_matches(".0").to_string()
-            } else {
-                formatted
-            }
-        }
-    }
 
     /// Calculate 35mm equivalent focal length
     fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {

@@ -28,7 +28,6 @@ mod enhanced_dng_parser;
 mod field_mapping;
 mod computed_fields;
 mod value_formatter;
-mod memory_optimization;
 mod ultra_fast_jpeg_reader;
 mod hybrid_reader;
 

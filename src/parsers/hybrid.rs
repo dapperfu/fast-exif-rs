@@ -118,9 +118,9 @@ impl HybridExifParser {
     /// Parse other formats with CPU
     fn parse_other_formats(
         &mut self,
-        data: &[u8],
+        _data: &[u8],
         extension: &str,
-        metadata: &mut HashMap<String, String>,
+        _metadata: &mut HashMap<String, String>,
     ) -> Result<(), ExifError> {
         match extension {
             "png" => {
