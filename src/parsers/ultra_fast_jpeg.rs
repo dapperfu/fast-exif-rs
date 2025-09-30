@@ -106,10 +106,14 @@ impl UltraFastJpegParser {
     fn extract_exif_ultra_fast<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // Use marker table for O(1) lookup
         if let Some(pos) = self.marker_table[0xE1] {
-            if pos + 4 < data.len() {
+            if pos + 10 < data.len() {
                 let length = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
                 if pos + 4 + length <= data.len() {
-                    return Some(&data[pos + 4..pos + 4 + length]);
+                    let exif_segment = &data[pos + 4..pos + 4 + length];
+                    // Skip "Exif\0\0" header (6 bytes) to get to TIFF data
+                    if exif_segment.len() >= 6 && &exif_segment[0..6] == b"Exif\0\0" {
+                        return Some(&exif_segment[6..]);
+                    }
                 }
             }
         }
