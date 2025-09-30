@@ -496,14 +496,8 @@ impl VideoParser {
             metadata.insert("Duration".to_string(), duration);
         }
         
-        if let Some(creation_time) = Self::extract_creation_time(data) {
-            metadata.insert("CreationDate".to_string(), creation_time.clone());
-            metadata.insert("CreateDate".to_string(), creation_time);
-        }
-        
-        if let Some(modification_time) = Self::extract_modification_time(data) {
-            metadata.insert("ModifyDate".to_string(), modification_time);
-        }
+        // Extract comprehensive date information from various atoms
+        Self::extract_comprehensive_dates(data, metadata);
     }
     
     /// Extract MOV GPS metadata
@@ -566,8 +560,12 @@ impl VideoParser {
     
     /// Extract MP4 time metadata
     fn extract_mp4_time_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
-        // MP4 uses similar structure to MOV
-        Self::extract_mov_time_metadata(data, metadata);
+        if let Some(duration) = Self::extract_duration(data) {
+            metadata.insert("Duration".to_string(), duration);
+        }
+        
+        // Extract comprehensive date information from various atoms
+        Self::extract_comprehensive_dates(data, metadata);
     }
     
     /// Extract MP4 GPS metadata
@@ -714,6 +712,109 @@ impl VideoParser {
         })
     }
     
+    /// Extract comprehensive date information from video files
+    fn extract_comprehensive_dates(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Extract creation and modification times from mvhd atom
+        if let Some(creation_time) = Self::extract_creation_time(data) {
+            metadata.insert("CreateDate".to_string(), creation_time.clone());
+            metadata.insert("CreationDate".to_string(), creation_time);
+        }
+        
+        if let Some(modification_time) = Self::extract_modification_time(data) {
+            metadata.insert("ModifyDate".to_string(), modification_time);
+        }
+        
+        // Extract track-level dates from trak atoms
+        Self::extract_track_dates(data, metadata);
+        
+        // Extract media-level dates from mdia atoms
+        Self::extract_media_dates(data, metadata);
+    }
+    
+    /// Extract track-level creation and modification dates
+    fn extract_track_dates(data: &[u8], metadata: &mut HashMap<String, String>) {
+        Self::find_trak_atoms(data, |trak_data| {
+            // Look for tkhd (track header) atom within trak
+            Self::find_tkhd_atom(trak_data, |tkhd_data| {
+                if tkhd_data.len() >= 20 {
+                    // Read creation time from tkhd atom (offset 4-8 after version/flags)
+                    let creation_time = ExifUtils::read_u32_be(tkhd_data, 4).unwrap_or(0);
+                    if creation_time > 0 {
+                        let unix_timestamp = creation_time as i64 - 2082844800;
+                        if unix_timestamp > 0 {
+                            if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                                let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                metadata.insert("TrackCreateDate".to_string(), formatted_time.clone());
+                                // If we don't have CreateDate yet, use track creation date
+                                if !metadata.contains_key("CreateDate") {
+                                    metadata.insert("CreateDate".to_string(), formatted_time);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Read modification time from tkhd atom (offset 8-12 after version/flags)
+                    let modification_time = ExifUtils::read_u32_be(tkhd_data, 8).unwrap_or(0);
+                    if modification_time > 0 {
+                        let unix_timestamp = modification_time as i64 - 2082844800;
+                        if unix_timestamp > 0 {
+                            if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                                let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                metadata.insert("TrackModifyDate".to_string(), formatted_time.clone());
+                                // If we don't have ModifyDate yet, use track modification date
+                                if !metadata.contains_key("ModifyDate") {
+                                    metadata.insert("ModifyDate".to_string(), formatted_time);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+    
+    /// Extract media-level creation and modification dates
+    fn extract_media_dates(data: &[u8], metadata: &mut HashMap<String, String>) {
+        Self::find_mdia_atoms(data, |mdia_data| {
+            // Look for mdhd (media header) atom within mdia
+            Self::find_mdhd_atom(mdia_data, |mdhd_data| {
+                if mdhd_data.len() >= 20 {
+                    // Read creation time from mdhd atom (offset 4-8 after version/flags)
+                    let creation_time = ExifUtils::read_u32_be(mdhd_data, 4).unwrap_or(0);
+                    if creation_time > 0 {
+                        let unix_timestamp = creation_time as i64 - 2082844800;
+                        if unix_timestamp > 0 {
+                            if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                                let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                metadata.insert("MediaCreateDate".to_string(), formatted_time.clone());
+                                // If we don't have CreateDate yet, use media creation date
+                                if !metadata.contains_key("CreateDate") {
+                                    metadata.insert("CreateDate".to_string(), formatted_time);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Read modification time from mdhd atom (offset 8-12 after version/flags)
+                    let modification_time = ExifUtils::read_u32_be(mdhd_data, 8).unwrap_or(0);
+                    if modification_time > 0 {
+                        let unix_timestamp = modification_time as i64 - 2082844800;
+                        if unix_timestamp > 0 {
+                            if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                                let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                metadata.insert("MediaModifyDate".to_string(), formatted_time.clone());
+                                // If we don't have ModifyDate yet, use media modification date
+                                if !metadata.contains_key("ModifyDate") {
+                                    metadata.insert("ModifyDate".to_string(), formatted_time);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
+
     fn extract_creation_time(data: &[u8]) -> Option<String> {
         // Look for mvhd (movie header) atom to get creation time
         Self::find_mvhd_atom(data, |mvhd_data| {
@@ -799,6 +900,132 @@ impl VideoParser {
             pos += size as usize;
         }
         None
+    }
+    
+    /// Helper function to find all trak atoms
+    fn find_trak_atoms<F>(data: &[u8], mut callback: F)
+    where
+        F: FnMut(&[u8]),
+    {
+        Self::find_trak_atoms_recursive(data, &mut callback);
+    }
+    
+    /// Recursive helper for finding trak atoms
+    fn find_trak_atoms_recursive<F>(data: &[u8], callback: &mut F)
+    where
+        F: FnMut(&[u8]),
+    {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"trak" {
+                // Found trak atom, extract its data (skip size and type)
+                let trak_data = &data[pos + 8..pos + size as usize];
+                callback(trak_data);
+            } else if atom_type == b"moov" {
+                // Recursively search inside moov atom
+                let moov_data = &data[pos + 8..pos + size as usize];
+                Self::find_trak_atoms_recursive(moov_data, callback);
+            }
+            
+            pos += size as usize;
+        }
+    }
+    
+    /// Helper function to find tkhd atom within trak
+    fn find_tkhd_atom<F>(data: &[u8], mut callback: F)
+    where
+        F: FnMut(&[u8]),
+    {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"tkhd" {
+                // Found tkhd atom, extract its data (skip size and type)
+                let tkhd_data = &data[pos + 8..pos + size as usize];
+                callback(tkhd_data);
+                break; // Only process first tkhd atom
+            }
+            
+            pos += size as usize;
+        }
+    }
+    
+    /// Helper function to find all mdia atoms
+    fn find_mdia_atoms<F>(data: &[u8], mut callback: F)
+    where
+        F: FnMut(&[u8]),
+    {
+        Self::find_mdia_atoms_recursive(data, &mut callback);
+    }
+    
+    /// Recursive helper for finding mdia atoms
+    fn find_mdia_atoms_recursive<F>(data: &[u8], callback: &mut F)
+    where
+        F: FnMut(&[u8]),
+    {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"mdia" {
+                // Found mdia atom, extract its data (skip size and type)
+                let mdia_data = &data[pos + 8..pos + size as usize];
+                callback(mdia_data);
+            } else if atom_type == b"trak" {
+                // Recursively search inside trak atom
+                let trak_data = &data[pos + 8..pos + size as usize];
+                Self::find_mdia_atoms_recursive(trak_data, callback);
+            } else if atom_type == b"moov" {
+                // Recursively search inside moov atom
+                let moov_data = &data[pos + 8..pos + size as usize];
+                Self::find_mdia_atoms_recursive(moov_data, callback);
+            }
+            
+            pos += size as usize;
+        }
+    }
+    
+    /// Helper function to find mdhd atom within mdia
+    fn find_mdhd_atom<F>(data: &[u8], mut callback: F)
+    where
+        F: FnMut(&[u8]),
+    {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"mdhd" {
+                // Found mdhd atom, extract its data (skip size and type)
+                let mdhd_data = &data[pos + 8..pos + size as usize];
+                callback(mdhd_data);
+                break; // Only process first mdhd atom
+            }
+            
+            pos += size as usize;
+        }
     }
 
     /// Add computed fields that exiftool provides
