@@ -141,9 +141,9 @@ fn process_file(
     reader: &mut FastExifReader,
     path: &Path,
     results: &mut Vec<FileResult>,
-    short: bool,
+    _short: bool,
     tags: &Option<Vec<String>>,
-    filenames: bool,
+    _filenames: bool,
     quiet: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match reader.read_file(path.to_str().unwrap()) {
