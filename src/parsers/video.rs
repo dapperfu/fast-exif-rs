@@ -82,8 +82,13 @@ impl VideoParser {
         // 3GP files are based on MP4 format
         metadata.insert("Format".to_string(), "3GP".to_string());
 
-        // Extract basic 3GP metadata
+        // Extract comprehensive 3GP metadata (same as MP4)
         Self::extract_3gp_basic_metadata(data, metadata);
+        Self::extract_3gp_video_metadata(data, metadata);
+        Self::extract_3gp_audio_metadata(data, metadata);
+        Self::extract_3gp_time_metadata(data, metadata);
+        Self::extract_3gp_gps_metadata(data, metadata);
+        Self::extract_3gp_text_metadata(data, metadata);
 
         // Look for EXIF data in 3GP atoms
         if let Some(exif_data) = Self::find_3gp_exif(data) {
@@ -92,6 +97,9 @@ impl VideoParser {
 
         // Add computed fields
         Self::add_computed_fields(metadata);
+        
+        // Add missing fields with defaults
+        Self::add_missing_video_fields(metadata);
 
         Ok(())
     }
@@ -578,6 +586,40 @@ impl VideoParser {
     fn extract_mp4_text_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
         // MP4 uses similar structure to MOV
         Self::extract_mov_text_metadata(data, metadata);
+    }
+    
+    /// Extract 3GP video metadata
+    fn extract_3gp_video_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // 3GP uses similar structure to MP4
+        Self::extract_mp4_video_metadata(data, metadata);
+    }
+    
+    /// Extract 3GP audio metadata
+    fn extract_3gp_audio_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // 3GP uses similar structure to MP4
+        Self::extract_mp4_audio_metadata(data, metadata);
+    }
+    
+    /// Extract 3GP time metadata
+    fn extract_3gp_time_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
+        if let Some(duration) = Self::extract_duration(data) {
+            metadata.insert("Duration".to_string(), duration);
+        }
+        
+        // Extract comprehensive date information from various atoms
+        Self::extract_comprehensive_dates(data, metadata);
+    }
+    
+    /// Extract 3GP GPS metadata
+    fn extract_3gp_gps_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // 3GP uses similar structure to MP4
+        Self::extract_mp4_gps_metadata(data, metadata);
+    }
+    
+    /// Extract 3GP text metadata
+    fn extract_3gp_text_metadata(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // 3GP uses similar structure to MP4
+        Self::extract_mp4_text_metadata(data, metadata);
     }
     
     /// Add missing video fields with defaults

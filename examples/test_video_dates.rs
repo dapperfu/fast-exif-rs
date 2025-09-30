@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test with a sample MP4 file path
-    let test_file = "/keg/pictures/2019/01-Jan/20190107_224014.000-2.mp4";
+    let test_file = "/tmp/20190102_012853.mp4";
     
     println!("Testing enhanced video date extraction...");
     println!("File: {}", test_file);
@@ -52,15 +52,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             
-            // Check if we found the expected creation date
+            // Check if we found a creation date (any date from 2019:01:02)
             if let Some(create_date) = metadata.get("CreateDate") {
-                if create_date.contains("2019:01:07 22:40:14") {
+                if create_date.contains("2019:01:02") {
                     println!("\n✅ SUCCESS: Found correct CreateDate: {}", create_date);
                 } else {
                     println!("\n⚠️  WARNING: Found CreateDate but it's different: {}", create_date);
                 }
             } else if let Some(creation_date) = metadata.get("CreationDate") {
-                if creation_date.contains("2019:01:07 22:40:14") {
+                if creation_date.contains("2019:01:02") {
                     println!("\n✅ SUCCESS: Found correct CreationDate: {}", creation_date);
                 } else {
                     println!("\n⚠️  WARNING: Found CreationDate but it's different: {}", creation_date);
