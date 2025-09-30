@@ -699,42 +699,27 @@ impl VideoParser {
     fn extract_audio_bitrate(_data: &[u8]) -> Option<String> { None }
     fn extract_duration(data: &[u8]) -> Option<String> {
         // Look for mvhd (movie header) atom to get duration
-        let mut pos = 0;
-        while pos + 8 < data.len() {
-            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
-            let atom_type = &data[pos + 4..pos + 8];
-            if atom_type == b"mvhd" && pos + 24 < data.len() {
-                // Read timescale from mvhd atom (offset 20-24)
-                let timescale = ExifUtils::read_u32_be(data, pos + 20).unwrap_or(1);
-                // Read duration from mvhd atom (offset 24-28)
-                let duration = ExifUtils::read_u32_be(data, pos + 24).unwrap_or(0);
+        Self::find_mvhd_atom(data, |mvhd_data| {
+            if mvhd_data.len() >= 24 {
+                // Read timescale from mvhd atom (offset 12-16)
+                let timescale = ExifUtils::read_u32_be(mvhd_data, 12).unwrap_or(1);
+                // Read duration from mvhd atom (offset 16-20)
+                let duration = ExifUtils::read_u32_be(mvhd_data, 16).unwrap_or(0);
                 if timescale > 0 {
                     let duration_secs = duration as f64 / timescale as f64;
                     return Some(format!("{:.2} s", duration_secs));
                 }
             }
-            pos += size as usize;
-        }
-        None
+            None
+        })
     }
     
     fn extract_creation_time(data: &[u8]) -> Option<String> {
         // Look for mvhd (movie header) atom to get creation time
-        let mut pos = 0;
-        while pos + 8 < data.len() {
-            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
-            let atom_type = &data[pos + 4..pos + 8];
-            if atom_type == b"mvhd" && pos + 16 < data.len() {
-                // Read creation time from mvhd atom (offset 8-12 after version/flags)
-                let creation_time = ExifUtils::read_u32_be(data, pos + 12).unwrap_or(0);
+        Self::find_mvhd_atom(data, |mvhd_data| {
+            if mvhd_data.len() >= 16 {
+                // Read creation time from mvhd atom (offset 4-8 after version/flags)
+                let creation_time = ExifUtils::read_u32_be(mvhd_data, 4).unwrap_or(0);
                 // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
                 let unix_timestamp = creation_time as i64 - 2082844800;
                 if unix_timestamp > 0 {
@@ -744,24 +729,16 @@ impl VideoParser {
                     }
                 }
             }
-            pos += size as usize;
-        }
-        None
+            None
+        })
     }
     
     fn extract_modification_time(data: &[u8]) -> Option<String> {
         // Look for mvhd (movie header) atom to get modification time
-        let mut pos = 0;
-        while pos + 8 < data.len() {
-            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
-            let atom_type = &data[pos + 4..pos + 8];
-            if atom_type == b"mvhd" && pos + 20 < data.len() {
-                // Read modification time from mvhd atom (offset 16-20 after version/flags)
-                let modification_time = ExifUtils::read_u32_be(data, pos + 16).unwrap_or(0);
+        Self::find_mvhd_atom(data, |mvhd_data| {
+            if mvhd_data.len() >= 20 {
+                // Read modification time from mvhd atom (offset 8-12 after version/flags)
+                let modification_time = ExifUtils::read_u32_be(mvhd_data, 8).unwrap_or(0);
                 // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
                 let unix_timestamp = modification_time as i64 - 2082844800;
                 if unix_timestamp > 0 {
@@ -771,9 +748,8 @@ impl VideoParser {
                     }
                 }
             }
-            pos += size as usize;
-        }
-        None
+            None
+        })
     }
     fn extract_gps_data(_data: &[u8]) -> Option<String> { None }
     fn extract_gps_latitude(_data: &[u8]) -> Option<String> { None }
@@ -785,6 +761,45 @@ impl VideoParser {
     fn extract_comment(_data: &[u8]) -> Option<String> { None }
     fn extract_software(_data: &[u8]) -> Option<String> { None }
     fn extract_copyright(_data: &[u8]) -> Option<String> { None }
+
+    /// Helper function to find mvhd atom in nested structure
+    fn find_mvhd_atom<F, R>(data: &[u8], mut callback: F) -> Option<R>
+    where
+        F: FnMut(&[u8]) -> Option<R>,
+    {
+        Self::find_mvhd_atom_recursive(data, &mut callback)
+    }
+    
+    /// Recursive helper for finding mvhd atom
+    fn find_mvhd_atom_recursive<F, R>(data: &[u8], callback: &mut F) -> Option<R>
+    where
+        F: FnMut(&[u8]) -> Option<R>,
+    {
+        let mut pos = 0;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size > data.len() as u32 {
+                break;
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"mvhd" {
+                // Found mvhd atom, extract its data (skip size and type)
+                let mvhd_data = &data[pos + 8..pos + size as usize];
+                return callback(mvhd_data);
+            } else if atom_type == b"moov" {
+                // Recursively search inside moov atom
+                let moov_data = &data[pos + 8..pos + size as usize];
+                if let Some(result) = Self::find_mvhd_atom_recursive(moov_data, callback) {
+                    return Some(result);
+                }
+            }
+            
+            pos += size as usize;
+        }
+        None
+    }
 
     /// Add computed fields that exiftool provides
     fn add_computed_fields(metadata: &mut HashMap<String, String>) {

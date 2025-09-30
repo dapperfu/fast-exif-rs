@@ -4,9 +4,11 @@ use crate::types::ExifError;
 use std::collections::HashMap;
 use rayon::prelude::*;
 use std::fs::File;
-use memmap2::Mmap;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::Path;
+use memmap2::{Mmap, MmapOptions};
 
-/// Ultra-fast JPEG EXIF parser with completely rewritten algorithms
+/// Ultra-fast JPEG EXIF parser with seek optimization and adaptive memory management
 pub struct UltraFastJpegParser {
     /// Pre-allocated marker positions cache
     marker_positions: Vec<(u8, usize)>, // (marker_type, position)
@@ -16,6 +18,47 @@ pub struct UltraFastJpegParser {
     marker_table: [Option<usize>; 256], // Direct lookup for common markers
     /// Segment cache for repeated access
     segment_cache: Vec<(u8, Vec<u8>)>, // (marker_type, data)
+    /// Seek optimization mode
+    seek_optimized: bool,
+    /// Memory mapping threshold (bytes)
+    mmap_threshold: usize,
+    /// Target fields for selective parsing
+    target_fields: Vec<String>,
+    /// Performance statistics
+    stats: UltraFastStats,
+}
+
+/// Performance statistics for UltraFast parser
+#[derive(Debug, Default)]
+struct UltraFastStats {
+    /// Number of files processed with memory mapping
+    mmap_count: usize,
+    /// Number of files processed with seeking
+    seek_count: usize,
+    /// Total bytes read
+    total_bytes_read: usize,
+    /// Total processing time (in microseconds)
+    total_processing_time: u64,
+}
+
+/// Parsing strategy for different file sizes
+#[derive(Debug, Clone, Copy)]
+enum ParseStrategy {
+    /// Use full memory mapping
+    MemoryMap,
+    /// Use seek optimization
+    SeekOptimized,
+    /// Use hybrid approach
+    Hybrid,
+}
+
+/// Information about an EXIF segment
+#[derive(Debug, Clone)]
+struct ExifSegmentInfo {
+    /// Offset in the file where EXIF data starts
+    offset: usize,
+    /// Size of the EXIF segment
+    size: usize,
 }
 
 impl UltraFastJpegParser {
@@ -26,7 +69,292 @@ impl UltraFastJpegParser {
             segment_data: Vec::with_capacity(1024 * 1024), // 1MB buffer
             marker_table: [None; 256],
             segment_cache: Vec::with_capacity(16),
+            seek_optimized: false,
+            mmap_threshold: 16 * 1024 * 1024, // 16MB threshold
+            target_fields: Vec::new(),
+            stats: UltraFastStats::default(),
         }
+    }
+    
+    /// Create parser with seek optimization enabled
+    pub fn with_seek_optimization() -> Self {
+        Self {
+            marker_positions: Vec::with_capacity(64),
+            segment_data: Vec::with_capacity(64 * 1024), // Smaller buffer for seeking
+            marker_table: [None; 256],
+            segment_cache: Vec::with_capacity(16),
+            seek_optimized: true,
+            mmap_threshold: 16 * 1024 * 1024,
+            target_fields: Vec::new(),
+            stats: UltraFastStats::default(),
+        }
+    }
+    
+    /// Create parser with specific target fields for selective parsing
+    pub fn with_target_fields(fields: Vec<String>) -> Self {
+        Self {
+            marker_positions: Vec::with_capacity(64),
+            segment_data: Vec::with_capacity(64 * 1024),
+            marker_table: [None; 256],
+            segment_cache: Vec::with_capacity(16),
+            seek_optimized: true,
+            mmap_threshold: 16 * 1024 * 1024,
+            target_fields: fields,
+            stats: UltraFastStats::default(),
+        }
+    }
+    
+    /// Parse EXIF data from file with automatic strategy selection
+    pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, ExifError> {
+        let start_time = std::time::Instant::now();
+        
+        let file = File::open(path)?;
+        let file_size = file.metadata()?.len() as usize;
+        
+        // Choose strategy based on file size and seek optimization setting
+        let strategy = self.choose_strategy(file_size);
+        
+        let result = match strategy {
+            ParseStrategy::MemoryMap => {
+                self.stats.mmap_count += 1;
+                self.parse_with_memory_map(file, file_size)
+            }
+            ParseStrategy::SeekOptimized => {
+                self.stats.seek_count += 1;
+                self.parse_with_seek_optimization(file, file_size)
+            }
+            ParseStrategy::Hybrid => {
+                self.stats.mmap_count += 1;
+                self.parse_with_hybrid_approach(file, file_size)
+            }
+        };
+        
+        // Update performance statistics
+        let processing_time = start_time.elapsed().as_micros() as u64;
+        self.stats.total_processing_time += processing_time;
+        
+        result
+    }
+    
+    /// Choose the optimal parsing strategy
+    fn choose_strategy(&self, file_size: usize) -> ParseStrategy {
+        if self.seek_optimized {
+            // Use seeking for large files
+            if file_size > self.mmap_threshold {
+                ParseStrategy::SeekOptimized
+            } else {
+                ParseStrategy::Hybrid
+            }
+        } else {
+            // Use memory mapping for small/medium files
+            if file_size <= self.mmap_threshold {
+                ParseStrategy::MemoryMap
+            } else {
+                ParseStrategy::Hybrid
+            }
+        }
+    }
+    
+    /// Parse using full memory mapping
+    fn parse_with_memory_map(&mut self, file: File, _file_size: usize) -> Result<HashMap<String, String>, ExifError> {
+        let mmap = unsafe { Mmap::map(&file)? };
+        let mut metadata = HashMap::new();
+        self.parse_jpeg_exif_ultra_fast(&mmap, &mut metadata)?;
+        Ok(metadata)
+    }
+    
+    /// Parse using seek optimization
+    fn parse_with_seek_optimization(&mut self, mut file: File, file_size: usize) -> Result<HashMap<String, String>, ExifError> {
+        // Locate EXIF segment with minimal reading
+        let exif_info = self.locate_exif_segment(&mut file, file_size)?;
+        
+        // Read only the EXIF segment
+        let exif_data = self.read_exif_segment(&mut file, &exif_info)?;
+        
+        // Parse EXIF data
+        let mut metadata = HashMap::new();
+        if !self.target_fields.is_empty() {
+            self.parse_selective_fields(&exif_data, &mut metadata)?;
+        } else {
+            TiffParser::parse_tiff_exif(&exif_data, &mut metadata)?;
+        }
+        
+        Ok(metadata)
+    }
+    
+    /// Parse using hybrid approach
+    fn parse_with_hybrid_approach(&mut self, file: File, file_size: usize) -> Result<HashMap<String, String>, ExifError> {
+        // Memory map only the first part of the file
+        let map_size = (file_size / 4).min(self.mmap_threshold);
+        
+        let mmap = unsafe {
+            MmapOptions::new()
+                .len(map_size)
+                .map(&file)?
+        };
+        
+        // Try to find EXIF in the mapped region
+        if let Ok(exif_data) = self.extract_exif_from_mapped(&mmap) {
+            let mut metadata = HashMap::new();
+            TiffParser::parse_tiff_exif(&exif_data, &mut metadata)?;
+            Ok(metadata)
+        } else {
+            // Fall back to seeking
+            drop(mmap);
+            self.parse_with_seek_optimization(file, file_size)
+        }
+    }
+    
+    /// Locate EXIF segment with minimal reading
+    fn locate_exif_segment(&self, file: &mut File, _file_size: usize) -> Result<ExifSegmentInfo, ExifError> {
+        // Read only the first 32 bytes to determine format
+        let mut header = [0u8; 32];
+        file.read_exact(&mut header)?;
+        file.seek(SeekFrom::Start(0))?;
+        
+        // Determine file format and locate EXIF
+        if header[0] == 0xFF && header[1] == 0xD8 {
+            // JPEG format
+            self.locate_jpeg_exif(file)
+        } else if (header[0] == 0x49 && header[1] == 0x49) || (header[0] == 0x4D && header[1] == 0x4D) {
+            // TIFF/CR2 format
+            Ok(ExifSegmentInfo {
+                offset: 0,
+                size: 64 * 1024, // Estimate
+            })
+        } else {
+            Err(ExifError::InvalidExif("Unsupported file format".to_string()))
+        }
+    }
+    
+    /// Locate EXIF segment in JPEG files
+    fn locate_jpeg_exif(&self, file: &mut File) -> Result<ExifSegmentInfo, ExifError> {
+        let mut offset = 2; // Skip SOI marker
+        let mut buffer = [0u8; 4];
+        let max_search = 1024 * 1024; // Limit search to 1MB
+        
+        while offset < max_search {
+            file.seek(SeekFrom::Start(offset as u64))?;
+            file.read_exact(&mut buffer)?;
+            
+            if buffer[0] != 0xFF {
+                return Err(ExifError::InvalidExif("Invalid JPEG marker".to_string()));
+            }
+            
+            let marker = buffer[1];
+            let segment_size = u16::from_be_bytes([buffer[2], buffer[3]]) as usize;
+            
+            if marker == 0xE1 {
+                // Check for EXIF signature
+                let mut exif_sig = [0u8; 6];
+                file.read_exact(&mut exif_sig)?;
+                
+                if exif_sig == *b"Exif\0\0" {
+                    return Ok(ExifSegmentInfo {
+                        offset: offset + 4 + 6,
+                        size: segment_size - 6,
+                    });
+                }
+            }
+            
+            offset += 2 + segment_size;
+        }
+        
+        Err(ExifError::InvalidExif("EXIF segment not found".to_string()))
+    }
+    
+    /// Read EXIF segment from file
+    fn read_exif_segment(&mut self, file: &mut File, exif_info: &ExifSegmentInfo) -> Result<Vec<u8>, ExifError> {
+        file.seek(SeekFrom::Start(exif_info.offset as u64))?;
+        
+        let size_to_read = exif_info.size.min(2 * 1024 * 1024); // Max 2MB
+        
+        if self.segment_data.capacity() < size_to_read {
+            self.segment_data.reserve(size_to_read - self.segment_data.capacity());
+        }
+        
+        self.segment_data.resize(size_to_read, 0);
+        file.read_exact(&mut self.segment_data)?;
+        
+        self.stats.total_bytes_read += size_to_read;
+        Ok(self.segment_data.clone())
+    }
+    
+    /// Extract EXIF data from memory mapped region
+    fn extract_exif_from_mapped(&self, data: &[u8]) -> Result<Vec<u8>, ExifError> {
+        // Quick scan for EXIF marker in mapped region
+        for i in 0..data.len().saturating_sub(10) {
+            if data[i] == 0xFF && data[i + 1] == 0xE1 {
+                // Found potential EXIF marker
+                if i + 10 < data.len() {
+                    let length = u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
+                    if i + 4 + length <= data.len() {
+                        let exif_segment = &data[i + 4..i + 4 + length];
+                        if exif_segment.len() >= 6 && &exif_segment[0..6] == b"Exif\0\0" {
+                            return Ok(exif_segment[6..].to_vec());
+                        }
+                    }
+                }
+            }
+        }
+        
+        Err(ExifError::InvalidExif("EXIF not found in mapped region".to_string()))
+    }
+    
+    /// Parse only the requested fields for maximum efficiency
+    fn parse_selective_fields(&mut self, exif_data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+        // Parse all fields first, then filter
+        TiffParser::parse_tiff_exif(exif_data, metadata)?;
+        
+        // Filter to only requested fields
+        if !self.target_fields.is_empty() {
+            let mut filtered_metadata = HashMap::new();
+            for field in &self.target_fields {
+                if let Some(value) = metadata.get(field) {
+                    filtered_metadata.insert(field.clone(), value.clone());
+                }
+            }
+            *metadata = filtered_metadata;
+        }
+        
+        Ok(())
+    }
+    
+    /// Set target fields for selective parsing
+    pub fn set_target_fields(&mut self, fields: Vec<String>) {
+        self.target_fields = fields;
+    }
+    
+    /// Enable or disable seek optimization
+    pub fn set_seek_optimization(&mut self, enabled: bool) {
+        self.seek_optimized = enabled;
+    }
+    
+    /// Set memory mapping threshold
+    pub fn set_mmap_threshold(&mut self, threshold: usize) {
+        self.mmap_threshold = threshold;
+    }
+    
+    /// Get performance statistics
+    pub fn get_stats(&self) -> HashMap<String, String> {
+        let mut stats = HashMap::new();
+        stats.insert("parser_type".to_string(), "UltraFastJpegParser".to_string());
+        stats.insert("seek_optimized".to_string(), self.seek_optimized.to_string());
+        stats.insert("mmap_threshold".to_string(), self.mmap_threshold.to_string());
+        stats.insert("target_fields_count".to_string(), self.target_fields.len().to_string());
+        stats.insert("mmap_count".to_string(), self.stats.mmap_count.to_string());
+        stats.insert("seek_count".to_string(), self.stats.seek_count.to_string());
+        stats.insert("total_bytes_read".to_string(), self.stats.total_bytes_read.to_string());
+        stats.insert("total_processing_time_us".to_string(), self.stats.total_processing_time.to_string());
+        
+        let avg_time = if self.stats.mmap_count + self.stats.seek_count > 0 {
+            self.stats.total_processing_time / (self.stats.mmap_count + self.stats.seek_count) as u64
+        } else {
+            0
+        };
+        stats.insert("avg_processing_time_us".to_string(), avg_time.to_string());
+        
+        stats
     }
     
     /// Parse EXIF data with ultra-fast algorithms
@@ -377,7 +705,7 @@ impl Default for UltraFastJpegParser {
     }
 }
 
-/// Ultra-fast batch JPEG processor
+/// Ultra-fast batch JPEG processor with seek optimization
 pub struct UltraFastBatchProcessor {
     /// Ultra-fast JPEG parser
     parser: UltraFastJpegParser,
@@ -385,6 +713,8 @@ pub struct UltraFastBatchProcessor {
     batch_size: usize,
     /// Pre-allocated batch buffer
     batch_buffer: Vec<HashMap<String, String>>,
+    /// Use seek optimization for batch processing
+    use_seek_optimization: bool,
 }
 
 impl UltraFastBatchProcessor {
@@ -394,11 +724,46 @@ impl UltraFastBatchProcessor {
             parser: UltraFastJpegParser::new(),
             batch_size,
             batch_buffer: Vec::with_capacity(batch_size),
+            use_seek_optimization: false,
+        }
+    }
+    
+    /// Create batch processor with seek optimization
+    pub fn with_seek_optimization(batch_size: usize) -> Self {
+        Self {
+            parser: UltraFastJpegParser::with_seek_optimization(),
+            batch_size,
+            batch_buffer: Vec::with_capacity(batch_size),
+            use_seek_optimization: true,
+        }
+    }
+    
+    /// Create batch processor with target fields
+    pub fn with_target_fields(batch_size: usize, fields: Vec<String>) -> Self {
+        Self {
+            parser: UltraFastJpegParser::with_target_fields(fields),
+            batch_size,
+            batch_buffer: Vec::with_capacity(batch_size),
+            use_seek_optimization: true,
         }
     }
     
     /// Process JPEG files with ultra-fast PARALLEL batch processing
     pub fn process_jpeg_files_ultra_fast(
+        &mut self,
+        file_paths: &[String],
+    ) -> Result<Vec<HashMap<String, String>>, ExifError> {
+        if self.use_seek_optimization {
+            // Use seek optimization for batch processing
+            self.process_files_with_seek_optimization(file_paths)
+        } else {
+            // Use traditional memory mapping
+            self.process_files_with_memory_mapping(file_paths)
+        }
+    }
+    
+    /// Process files with memory mapping (original method)
+    fn process_files_with_memory_mapping(
         &mut self,
         file_paths: &[String],
     ) -> Result<Vec<HashMap<String, String>>, ExifError> {
@@ -421,11 +786,60 @@ impl UltraFastBatchProcessor {
         results
     }
     
+    /// Process files with seek optimization
+    fn process_files_with_seek_optimization(
+        &mut self,
+        file_paths: &[String],
+    ) -> Result<Vec<HashMap<String, String>>, ExifError> {
+        // Use Rayon for true parallel processing
+        let results: Result<Vec<_>, _> = file_paths
+            .par_iter()
+            .map(|file_path| {
+                // Create a temporary parser for this thread
+                let mut temp_parser = UltraFastJpegParser::with_seek_optimization();
+                temp_parser.parse_file(file_path)
+            })
+            .collect();
+        
+        results
+    }
+    
+    /// Process files with specific target fields
+    pub fn process_files_with_fields(
+        &mut self,
+        file_paths: &[String],
+        target_fields: Vec<String>,
+    ) -> Result<Vec<HashMap<String, String>>, ExifError> {
+        // Use Rayon for true parallel processing
+        let results: Result<Vec<_>, _> = file_paths
+            .par_iter()
+            .map(|file_path| {
+                // Create a temporary parser for this thread
+                let mut temp_parser = UltraFastJpegParser::with_target_fields(target_fields.clone());
+                temp_parser.parse_file(file_path)
+            })
+            .collect();
+        
+        results
+    }
+    
+    /// Set seek optimization mode
+    pub fn set_seek_optimization(&mut self, enabled: bool) {
+        self.use_seek_optimization = enabled;
+        self.parser.set_seek_optimization(enabled);
+    }
+    
+    /// Set target fields for selective parsing
+    pub fn set_target_fields(&mut self, fields: Vec<String>) {
+        self.parser.set_target_fields(fields);
+    }
+    
     /// Get ultra-fast processor statistics
     pub fn get_ultra_fast_stats(&self) -> HashMap<String, String> {
-        let mut stats = self.parser.get_ultra_fast_stats();
+        let mut stats = self.parser.get_stats();
         stats.insert("batch_size".to_string(), self.batch_size.to_string());
         stats.insert("batch_buffer_capacity".to_string(), self.batch_buffer.capacity().to_string());
+        stats.insert("use_seek_optimization".to_string(), self.use_seek_optimization.to_string());
         stats
     }
 }
