@@ -401,6 +401,14 @@ impl TiffParser {
                         // Check if this is a raw Canon-style value that needs special conversion
                         let formatted = Self::convert_shutter_speed_value(value as u32);
                         metadata.insert(tag_name, formatted);
+                    } else if tag_id == 0x0112 {
+                        // Orientation as SHORT
+                        let formatted_value = Self::format_special_field(tag_id, value);
+                        metadata.insert(tag_name, formatted_value);
+                    } else if tag_id == 0xA403 {
+                        // WhiteBalance as SHORT
+                        let formatted_value = Self::format_special_field(tag_id, value);
+                        metadata.insert(tag_name, formatted_value);
                     } else {
                         // Format special fields
                         let formatted_value = Self::format_special_field(tag_id, value);
@@ -1005,6 +1013,7 @@ impl TiffParser {
             0x0128 => "ResolutionUnit".to_string(),
             0x0131 => "Software".to_string(),
             0x0132 => "DateTime".to_string(),
+            0x013B => "Artist".to_string(),
             0x9003 => "DateTimeOriginal".to_string(),
             0x9004 => "DateTimeDigitized".to_string(),
             0x829A => "ExposureTime".to_string(),

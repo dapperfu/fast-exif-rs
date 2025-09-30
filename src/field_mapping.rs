@@ -389,10 +389,10 @@ impl FieldMapper {
             ("YResolution", "EXIF:YResolution"),
         ];
         
-        // Add EXIF namespace mappings
-        for (fast_field, exif_field) in exif_namespace_mappings {
-            fast_to_exiftool.insert(fast_field.to_string(), exif_field.to_string());
-            exiftool_to_fast.insert(exif_field.to_string(), fast_field.to_string());
+        // Add EXIF namespace mappings (reverse mapping - EXIF: fields should map to standard names)
+        for (standard_field, exif_field) in exif_namespace_mappings {
+            fast_to_exiftool.insert(exif_field.to_string(), standard_field.to_string());
+            exiftool_to_fast.insert(standard_field.to_string(), exif_field.to_string());
         }
         
         Self {

@@ -51,7 +51,6 @@ impl ValueFormatter {
             "Contrast" => Self::format_contrast_value(value),
             "LightSource" => Self::format_light_source_value(value),
             "ExposureProgram" => Self::format_exposure_program_value(value),
-            "Orientation" => Self::format_orientation_value(value),
             "EncodingProcess" => Self::format_encoding_process_value(value),
             "PictureControlVersion" => Self::format_picture_control_version_value(value),
             "FileTypeExtension" => Self::format_file_type_extension_value(value),
