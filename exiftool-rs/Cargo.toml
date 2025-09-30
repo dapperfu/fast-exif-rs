@@ -1,0 +1,37 @@
+[package]
+name = "exiftool-rs"
+version = "0.1.0"
+edition = "2021"
+description = "A fast EXIF metadata extraction tool written in Rust"
+license = "MIT"
+repository = "https://github.com/dapperfu/fast-exif-rs"
+keywords = ["exif", "metadata", "cli", "image", "rust", "performance"]
+categories = ["command-line-utilities", "multimedia"]
+
+[[bin]]
+name = "exiftool-rs"
+path = "src/main.rs"
+
+[dependencies]
+# Core EXIF processing
+fast-exif-reader = { path = ".." }
+
+# CLI argument parsing
+clap = { version = "4.5", features = ["derive", "color"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Output formatting
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# File handling
+walkdir = "2.5"
+
+# Terminal output
+colored = "2.1"
+
+[dev-dependencies]
+tempfile = "3.0"
