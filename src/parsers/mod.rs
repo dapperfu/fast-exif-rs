@@ -11,12 +11,15 @@
 //! - MKV: Matroska video format parsing
 //! - Maker Notes: Camera manufacturer specific data
 
+pub mod adaptive_memory;
 pub mod bmp;
 pub mod gpu;
 pub mod heif;
 pub mod hybrid;
 pub mod jpeg;
+// pub mod lazy_parser;
 pub mod ultra_fast_jpeg;
+pub mod ultra_seek_optimized;
 // mod optimized_jpeg;
 pub mod maker_notes;
 pub mod mkv;
@@ -31,15 +34,18 @@ pub mod video;
 pub mod zero_copy;
 
 // Re-export commonly used parsers
+pub use adaptive_memory::{AdaptiveMemoryParser, AdaptiveMemoryBatchProcessor};
 pub use bmp::BmpParser;
 pub use gpu::GpuExifParser;
 pub use heif::HeifParser;
 pub use hybrid::{HybridExifParser, PerformanceAwareParser};
 pub use jpeg::JpegParser;
+// pub use lazy_parser::{LazyExifParser, LazyExifBatchProcessor};
 // pub use optimized_jpeg::{OptimizedJpegParser, BatchJpegProcessor};
 pub use mkv::MkvParser;
 pub use png::PngParser;
 pub use raw::RawParser;
 pub use simd_heic::SimdHeicParser;
 pub use simd_jpeg::SimdJpegParser;
+pub use ultra_seek_optimized::{UltraSeekOptimizedParser, UltraSeekBatchProcessor};
 pub use video::VideoParser;
