@@ -64,18 +64,39 @@ impl OptimizedJpegParser {
     /// Find JPEG EXIF segment with memory optimization
     fn find_jpeg_exif_segment_optimized<'a>(&self, data: &'a [u8]) -> Option<&'a [u8]> {
         // Use pre-allocated buffer for efficient searching
+        let mut best_exif_segment: Option<&[u8]> = None;
+        let mut best_segment_size = 0;
+        
         for i in 0..data.len().saturating_sub(4) {
             if data[i] == 0xFF && data[i + 1] == 0xE1 {
                 // Found EXIF marker
                 if i + 4 < data.len() {
                     let length = u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
                     if i + 4 + length <= data.len() {
-                        return Some(&data[i + 4..i + 4 + length]);
+                        let segment_data = &data[i + 4..i + 4 + length];
+                        
+                        // Look for "Exif" identifier in this segment
+                        for exif_start in 0..segment_data.len().saturating_sub(4) {
+                            if &segment_data[exif_start..exif_start + 4] == b"Exif" {
+                                let exif_data_start = exif_start + 4;
+                                if exif_data_start < segment_data.len() {
+                                    let exif_data = &segment_data[exif_data_start..];
+                                    let exif_size = exif_data.len();
+                                    
+                                    // Use the largest EXIF segment (most complete metadata)
+                                    if exif_size > best_segment_size {
+                                        best_exif_segment = Some(exif_data);
+                                        best_segment_size = exif_size;
+                                    }
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
-        None
+        best_exif_segment
     }
     
     /// Extract basic JPEG information with optimization

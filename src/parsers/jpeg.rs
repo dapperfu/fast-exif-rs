@@ -275,6 +275,8 @@ impl JpegParser {
     pub fn find_jpeg_exif_segment(data: &[u8]) -> Option<&[u8]> {
         // Look for APP1 segment (0xFFE1) containing EXIF
         let mut pos = 2;
+        let mut best_exif_segment: Option<&[u8]> = None;
+        let mut best_segment_size = 0;
 
         while pos < data.len().saturating_sub(6) {
             if data[pos] == 0xFF && data[pos + 1] == 0xE1 {
@@ -290,10 +292,17 @@ impl JpegParser {
                 let segment_start = pos + 4;
                 for exif_start in segment_start..segment_end.saturating_sub(4) {
                     if &data[exif_start..exif_start + 4] == b"Exif" {
-                        // Found EXIF identifier, return the data after it
+                        // Found EXIF identifier, check if this is the best segment
                         let exif_data_start = exif_start + 4;
                         if exif_data_start < segment_end {
-                            return Some(&data[exif_data_start..segment_end]);
+                            let exif_data = &data[exif_data_start..segment_end];
+                            let exif_size = exif_data.len();
+                            
+                            // Use the largest EXIF segment (most complete metadata)
+                            if exif_size > best_segment_size {
+                                best_exif_segment = Some(exif_data);
+                                best_segment_size = exif_size;
+                            }
                         }
                     }
                 }
@@ -305,7 +314,7 @@ impl JpegParser {
             }
         }
 
-        None
+        best_exif_segment
     }
 
     /// Extract camera-specific metadata based on detected make
