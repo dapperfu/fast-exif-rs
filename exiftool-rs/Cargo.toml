@@ -33,5 +33,11 @@ walkdir = "2.5"
 # Terminal output
 colored = "2.1"
 
+# Progress bar
+indicatif = "0.17"
+
+# Parallel processing
+rayon = "1.8"
+
 [dev-dependencies]
 tempfile = "3.0"

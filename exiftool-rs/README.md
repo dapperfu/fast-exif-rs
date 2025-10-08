@@ -11,6 +11,8 @@ A fast EXIF metadata extraction tool written in Rust, built on top of the `fast-
 - **Batch Processing**: Process multiple files and directories
 - **Recursive Scanning**: Deep directory traversal
 - **Performance Benchmarking**: Built-in speed testing and analysis
+- **Progress Bars**: Real-time progress indication during processing
+- **Parallel Processing**: Multi-threaded EXIF extraction for maximum speed
 - **20+ Formats**: Support for images and videos
 
 ## Installation
@@ -106,6 +108,12 @@ cargo build --release
 
 # Output benchmark results in CSV format
 ./target/release/exiftool-rs benchmark /path/to/photos --format csv
+
+# Use parallel processing for better performance
+./target/release/exiftool-rs benchmark /path/to/photos --parallel
+
+# Use parallel processing with specific thread count
+./target/release/exiftool-rs benchmark /path/to/photos --parallel --threads 8
 ```
 
 ## Supported Formats

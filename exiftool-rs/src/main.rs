@@ -8,7 +8,8 @@
 
 use clap::{Parser, Subcommand};
 use colored::*;
-use fast_exif_reader::FastExifReader;
+use fast_exif_reader::{FastExifReader, parsers::OptimalBatchProcessor};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -90,6 +91,14 @@ enum Commands {
         /// Output format for benchmark results
         #[arg(short, long, default_value = "text")]
         format: BenchmarkFormat,
+        
+        /// Use parallel processing for better performance
+        #[arg(long)]
+        parallel: bool,
+        
+        /// Number of threads for parallel processing (0 = auto-detect)
+        #[arg(long, default_value = "0")]
+        threads: usize,
     },
 }
 
@@ -133,9 +142,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             recursive, 
             iterations, 
             detailed, 
-            format 
+            format,
+            parallel,
+            threads
         } => {
-            benchmark_exif_extraction(inputs, recursive, iterations, detailed, format)?;
+            benchmark_exif_extraction(inputs, recursive, iterations, detailed, format, parallel, threads)?;
         }
     }
     
@@ -360,8 +371,9 @@ fn benchmark_exif_extraction(
     iterations: u32,
     detailed: bool,
     format: BenchmarkFormat,
+    parallel: bool,
+    threads: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut reader = FastExifReader::new();
     let mut all_files = Vec::new();
     
     // Collect all files to benchmark
@@ -401,6 +413,10 @@ fn benchmark_exif_extraction(
     println!("{}", "=========================".blue());
     println!("Files to process: {}", all_files.len().to_string().green());
     println!("Iterations: {}", iterations.to_string().green());
+    println!("Parallel processing: {}", if parallel { "Enabled".green() } else { "Disabled".yellow() });
+    if parallel && threads > 0 {
+        println!("Threads: {}", threads.to_string().green());
+    }
     println!();
     
     let mut total_duration = Duration::new(0, 0);
@@ -418,43 +434,121 @@ fn benchmark_exif_extraction(
         let mut iteration_successful = 0;
         let mut iteration_exif_fields = 0;
         
-        for file_path in &all_files {
-            let file_start = Instant::now();
+        if parallel {
+            // Use parallel processing
+            let file_paths: Vec<String> = all_files.iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
             
-            match reader.read_file(file_path.to_str().unwrap()) {
-                Ok(metadata) => {
-                    let file_duration = file_start.elapsed();
-                    let field_count = metadata.len();
-                    
-                    iteration_successful += 1;
-                    iteration_exif_fields += field_count;
-                    
-                    if detailed {
-                        file_timings.push(FileTiming {
-                            filename: file_path.to_string_lossy().to_string(),
-                            duration: file_duration,
-                            exif_fields: field_count,
-                            iteration,
-                        });
-                    }
-                    
-                    if detailed && iterations == 1 {
-                        println!("  {}: {} fields in {:.3}ms", 
-                            file_path.file_name().unwrap().to_string_lossy().cyan(),
-                            field_count.to_string().green(),
-                            file_duration.as_secs_f64() * 1000.0
-                        );
+            // Create progress bar
+            let progress = ProgressBar::new(file_paths.len() as u64);
+            progress.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%) {msg}")
+                    .unwrap()
+                    .progress_chars("#>-")
+            );
+            progress.set_message("Processing files...");
+            
+            // Set thread count if specified
+            if threads > 0 {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .build_global()
+                    .unwrap_or_default();
+            }
+            
+            // Process files in parallel using OptimalBatchProcessor
+            let mut processor = OptimalBatchProcessor::new(50);
+            match processor.process_files(&file_paths) {
+                Ok(results) => {
+                    for (i, metadata) in results.iter().enumerate() {
+                        progress.inc(1);
+                        
+                        if !metadata.is_empty() {
+                            iteration_successful += 1;
+                            iteration_exif_fields += metadata.len();
+                            
+                            if detailed {
+                                file_timings.push(FileTiming {
+                                    filename: file_paths[i].clone(),
+                                    duration: Duration::new(0, 0), // Parallel processing doesn't track individual timing
+                                    exif_fields: metadata.len(),
+                                    iteration,
+                                });
+                            }
+                        }
+                        
+                        if detailed && iterations == 1 {
+                            println!("  {}: {} fields", 
+                                Path::new(&file_paths[i]).file_name().unwrap().to_string_lossy().cyan(),
+                                metadata.len().to_string().green()
+                            );
+                        }
                     }
                 }
                 Err(e) => {
-                    if detailed {
-                        eprintln!("  {}: Error - {}", 
-                            file_path.file_name().unwrap().to_string_lossy().red(),
-                            e
-                        );
-                    }
+                    eprintln!("Error in parallel processing: {}", e);
                 }
             }
+            
+            progress.finish_with_message("Processing complete!");
+        } else {
+            // Use sequential processing with progress bar
+            let mut reader = FastExifReader::new();
+            
+            // Create progress bar
+            let progress = ProgressBar::new(all_files.len() as u64);
+            progress.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%) {msg}")
+                    .unwrap()
+                    .progress_chars("#>-")
+            );
+            progress.set_message("Processing files...");
+            
+            for file_path in &all_files {
+                let file_start = Instant::now();
+                
+                match reader.read_file(file_path.to_str().unwrap()) {
+                    Ok(metadata) => {
+                        let file_duration = file_start.elapsed();
+                        let field_count = metadata.len();
+                        
+                        iteration_successful += 1;
+                        iteration_exif_fields += field_count;
+                        
+                        if detailed {
+                            file_timings.push(FileTiming {
+                                filename: file_path.to_string_lossy().to_string(),
+                                duration: file_duration,
+                                exif_fields: field_count,
+                                iteration,
+                            });
+                        }
+                        
+                        if detailed && iterations == 1 {
+                            println!("  {}: {} fields in {:.3}ms", 
+                                file_path.file_name().unwrap().to_string_lossy().cyan(),
+                                field_count.to_string().green(),
+                                file_duration.as_secs_f64() * 1000.0
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        if detailed {
+                            eprintln!("  {}: Error - {}", 
+                                file_path.file_name().unwrap().to_string_lossy().red(),
+                                e
+                            );
+                        }
+                    }
+                }
+                
+                progress.inc(1);
+            }
+            
+            progress.finish_with_message("Processing complete!");
         }
         
         let iteration_duration = iteration_start.elapsed();
@@ -487,7 +581,7 @@ fn benchmark_exif_extraction(
     };
     
     let success_rate = if !all_files.is_empty() {
-        (successful_files as f64 / (all_files.len() as f64 * iterations as f64)) * 100.0
+        ((successful_files / iterations as usize) as f64 / all_files.len() as f64) * 100.0
     } else {
         0.0
     };
