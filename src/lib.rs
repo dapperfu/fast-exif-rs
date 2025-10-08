@@ -3,7 +3,10 @@
 //! A high-performance EXIF metadata extraction library written in Rust.
 //! Provides comprehensive support for image and video formats with exceptional performance.
 
+use memmap2::Mmap;
 use std::collections::HashMap;
+use std::fs::File;
+use rayon::prelude::*;
 
 // Module declarations
 mod format_detection;
@@ -57,9 +60,7 @@ impl FastExifReader {
 
     /// Read EXIF data from file path
     pub fn read_file(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        eprintln!("DEBUG: read_file called for: {}", file_path);
         let mut metadata = self.parser.parse_file(file_path)?;
-        eprintln!("DEBUG: metadata keys: {:?}", metadata.keys().collect::<Vec<_>>());
         Self::add_file_system_metadata(file_path, &mut metadata);
         crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
         FieldMapper::normalize_metadata_to_exiftool(&mut metadata);

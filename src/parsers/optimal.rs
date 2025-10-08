@@ -144,7 +144,6 @@ impl OptimalExifParser {
         
         // Detect format from header
         let format = self.detect_format(&header)?;
-        eprintln!("DEBUG: Detected format: {:?}", format);
         
         // For MP4 files, always use memory mapping since they don't have traditional EXIF segments
         if matches!(format, FileFormat::Mp4) {
@@ -354,7 +353,6 @@ impl OptimalExifParser {
     pub fn parse_exif_from_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         // Detect file format
         let format = self.detect_format(data)?;
-        eprintln!("DEBUG: Detected format: {:?}", format);
         
         // Parse based on format
         match format {
@@ -493,6 +491,10 @@ impl OptimalExifParser {
     fn parse_mp4_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
         use crate::parsers::video::VideoParser;
         VideoParser::parse_mp4_exif(data, &mut self.metadata_cache)?;
+        
+        // Add global computed fields (like Track and Media dates for video files)
+        crate::computed_fields::ComputedFields::add_computed_fields(&mut self.metadata_cache);
+        
         Ok(())
     }
     

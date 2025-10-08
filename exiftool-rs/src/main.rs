@@ -11,6 +11,7 @@ use colored::*;
 use fast_exif_reader::FastExifReader;
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 use walkdir::WalkDir;
 
 /// A fast EXIF metadata extraction tool written in Rust
@@ -68,6 +69,28 @@ enum Commands {
     },
     /// Show tool information
     Info,
+    /// Benchmark EXIF extraction performance
+    Benchmark {
+        /// Input files or directories to benchmark
+        #[arg(required = true)]
+        inputs: Vec<String>,
+        
+        /// Recursively process directories
+        #[arg(short, long)]
+        recursive: bool,
+        
+        /// Number of iterations to run for more accurate timing
+        #[arg(short, long, default_value = "1")]
+        iterations: u32,
+        
+        /// Show detailed per-file timing
+        #[arg(long)]
+        detailed: bool,
+        
+        /// Output format for benchmark results
+        #[arg(short, long, default_value = "text")]
+        format: BenchmarkFormat,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]

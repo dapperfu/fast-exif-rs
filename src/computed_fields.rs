@@ -618,5 +618,16 @@ impl ComputedFields {
         if let Some(md) = metadata.get("ModifyDate") {
             metadata.insert("MakerNotes:ModifyDate".to_string(), md.clone());
         }
+        
+        // Add Track and Media date fields for video files (like exiftool)
+        if let Some(create_date) = metadata.get("CreateDate").cloned() {
+            metadata.insert("TrackCreateDate".to_string(), create_date.clone());
+            metadata.insert("MediaCreateDate".to_string(), create_date);
+        }
+        
+        if let Some(modify_date) = metadata.get("ModifyDate").cloned() {
+            metadata.insert("TrackModifyDate".to_string(), modify_date.clone());
+            metadata.insert("MediaModifyDate".to_string(), modify_date);
+        }
     }
 }

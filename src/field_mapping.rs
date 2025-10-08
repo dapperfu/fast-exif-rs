@@ -20,6 +20,10 @@ impl FieldMapper {
             // Date/Time fields
             ("DateTime", "ModifyDate"),
             ("DateTimeDigitized", "DateTimeCreated"),
+        ("TrackCreateDate", "TrackCreateDate"),
+        ("TrackModifyDate", "TrackModifyDate"),
+        ("MediaCreateDate", "MediaCreateDate"),
+        ("MediaModifyDate", "MediaModifyDate"),
             
             // ISO fields
             ("ISOSpeedRatings", "ISO"),

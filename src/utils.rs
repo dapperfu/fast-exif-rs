@@ -19,6 +19,23 @@ impl ExifUtils {
             | (data[pos + 3] as u32))
     }
 
+    /// Read a 64-bit big-endian integer from data at position
+    pub fn read_u64_be(data: &[u8], pos: usize) -> Result<u64, ExifError> {
+        if pos + 8 > data.len() {
+            return Err(ExifError::InvalidExif(
+                "Insufficient data for u64 read".to_string(),
+            ));
+        }
+        Ok(((data[pos] as u64) << 56)
+            | ((data[pos + 1] as u64) << 48)
+            | ((data[pos + 2] as u64) << 40)
+            | ((data[pos + 3] as u64) << 32)
+            | ((data[pos + 4] as u64) << 24)
+            | ((data[pos + 5] as u64) << 16)
+            | ((data[pos + 6] as u64) << 8)
+            | (data[pos + 7] as u64))
+    }
+
     /// Find a pattern in data and return its position
     pub fn find_pattern_in_data(data: &[u8], pattern: &[u8]) -> Option<usize> {
         data.windows(pattern.len())

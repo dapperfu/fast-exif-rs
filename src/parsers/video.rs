@@ -730,14 +730,165 @@ impl VideoParser {
     
     fn extract_creation_time(data: &[u8]) -> Option<String> {
         // Look for mvhd (movie header) atom to get creation time
-        let mut pos = 0;
+        // MP4 files have hierarchical structure: ftyp -> moov -> mvhd
+        Self::find_mvhd_atom(data, 0)
+    }
+    
+    fn find_mvhd_atom(data: &[u8], start_pos: usize) -> Option<String> {
+        // First, try to find the moov atom directly using pattern search
+        if let Some(moov_pos) = Self::find_moov_atom(data) {
+            return Self::parse_moov_atom(data, moov_pos);
+        }
+        
+        // Fallback to recursive atom parsing
+        let mut pos = start_pos;
         while pos + 8 < data.len() {
             let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
+            if size == 0 || size < 8 {
+                break;
+            }
+            
+            // Handle extended size (size = 1 means extended size follows)
+            let mut actual_size = if size == 1 {
+                if pos + 16 < data.len() {
+                    let extended_size = ExifUtils::read_u64_be(data, pos + 8).unwrap_or(0);
+                    extended_size as u32
+                } else {
+                    break;
+                }
+            } else {
+                size
+            };
+            
+            if actual_size > data.len() as u32 {
+                // Truncate the atom size to the remaining file size
+                actual_size = (data.len() - pos) as u32;
+                if actual_size < 8 {
+                    break;
+                }
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"mvhd" && pos + 16 < data.len() {
+                // Read creation time from mvhd atom (offset 8-12 after version/flags)
+                let creation_time = ExifUtils::read_u32_be(data, pos + 12).unwrap_or(0);
+                // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
+                let unix_timestamp = creation_time as i64 - 2082844800;
+                if unix_timestamp > 0 {
+                    // Format as YYYY:MM:DD HH:MM:SS
+                    if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                        return Some(datetime.format("%Y:%m:%d %H:%M:%S").to_string());
+                    }
+                }
+            } else if atom_type == b"moov" && pos + actual_size as usize <= data.len() {
+                // Recursively search inside moov atom
+                let moov_start = if size == 1 { pos + 16 } else { pos + 8 };
+                let moov_size = actual_size as usize - (moov_start - pos);
+                if let Some(result) = Self::find_mvhd_atom(&data[moov_start..moov_start + moov_size], 0) {
+                    return Some(result);
+                }
+            }
+            pos += actual_size as usize;
+        }
+        None
+    }
+    
+    fn extract_modification_time(data: &[u8]) -> Option<String> {
+        // Look for mvhd (movie header) atom to get modification time
+        // MP4 files have hierarchical structure: ftyp -> moov -> mvhd
+        Self::find_mvhd_modification_time(data, 0)
+    }
+    
+    fn find_mvhd_modification_time(data: &[u8], start_pos: usize) -> Option<String> {
+        // First, try to find the moov atom directly using pattern search
+        if let Some(moov_pos) = Self::find_moov_atom(data) {
+            return Self::parse_moov_atom_modification_time(data, moov_pos);
+        }
+        
+        // Fallback to recursive atom parsing
+        let mut pos = start_pos;
+        while pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size < 8 {
+                break;
+            }
+            
+            // Handle extended size (size = 1 means extended size follows)
+            let mut actual_size = if size == 1 {
+                if pos + 16 < data.len() {
+                    let extended_size = ExifUtils::read_u64_be(data, pos + 8).unwrap_or(0);
+                    extended_size as u32
+                } else {
+                    break;
+                }
+            } else {
+                size
+            };
+            
+            if actual_size > data.len() as u32 {
+                // Truncate the atom size to the remaining file size
+                actual_size = (data.len() - pos) as u32;
+                if actual_size < 8 {
+                    break;
+                }
+            }
+            
+            let atom_type = &data[pos + 4..pos + 8];
+            
+            if atom_type == b"mvhd" && pos + 20 < data.len() {
+                // Read modification time from mvhd atom (offset 16-20 after version/flags)
+                let modification_time = ExifUtils::read_u32_be(data, pos + 16).unwrap_or(0);
+                // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
+                let unix_timestamp = modification_time as i64 - 2082844800;
+                if unix_timestamp > 0 {
+                    // Format as YYYY:MM:DD HH:MM:SS
+                    if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
+                        return Some(datetime.format("%Y:%m:%d %H:%M:%S").to_string());
+                    }
+                }
+            } else if atom_type == b"moov" && pos + actual_size as usize <= data.len() {
+                // Recursively search inside moov atom
+                if let Some(result) = Self::find_mvhd_modification_time(&data[pos + 8..pos + actual_size as usize], 0) {
+                    return Some(result);
+                }
+            }
+            pos += actual_size as usize;
+        }
+        None
+    }
+    /// Find moov atom using pattern search
+    fn find_moov_atom(data: &[u8]) -> Option<usize> {
+        // Search for "moov" pattern in the file
+        for i in 0..data.len().saturating_sub(4) {
+            if &data[i..i+4] == b"moov" {
+                // Check if this looks like a valid atom header
+                if i >= 4 {
+                    let size = ExifUtils::read_u32_be(data, i - 4).unwrap_or(0);
+                    if size > 8 && size < data.len() as u32 {
+                        return Some(i - 4);
+                    }
+                }
+            }
+        }
+        None
+    }
+    
+    /// Parse moov atom to find mvhd
+    fn parse_moov_atom(data: &[u8], moov_pos: usize) -> Option<String> {
+        let moov_size = ExifUtils::read_u32_be(data, moov_pos).unwrap_or(0);
+        
+        let mut pos = moov_pos + 8; // Skip moov header
+        let end_pos = moov_pos + moov_size as usize;
+        
+        while pos + 8 < end_pos && pos + 8 < data.len() {
+            let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
+            if size == 0 || size < 8 {
                 break;
             }
             
             let atom_type = &data[pos + 4..pos + 8];
+            
             if atom_type == b"mvhd" && pos + 16 < data.len() {
                 // Read creation time from mvhd atom (offset 8-12 after version/flags)
                 let creation_time = ExifUtils::read_u32_be(data, pos + 12).unwrap_or(0);
@@ -750,21 +901,27 @@ impl VideoParser {
                     }
                 }
             }
+            
             pos += size as usize;
         }
         None
     }
     
-    fn extract_modification_time(data: &[u8]) -> Option<String> {
-        // Look for mvhd (movie header) atom to get modification time
-        let mut pos = 0;
-        while pos + 8 < data.len() {
+    /// Parse moov atom to find mvhd modification time
+    fn parse_moov_atom_modification_time(data: &[u8], moov_pos: usize) -> Option<String> {
+        let moov_size = ExifUtils::read_u32_be(data, moov_pos).unwrap_or(0);
+        
+        let mut pos = moov_pos + 8; // Skip moov header
+        let end_pos = moov_pos + moov_size as usize;
+        
+        while pos + 8 < end_pos && pos + 8 < data.len() {
             let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
+            if size == 0 || size < 8 {
                 break;
             }
             
             let atom_type = &data[pos + 4..pos + 8];
+            
             if atom_type == b"mvhd" && pos + 20 < data.len() {
                 // Read modification time from mvhd atom (offset 16-20 after version/flags)
                 let modification_time = ExifUtils::read_u32_be(data, pos + 16).unwrap_or(0);
@@ -777,10 +934,12 @@ impl VideoParser {
                     }
                 }
             }
+            
             pos += size as usize;
         }
         None
     }
+
     fn extract_gps_data(_data: &[u8]) -> Option<String> { None }
     fn extract_gps_latitude(_data: &[u8]) -> Option<String> { None }
     fn extract_gps_longitude(_data: &[u8]) -> Option<String> { None }
@@ -857,6 +1016,17 @@ impl VideoParser {
             if let Ok(parsed) = f_number.parse::<f32>() {
                 metadata.insert("FNumberFormatted".to_string(), format!("f/{:.1}", parsed));
             }
+        }
+
+        // Add Track and Media date fields for video files (like exiftool)
+        if let Some(create_date) = metadata.get("CreateDate").cloned() {
+            metadata.insert("TrackCreateDate".to_string(), create_date.clone());
+            metadata.insert("MediaCreateDate".to_string(), create_date);
+        }
+        
+        if let Some(modify_date) = metadata.get("ModifyDate").cloned() {
+            metadata.insert("TrackModifyDate".to_string(), modify_date.clone());
+            metadata.insert("MediaModifyDate".to_string(), modify_date);
         }
     }
 }
