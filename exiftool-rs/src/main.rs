@@ -8,8 +8,9 @@
 
 use clap::{Parser, Subcommand};
 use colored::*;
-use fast_exif_reader::{FastExifReader, parsers::OptimalBatchProcessor};
+use fast_exif_reader::{FastExifReader, ExifError};
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -435,7 +436,7 @@ fn benchmark_exif_extraction(
         let mut iteration_exif_fields = 0;
         
         if parallel {
-            // Use parallel processing
+            // Use true parallel processing with rayon
             let file_paths: Vec<String> = all_files.iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
@@ -448,7 +449,7 @@ fn benchmark_exif_extraction(
                     .unwrap()
                     .progress_chars("#>-")
             );
-            progress.set_message("Processing files...");
+            progress.set_message("Processing files in parallel...");
             
             // Set thread count if specified
             if threads > 0 {
@@ -458,20 +459,29 @@ fn benchmark_exif_extraction(
                     .unwrap_or_default();
             }
             
-            // Process files in parallel using OptimalBatchProcessor
-            let mut processor = OptimalBatchProcessor::new(50);
-            match processor.process_files(&file_paths) {
-                Ok(results) => {
-                    for (i, metadata) in results.iter().enumerate() {
-                        progress.inc(1);
-                        
+            // Process files in parallel using rayon
+            let results: Vec<(String, Result<HashMap<String, String>, ExifError>)> = file_paths
+                .par_iter()
+                .map(|file_path| {
+                    let mut reader = FastExifReader::new();
+                    let result = reader.read_file(file_path);
+                    (file_path.clone(), result)
+                })
+                .collect();
+            
+            // Process results and update progress
+            for (file_path, result) in results {
+                progress.inc(1);
+                
+                match result {
+                    Ok(metadata) => {
                         if !metadata.is_empty() {
                             iteration_successful += 1;
                             iteration_exif_fields += metadata.len();
                             
                             if detailed {
                                 file_timings.push(FileTiming {
-                                    filename: file_paths[i].clone(),
+                                    filename: file_path.clone(),
                                     duration: Duration::new(0, 0), // Parallel processing doesn't track individual timing
                                     exif_fields: metadata.len(),
                                     iteration,
@@ -481,18 +491,23 @@ fn benchmark_exif_extraction(
                         
                         if detailed && iterations == 1 {
                             println!("  {}: {} fields", 
-                                Path::new(&file_paths[i]).file_name().unwrap().to_string_lossy().cyan(),
+                                Path::new(&file_path).file_name().unwrap().to_string_lossy().cyan(),
                                 metadata.len().to_string().green()
                             );
                         }
                     }
-                }
-                Err(e) => {
-                    eprintln!("Error in parallel processing: {}", e);
+                    Err(e) => {
+                        if detailed {
+                            eprintln!("  {}: Error - {}", 
+                                Path::new(&file_path).file_name().unwrap().to_string_lossy().red(),
+                                e
+                            );
+                        }
+                    }
                 }
             }
             
-            progress.finish_with_message("Processing complete!");
+            progress.finish_with_message("Parallel processing complete!");
         } else {
             // Use sequential processing with progress bar
             let mut reader = FastExifReader::new();
