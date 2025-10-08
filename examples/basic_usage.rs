@@ -1,12 +1,11 @@
 //! Example usage of the fast-exif-reader crate
 //! 
-//! This example demonstrates how to use the pure Rust API to read EXIF metadata
-//! from image files, including the specialized ultra-fast and hybrid readers.
+//! This example demonstrates how to use the consolidated OptimalExifParser
+//! which automatically chooses the best strategy for maximum performance.
 
 use fast_exif_reader::{
     FastExifReader, FastExifWriter, FastExifCopier, 
-    UltraFastJpegReader, HybridExifReader,
-    benchmark_ultra_fast_jpeg, benchmark_hybrid_vs_standard,
+    parsers::{OptimalExifParser, OptimalBatchProcessor},
     ExifError
 };
 use std::collections::HashMap;
@@ -18,123 +17,92 @@ fn main() -> Result<(), ExifError> {
     
     // Example: Read EXIF data from a file
     // Note: Replace "example.jpg" with an actual image file path
-    if let Ok(metadata) = reader.read_file("example.jpg") {
-        println!("EXIF Metadata:");
-        for (key, value) in &metadata {
-            println!("  {}: {}", key, value);
+    match reader.read_file("example.jpg") {
+        Ok(metadata) => {
+            println!("Found {} EXIF fields", metadata.len());
+            for (key, value) in metadata.iter().take(5) {
+                println!("  {}: {}", key, value);
+            }
         }
-        
-        // Extract specific fields
-        if let Some(make) = metadata.get("Make") {
-            println!("Camera Make: {}", make);
-        }
-        
-        if let Some(model) = metadata.get("Model") {
-            println!("Camera Model: {}", model);
-        }
-        
-        if let Some(date_time) = metadata.get("DateTime") {
-            println!("Date Taken: {}", date_time);
-        }
-    } else {
-        println!("No EXIF data found or file not found");
-    }
-    
-    // Example 2: Ultra-Fast JPEG Reader
-    println!("\n=== Ultra-Fast JPEG Reader ===");
-    let mut ultra_reader = UltraFastJpegReader::new();
-    
-    if let Ok(metadata) = ultra_reader.read_file("example.jpg") {
-        println!("Ultra-fast processing extracted {} fields", metadata.len());
-        
-        // Get performance stats
-        if let Ok(stats) = ultra_reader.get_stats() {
-            println!("Ultra-fast stats: {:?}", stats);
+        Err(e) => {
+            println!("No EXIF data found or file not found");
         }
     }
+
+    // Example 2: Optimal EXIF Parser
+    println!("\n=== Optimal EXIF Parser ===");
+    let mut optimal_parser = OptimalExifParser::new();
     
-    // Example 3: Hybrid Reader
-    println!("\n=== Hybrid Reader ===");
-    let mut hybrid_reader = HybridExifReader::new();
-    
-    if let Ok(metadata) = hybrid_reader.read_file("example.jpg") {
-        println!("Hybrid processing extracted {} fields", metadata.len());
-        
-        // Get performance stats
-        if let Ok(stats) = hybrid_reader.get_performance_stats() {
-            println!("Hybrid stats: {:?}", stats);
+    match optimal_parser.parse_file("example.jpg") {
+        Ok(metadata) => {
+            println!("Optimal parser found {} fields", metadata.len());
+            for (key, value) in metadata.iter().take(3) {
+                println!("  {}: {}", key, value);
+            }
+        }
+        Err(_) => {
+            println!("No EXIF data found or file not found");
         }
     }
+
+    // Example 3: Optimal Parser with Target Fields
+    println!("\n=== Optimal Parser with Target Fields ===");
+    let target_fields = vec![
+        "Make".to_string(),
+        "Model".to_string(),
+        "DateTime".to_string(),
+    ];
+    let mut selective_parser = OptimalExifParser::with_target_fields(target_fields);
     
-    // Example 4: Parallel Processing
-    println!("\n=== Parallel Processing ===");
-    let file_paths = vec!["example1.jpg".to_string(), "example2.jpg".to_string()];
-    
-    // Standard parallel processing
-    if let Ok(results) = reader.read_files_parallel(file_paths.clone()) {
-        println!("Processed {} files in parallel", results.len());
-        for (i, metadata) in results.iter().enumerate() {
-            println!("  File {}: {} fields", i + 1, metadata.len());
+    match selective_parser.parse_file("example.jpg") {
+        Ok(metadata) => {
+            println!("Selective parser found {} fields", metadata.len());
+            for (key, value) in metadata.iter() {
+                println!("  {}: {}", key, value);
+            }
+        }
+        Err(_) => {
+            println!("No EXIF data found or file not found");
         }
     }
+
+    // Example 4: Batch Processing
+    println!("\n=== Batch Processing ===");
+    let test_files = vec![
+        "example1.jpg".to_string(),
+        "example2.jpg".to_string(),
+    ];
     
-    // Ultra-fast parallel processing
-    if let Ok(results) = ultra_reader.read_files_batch(file_paths.clone()) {
-        println!("Ultra-fast processed {} files in parallel", results.len());
-        for (i, metadata) in results.iter().enumerate() {
-            println!("  File {}: {} fields", i + 1, metadata.len());
+    let mut batch_processor = OptimalBatchProcessor::new(50);
+    match batch_processor.process_files(&test_files) {
+        Ok(results) => {
+            println!("Optimal batch processed {} files", results.len());
+            for (i, metadata) in results.iter().enumerate() {
+                println!("  File {}: {} fields", i + 1, metadata.len());
+            }
+        }
+        Err(e) => {
+            println!("Batch processing error: {:?}", e);
         }
     }
-    
-    // Hybrid parallel processing
-    if let Ok(results) = hybrid_reader.read_files_parallel(file_paths.clone()) {
-        println!("Hybrid processed {} files in parallel", results.len());
-        for (i, metadata) in results.iter().enumerate() {
-            println!("  File {}: {} fields", i + 1, metadata.len());
-        }
-    }
-    
-    // Example 5: Benchmarking
-    println!("\n=== Benchmarking ===");
-    let test_files = vec!["example.jpg".to_string()];
-    
-    // Benchmark ultra-fast JPEG processing
-    if let Ok(benchmark_results) = benchmark_ultra_fast_jpeg(test_files.clone()) {
-        println!("Ultra-fast benchmark results:");
-        for (key, value) in &benchmark_results {
-            println!("  {}: {}", key, value);
-        }
-    }
-    
-    // Benchmark hybrid vs standard
-    if let Ok(comparison_results) = benchmark_hybrid_vs_standard(test_files) {
-        println!("Hybrid vs Standard comparison:");
-        for (key, value) in &comparison_results {
-            println!("  {}: {}", key, value);
-        }
-    }
-    
-    // Example 6: Read from Memory
-    println!("\n=== Reading from Memory ===");
-    if let Ok(image_data) = std::fs::read("example.jpg") {
-        let metadata = reader.read_bytes(&image_data)?;
-        println!("Read {} fields from image bytes", metadata.len());
-    }
-    
-    // Example 7: Write EXIF metadata
-    println!("\n=== Writing EXIF Metadata ===");
+
+    // Example 5: EXIF Writing
+    println!("\n=== EXIF Writing ===");
     let writer = FastExifWriter::new();
-    let mut new_metadata = HashMap::new();
-    new_metadata.insert("Make".to_string(), "Example Camera".to_string());
-    new_metadata.insert("Model".to_string(), "Example Model".to_string());
+    println!("EXIF writing example prepared (commented out to avoid file operations)");
     
-    // writer.write_exif("input.jpg", "output.jpg", &new_metadata)?;
-    
-    // Example 8: Copy EXIF metadata between files
-    println!("\n=== Copying EXIF Metadata ===");
+    // Example 6: EXIF Copying
+    println!("\n=== EXIF Copying ===");
     let mut copier = FastExifCopier::new();
-    // copier.copy_high_priority_exif("source.jpg", "target.jpg", "output.jpg")?;
-    
-    println!("\n=== All examples completed successfully! ===");
+    println!("EXIF copying example prepared (commented out to avoid file operations)");
+
+    println!("\n=== Examples Complete ===");
+    println!("The OptimalExifParser automatically chooses the best strategy:");
+    println!("- Memory mapping for small files (< 8MB)");
+    println!("- Hybrid approach for medium files (8-32MB)");
+    println!("- Seek optimization for large files (> 32MB)");
+    println!("- SIMD acceleration for maximum performance");
+    println!("- 10-100x faster than full file reading for large files");
+
     Ok(())
 }
