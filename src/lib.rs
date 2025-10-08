@@ -13,7 +13,6 @@ mod format_detection;
 mod parsers;
 mod types;
 mod utils;
-mod v2_reader;
 mod writer;
 mod exif_copier;
 
@@ -28,15 +27,12 @@ mod enhanced_dng_parser;
 mod field_mapping;
 mod computed_fields;
 mod value_formatter;
-mod ultra_fast_jpeg_reader;
-mod hybrid_reader;
 
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
-pub use parsers::{BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser, SimdJpegParser, SimdHeicParser, GpuExifParser, HybridExifParser, PerformanceAwareParser};
+pub use parsers::{OptimalExifParser, OptimalBatchProcessor, BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
-pub use v2_reader::FastExifReaderV2;
 pub use writer::ExifWriter;
 pub use exif_copier::ExifCopier;
 
@@ -47,22 +43,18 @@ pub use enhanced_video_parser::EnhancedVideoParser;
 pub use enhanced_image_parser::EnhancedImageParser;
 pub use field_mapping::FieldMapper;
 
-// Re-export specialized readers
-pub use ultra_fast_jpeg_reader::{UltraFastJpegReader, benchmark_ultra_fast_jpeg, profile_ultra_fast_jpeg};
-pub use hybrid_reader::{HybridExifReader, benchmark_hybrid_vs_standard};
-
 /// Fast EXIF reader with comprehensive multimedia support
 #[derive(Clone)]
 pub struct FastExifReader {
-    /// Pre-allocated buffers for performance
-    buffer: Vec<u8>,
+    /// Optimal parser for maximum performance
+    parser: OptimalExifParser,
 }
 
 impl FastExifReader {
     /// Create a new FastExifReader instance
     pub fn new() -> Self {
         Self {
-            buffer: Vec::with_capacity(1024 * 1024), // 1MB buffer
+            parser: OptimalExifParser::new(),
         }
     }
 

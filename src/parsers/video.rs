@@ -910,7 +910,13 @@ impl VideoParser {
     where
         F: FnMut(&[u8]) -> Option<R>,
     {
-        Self::find_mvhd_atom_recursive(data, &mut callback)
+        // First try searching from the beginning
+        if let Some(result) = Self::find_mvhd_atom_recursive(data, &mut callback) {
+            return Some(result);
+        }
+        
+        // If not found, try searching from the end (common for MP4/3GP files)
+        Self::find_mvhd_atom_from_end(data, &mut callback)
     }
     
     /// Recursive helper for finding mvhd atom
@@ -941,6 +947,36 @@ impl VideoParser {
             
             pos += size as usize;
         }
+        None
+    }
+    
+    /// Search for mvhd atom from the end of the file (for files with moov at the end)
+    fn find_mvhd_atom_from_end<F, R>(data: &[u8], callback: &mut F) -> Option<R>
+    where
+        F: FnMut(&[u8]) -> Option<R>,
+    {
+        // Search backwards for moov atom
+        let mut pos = data.len();
+        while pos >= 8 {
+            pos -= 1;
+            
+            // Check if we found a moov atom
+            if pos >= 4 && &data[pos - 4..pos] == b"moov" {
+                // Found moov atom, now search for mvhd within it
+                
+                // Read the size of the moov atom (4 bytes before the type)
+                if pos >= 8 {
+                    let size = ExifUtils::read_u32_be(data, pos - 8).unwrap_or(0);
+                    if size > 0 && pos - 8 + size as usize <= data.len() {
+                        let moov_data = &data[pos - 8..pos - 8 + size as usize];
+                        if let Some(result) = Self::find_mvhd_atom_recursive(moov_data, callback) {
+                            return Some(result);
+                        }
+                    }
+                }
+            }
+        }
+        
         None
     }
     
