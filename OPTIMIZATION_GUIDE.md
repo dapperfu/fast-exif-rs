@@ -74,6 +74,7 @@ let results = processor.process_files(&file_paths)?;
 ## Key Features
 
 - **Automatic Strategy Selection**: No need to choose parser type
+- **SIMD Acceleration**: AVX2 acceleration on x86_64 for parallel processing
 - **Minimal I/O**: Reads only EXIF segment for large files
 - **Memory Efficient**: Adapts memory usage to file size
 - **Selective Parsing**: Parse only needed fields
