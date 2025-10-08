@@ -3,10 +3,7 @@
 //! A high-performance EXIF metadata extraction library written in Rust.
 //! Provides comprehensive support for image and video formats with exceptional performance.
 
-use memmap2::Mmap;
 use std::collections::HashMap;
-use std::fs::File;
-use rayon::prelude::*;
 
 // Module declarations
 mod format_detection;
@@ -46,93 +43,43 @@ pub use field_mapping::FieldMapper;
 /// Fast EXIF reader with comprehensive multimedia support
 #[derive(Clone)]
 pub struct FastExifReader {
-    /// Pre-allocated buffers for performance
-    buffer: Vec<u8>,
+    /// Optimal parser for maximum performance
+    parser: OptimalExifParser,
 }
 
 impl FastExifReader {
     /// Create a new FastExifReader instance
     pub fn new() -> Self {
         Self {
-            buffer: Vec::with_capacity(1024 * 1024), // 1MB buffer
+            parser: OptimalExifParser::new(),
         }
     }
 
     /// Read EXIF data from file path
     pub fn read_file(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        let mut metadata = self.read_exif_fast(file_path)?;
-        
-        // Add computed fields for comprehensive metadata
+        eprintln!("DEBUG: read_file called for: {}", file_path);
+        let mut metadata = self.parser.parse_file(file_path)?;
+        eprintln!("DEBUG: metadata keys: {:?}", metadata.keys().collect::<Vec<_>>());
+        Self::add_file_system_metadata(file_path, &mut metadata);
         crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-        
-        // Normalize field names to standard format
         FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-        
-        // Normalize values to standard format
         crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-        
         Ok(metadata)
     }
 
     /// Read EXIF data from bytes
     pub fn read_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
-        let mut metadata = self.read_exif_from_bytes(data)?;
-        
-        // Add computed fields for comprehensive metadata
+        let mut metadata = self.parser.parse_exif_from_bytes(data)?;
         crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-        
-        // Normalize field names to standard format
         FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-        
-        // Normalize values to standard format
         crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-        
         Ok(metadata)
     }
 
     /// Read EXIF data from multiple files in parallel
     pub fn read_files_parallel(&mut self, file_paths: Vec<String>) -> Result<Vec<HashMap<String, String>>, ExifError> {
-        // Use Rayon for true parallel processing across multiple files
-        let results: Result<Vec<_>, _> = file_paths
-            .par_iter()
-            .map(|file_path| {
-                let file = File::open(file_path)?;
-                let mmap = unsafe { Mmap::map(&file)? };
-                
-                // Create a temporary reader for this thread
-                let mut temp_reader = FastExifReader::new();
-                let mut metadata = temp_reader.read_exif_from_bytes(&mmap)?;
-                
-                // Add file system information that exiftool provides
-                Self::add_file_system_metadata(file_path, &mut metadata);
-                
-                // Add computed fields for 1:1 exiftool compatibility
-                crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-                
-                // Normalize field names to exiftool standard for 1:1 compatibility
-                FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-                
-                // Normalize values to match PyExifTool raw format
-                crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-                
-                Ok(metadata)
-            })
-            .collect();
-        
-        results
-    }
-
-    /// Read EXIF data from file path (internal implementation)
-    fn read_exif_fast(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        let file = File::open(file_path)?;
-        let mmap = unsafe { Mmap::map(&file)? };
-
-        let mut metadata = self.read_exif_from_bytes(&mmap)?;
-        
-        // Add file system information
-        Self::add_file_system_metadata(file_path, &mut metadata);
-        
-        Ok(metadata)
+        let mut processor = OptimalBatchProcessor::new(50);
+        processor.process_files(&file_paths)
     }
 
     /// Add file system metadata
@@ -231,78 +178,6 @@ impl FastExifReader {
         datetime_chrono.format("%Y:%m:%d %H:%M:%S").to_string()
     }
 
-    /// Read EXIF data from bytes (internal implementation)
-    fn read_exif_from_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
-        let mut metadata = HashMap::new();
-
-        // Detect file format
-        let format = EnhancedFormatDetector::detect_format(data)?;
-        metadata.insert("Format".to_string(), format.clone());
-
-        // Parse EXIF based on format
-        match format.as_str() {
-            "JPEG" => JpegParser::parse_jpeg_exif(data, &mut metadata)?,
-            "CR2" => enhanced_cr2_parser::EnhancedCr2Parser::parse_cr2_exif(data, &mut metadata)?,
-            "NEF" => RawParser::parse_nef_exif(data, &mut metadata)?,
-            "ARW" => {
-                let arw_metadata = EnhancedRawParser::parse_sony_arw(data)?;
-                metadata.extend(arw_metadata);
-            },
-            "RAF" => {
-                let raf_metadata = EnhancedRawParser::parse_fuji_raf(data)?;
-                metadata.extend(raf_metadata);
-            },
-            "SRW" => {
-                let srw_metadata = EnhancedRawParser::parse_samsung_srw(data)?;
-                metadata.extend(srw_metadata);
-            },
-            "PEF" => {
-                let pef_metadata = EnhancedRawParser::parse_pentax_pef(data)?;
-                metadata.extend(pef_metadata);
-            },
-            "RW2" => {
-                let rw2_metadata = EnhancedRawParser::parse_panasonic_rw2(data)?;
-                metadata.extend(rw2_metadata);
-            },
-            "ORF" => RawParser::parse_orf_exif(data, &mut metadata)?,
-            "DNG" => enhanced_dng_parser::EnhancedDngParser::parse_dng_exif(data, &mut metadata)?,
-            "HEIF" | "HIF" => enhanced_heif_parser::EnhancedHeifParser::parse_heif_exif(data, &mut metadata)?,
-            "MOV" => VideoParser::parse_mov_exif(data, &mut metadata)?,
-            "MP4" => VideoParser::parse_mp4_exif(data, &mut metadata)?,
-            "3GP" => VideoParser::parse_3gp_exif(data, &mut metadata)?,
-            "AVI" => {
-                let avi_metadata = EnhancedVideoParser::parse_avi(data)?;
-                metadata.extend(avi_metadata);
-            },
-            "WMV" => {
-                let wmv_metadata = EnhancedVideoParser::parse_wmv(data)?;
-                metadata.extend(wmv_metadata);
-            },
-            "WEBM" => {
-                let webm_metadata = EnhancedVideoParser::parse_webm(data)?;
-                metadata.extend(webm_metadata);
-            },
-            "PNG" => PngParser::parse_png_exif(data, &mut metadata)?,
-            "BMP" => BmpParser::parse_bmp_exif(data, &mut metadata)?,
-            "GIF" => {
-                let gif_metadata = EnhancedImageParser::parse_gif(data)?;
-                metadata.extend(gif_metadata);
-            },
-            "WEBP" => {
-                let webp_metadata = EnhancedImageParser::parse_webp(data)?;
-                metadata.extend(webp_metadata);
-            },
-            "MKV" => MkvParser::parse_mkv_exif(data, &mut metadata)?,
-            _ => {
-                return Err(ExifError::UnsupportedFormat(format!(
-                    "Unsupported format: {}",
-                    format
-                )))
-            }
-        }
-
-        Ok(metadata)
-    }
 }
 
 impl Default for FastExifReader {

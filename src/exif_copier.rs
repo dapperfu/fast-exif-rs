@@ -26,7 +26,7 @@ impl ExifCopier {
         output_path: &str,
     ) -> Result<(), ExifError> {
         // Read source image EXIF data
-        let source_metadata = self.reader.read_exif_fast(source_path)
+        let source_metadata = self.reader.read_file(source_path)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         // Filter to high-priority fields only
@@ -47,7 +47,7 @@ impl ExifCopier {
         target_data: &[u8],
     ) -> Result<Vec<u8>, ExifError> {
         // Read source image EXIF data
-        let source_metadata = self.reader.read_exif_from_bytes(source_data)
+        let source_metadata = self.reader.read_bytes(source_data)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         // Filter to high-priority fields only
@@ -69,7 +69,7 @@ impl ExifCopier {
         output_path: &str,
     ) -> Result<(), ExifError> {
         // Read source image EXIF data
-        let source_metadata = self.reader.read_exif_fast(source_path)
+        let source_metadata = self.reader.read_file(source_path)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         if source_metadata.is_empty() {
@@ -89,7 +89,7 @@ impl ExifCopier {
         field_names: &[&str],
     ) -> Result<(), ExifError> {
         // Read source image EXIF data
-        let source_metadata = self.reader.read_exif_fast(source_path)
+        let source_metadata = self.reader.read_file(source_path)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         // Filter to specific fields only
@@ -110,7 +110,7 @@ impl ExifCopier {
 
     /// Get available EXIF fields from source image
     pub fn get_available_fields(&mut self, source_path: &str) -> Result<Vec<String>, ExifError> {
-        let source_metadata = self.reader.read_exif_fast(source_path)
+        let source_metadata = self.reader.read_file(source_path)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         Ok(source_metadata.keys().cloned().collect())
@@ -118,7 +118,7 @@ impl ExifCopier {
 
     /// Get high-priority EXIF fields from source image
     pub fn get_high_priority_fields(&mut self, source_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        let source_metadata = self.reader.read_exif_fast(source_path)
+        let source_metadata = self.reader.read_file(source_path)
             .map_err(|e| ExifError::InvalidExif(format!("Failed to read source EXIF: {}", e)))?;
         
         Ok(ExifUtils::filter_high_priority_fields(&source_metadata))

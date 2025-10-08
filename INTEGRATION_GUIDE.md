@@ -1,6 +1,6 @@
-# Integration Guide for fast-exif-reader v0.7.0
+# Integration Guide for fast-exif-reader
 
-This crate is now a **pure Rust library** ready for integration into other Rust projects.
+This crate is a **pure Rust library** ready for integration into other Rust projects.
 
 ## 🚀 Quick Integration
 
@@ -36,36 +36,102 @@ fn main() -> Result<(), ExifError> {
 
 ## 🔥 Advanced Usage
 
-### Parallel Processing
+### Optimal Parser
 ```rust
-use fast_exif_reader::{FastExifReader, UltraFastJpegReader, HybridExifReader};
+use fast_exif_reader::parsers::OptimalExifParser;
 
-// Standard parallel processing
-let mut reader = FastExifReader::new();
-let results = reader.read_files_parallel(file_paths)?;
+// Automatic strategy selection
+let mut parser = OptimalExifParser::new();
+let metadata = parser.parse_file("photo.jpg")?;
 
-// Ultra-fast parallel processing
-let mut ultra_reader = UltraFastJpegReader::new();
-let results = ultra_reader.read_files_batch(file_paths)?;
-
-// Hybrid parallel processing
-let mut hybrid_reader = HybridExifReader::new();
-let results = hybrid_reader.read_files_parallel(file_paths)?;
+// With specific target fields for maximum efficiency
+let mut parser = OptimalExifParser::with_target_fields(
+    vec!["Make".to_string(), "Model".to_string(), "DateTime".to_string()]
+);
+let metadata = parser.parse_file("photo.jpg")?;
 ```
 
-### EXIF Writing
+### Batch Processing
+```rust
+use fast_exif_reader::parsers::OptimalBatchProcessor;
+
+let mut processor = OptimalBatchProcessor::new(50);
+let results = processor.process_files(&file_paths)?;
+```
+
+### Parallel Processing
+```rust
+use fast_exif_reader::FastExifReader;
+
+let mut reader = FastExifReader::new();
+let results = reader.read_files_parallel(file_paths)?;
+```
+
+## 📊 Performance Monitoring
+
+```rust
+use fast_exif_reader::parsers::OptimalExifParser;
+
+let mut parser = OptimalExifParser::new();
+let metadata = parser.parse_file("photo.jpg")?;
+
+// Get performance statistics
+let stats = parser.get_stats();
+println!("Parser stats: {:?}", stats);
+```
+
+## 🎯 Format Support
+
+The library supports comprehensive format detection and parsing:
+
+- **JPEG** - Standard JPEG EXIF metadata
+- **RAW** - Canon CR2, Nikon NEF, Olympus ORF, Adobe DNG
+- **HEIF/HEIC** - Modern image format with EXIF
+- **PNG** - PNG format with EXIF support
+- **TIFF** - TIFF-based EXIF parsing
+- **Video** - MOV, MP4, 3GP video format parsing
+- **BMP** - BMP format parsing
+- **MKV** - Matroska video format parsing
+
+## 🔧 Error Handling
+
+```rust
+use fast_exif_reader::{FastExifReader, ExifError};
+
+let mut reader = FastExifReader::new();
+
+match reader.read_file("photo.jpg") {
+    Ok(metadata) => {
+        println!("Found {} EXIF fields", metadata.len());
+    }
+    Err(ExifError::InvalidExif(msg)) => {
+        println!("Invalid EXIF data: {}", msg);
+    }
+    Err(ExifError::IoError(err)) => {
+        println!("File I/O error: {}", err);
+    }
+    Err(e) => {
+        println!("Other error: {:?}", e);
+    }
+}
+```
+
+## 📝 Writing EXIF Data
+
 ```rust
 use fast_exif_reader::{FastExifWriter, ExifError};
 use std::collections::HashMap;
 
 let writer = FastExifWriter::new();
 let mut metadata = HashMap::new();
-metadata.insert("Artist".to_string(), "Your Name".to_string());
+metadata.insert("Make".to_string(), "Canon".to_string());
+metadata.insert("Model".to_string(), "EOS R5".to_string());
 
 writer.write_exif("input.jpg", "output.jpg", &metadata)?;
 ```
 
-### EXIF Copying
+## 📋 Copying EXIF Data
+
 ```rust
 use fast_exif_reader::{FastExifCopier, ExifError};
 
@@ -73,153 +139,30 @@ let mut copier = FastExifCopier::new();
 copier.copy_high_priority_exif("source.jpg", "target.jpg", "output.jpg")?;
 ```
 
-## 📊 Performance Features
+## 🚀 Performance Tips
 
-### Automatic Parallelization
-- **File-level parallelization**: Process multiple files simultaneously
-- **SIMD acceleration**: AVX2/NEON vectorized operations
-- **Memory mapping**: Zero-copy file access
-- **Thread pool management**: Automatic CPU core utilization
+1. **Use OptimalExifParser** - Automatically chooses the best strategy
+2. **Specify Target Fields** - Only parse what you need
+3. **Batch Processing** - Process multiple files together
+4. **Monitor Performance** - Use statistics to optimize
 
-### Benchmarking
-```rust
-use fast_exif_reader::{benchmark_ultra_fast_jpeg, benchmark_hybrid_vs_standard};
+## 📚 Examples
 
-// Benchmark ultra-fast processing
-let results = benchmark_ultra_fast_jpeg(file_paths)?;
+See the `examples/` directory for complete working examples:
 
-// Compare different approaches
-let comparison = benchmark_hybrid_vs_standard(file_paths)?;
-```
+- `basic_usage.rs` - Basic EXIF reading and writing
+- Additional examples demonstrate advanced usage patterns
 
-## 🎯 Supported Formats
+## 🔗 API Reference
 
-### Image Formats
-- **JPEG** (with ultra-fast parsing)
-- **CR2** (Canon RAW)
-- **NEF** (Nikon RAW)
-- **ARW** (Sony RAW)
-- **RAF** (Fuji RAW)
-- **SRW** (Samsung RAW)
-- **PEF** (Pentax RAW)
-- **RW2** (Panasonic RAW)
-- **ORF** (Olympus RAW)
-- **DNG** (Adobe Digital Negative)
-- **HEIF/HEIC** (Apple formats)
-- **PNG**
-- **BMP**
-- **GIF**
-- **WEBP**
+The main API components:
 
-### Video Formats
-- **MOV** (QuickTime)
-- **MP4**
-- **3GP**
-- **AVI**
-- **WMV**
-- **WEBM**
-- **MKV**
+- `FastExifReader` - Main EXIF reading interface
+- `OptimalExifParser` - High-performance parser with automatic optimization
+- `OptimalBatchProcessor` - Batch processing for multiple files
+- `FastExifWriter` - EXIF writing capabilities
+- `FastExifCopier` - EXIF copying between files
 
-## 🔧 Features
+## 🎉 Ready to Use
 
-### ✅ Pure Rust
-- No Python dependencies
-- No external C libraries required
-- Cross-platform compatibility
-
-### ✅ High Performance
-- **55.6x faster** than standard EXIF libraries
-- Parallel processing across CPU cores
-- SIMD-accelerated parsing
-- Memory-mapped file access
-
-### ✅ Comprehensive
-- **1:1 exiftool compatibility**
-- Support for 20+ formats
-- Maker notes parsing
-- GPS data extraction
-- Computed fields
-
-### ✅ Production Ready
-- Comprehensive error handling
-- Memory safety
-- Thread safety
-- Extensive testing
-
-## 📦 Crate Information
-
-- **Name**: `fast-exif-reader`
-- **Version**: `0.7.0`
-- **License**: MIT
-- **Repository**: https://github.com/dapperfu/fast-exif-rs
-- **Categories**: multimedia, development-tools
-
-## 🚀 Integration Examples
-
-### CLI Tool
-```rust
-use fast_exif_reader::FastExifReader;
-use clap::Parser;
-
-#[derive(Parser)]
-struct Args {
-    files: Vec<String>,
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-    let mut reader = FastExifReader::new();
-    
-    for file in args.files {
-        let metadata = reader.read_file(&file)?;
-        println!("{}: {} fields", file, metadata.len());
-    }
-    
-    Ok(())
-}
-```
-
-### Web Service
-```rust
-use fast_exif_reader::FastExifReader;
-use warp::Filter;
-
-async fn extract_exif(file: Vec<u8>) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut reader = FastExifReader::new();
-    let metadata = reader.read_bytes(&file)?;
-    Ok(warp::reply::json(&metadata))
-}
-
-#[tokio::main]
-async fn main() {
-    let exif_route = warp::path("exif")
-        .and(warp::body::bytes())
-        .and_then(extract_exif);
-    
-    warp::serve(exif_route).run(([127, 0, 0, 1], 3030)).await;
-}
-```
-
-### Batch Processing
-```rust
-use fast_exif_reader::{FastExifReader, UltraFastJpegReader};
-use std::path::Path;
-
-fn process_directory(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut reader = FastExifReader::new();
-    let mut ultra_reader = UltraFastJpegReader::new();
-    
-    let files: Vec<String> = std::fs::read_dir(dir)?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path().to_string_lossy().to_string())
-        .collect();
-    
-    // Use ultra-fast parallel processing for large batches
-    let results = ultra_reader.read_files_batch(files)?;
-    
-    println!("Processed {} files", results.len());
-    Ok(())
-}
-```
-
-This crate is **production-ready** and can be integrated into any Rust project that needs high-performance EXIF metadata extraction! 🚀
+The library is production-ready with comprehensive error handling, performance optimization, and extensive format support. Simply add it to your `Cargo.toml` and start reading EXIF metadata!

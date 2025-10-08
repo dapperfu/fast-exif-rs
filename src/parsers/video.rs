@@ -498,11 +498,17 @@ impl VideoParser {
         
         if let Some(creation_time) = Self::extract_creation_time(data) {
             metadata.insert("CreationDate".to_string(), creation_time.clone());
-            metadata.insert("CreateDate".to_string(), creation_time);
+            metadata.insert("CreateDate".to_string(), creation_time.clone());
+            // Add video-specific timestamp fields
+            metadata.insert("TrackCreateDate".to_string(), creation_time.clone());
+            metadata.insert("MediaCreateDate".to_string(), creation_time);
         }
         
         if let Some(modification_time) = Self::extract_modification_time(data) {
-            metadata.insert("ModifyDate".to_string(), modification_time);
+            metadata.insert("ModifyDate".to_string(), modification_time.clone());
+            // Add video-specific timestamp fields
+            metadata.insert("TrackModifyDate".to_string(), modification_time.clone());
+            metadata.insert("MediaModifyDate".to_string(), modification_time);
         }
     }
     

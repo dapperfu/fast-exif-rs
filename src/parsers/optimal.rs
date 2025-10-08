@@ -6,9 +6,6 @@ use memmap2::{Mmap, MmapOptions};
 use crate::types::ExifError;
 use crate::parsers::tiff::TiffParser;
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 /// Optimal EXIF parser that automatically chooses the best strategy
 /// 
 /// This parser combines the best features from all implementations:
@@ -74,6 +71,7 @@ enum FileFormat {
     Tiff,
     Heic,
     Mov,
+    Mp4,
 }
 
 /// Parsing strategy for different file sizes
@@ -134,13 +132,26 @@ impl OptimalExifParser {
     pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, ExifError> {
         let start_time = std::time::Instant::now();
         
-        let mut file = File::open(path)?;
+        let file = File::open(path)?;
         let file_size = file.metadata()?.len() as usize;
         
         // Clear cache for new file
         self.metadata_cache.clear();
         
-        // Determine optimal parsing strategy
+        // Read first 32 bytes to detect format
+        let mut header = [0u8; 32];
+        file.try_clone()?.read_exact(&mut header)?;
+        
+        // Detect format from header
+        let format = self.detect_format(&header)?;
+        eprintln!("DEBUG: Detected format: {:?}", format);
+        
+        // For MP4 files, always use memory mapping since they don't have traditional EXIF segments
+        if matches!(format, FileFormat::Mp4) {
+            return self.parse_with_memory_map(file, file_size);
+        }
+        
+        // Determine optimal parsing strategy for other formats
         let strategy = self.determine_strategy(file_size);
         
         // Parse using optimal strategy
@@ -290,7 +301,7 @@ impl OptimalExifParser {
     }
     
     /// Locate EXIF segment in HEIC/MOV files
-    fn locate_heic_exif(&self, file: &mut File, file_size: usize) -> Result<ExifSegmentInfo, ExifError> {
+    fn locate_heic_exif(&self, _file: &mut File, file_size: usize) -> Result<ExifSegmentInfo, ExifError> {
         // Simplified HEIC/MOV EXIF location
         // In practice, this would need more sophisticated parsing
         Ok(ExifSegmentInfo {
@@ -339,9 +350,11 @@ impl OptimalExifParser {
     }
     
     /// Parse EXIF data from bytes with optimizations
-    fn parse_exif_from_bytes(&mut self, data: &[u8]) -> Result<(), ExifError> {
+    /// Parse EXIF data from bytes
+    pub fn parse_exif_from_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         // Detect file format
         let format = self.detect_format(data)?;
+        eprintln!("DEBUG: Detected format: {:?}", format);
         
         // Parse based on format
         match format {
@@ -349,9 +362,10 @@ impl OptimalExifParser {
             FileFormat::Tiff => self.parse_tiff_exif(data)?,
             FileFormat::Heic => self.parse_heic_exif(data)?,
             FileFormat::Mov => self.parse_mov_exif(data)?,
+            FileFormat::Mp4 => self.parse_mp4_exif(data)?,
         }
         
-        Ok(())
+        Ok(self.metadata_cache.clone())
     }
     
     /// Parse EXIF data with optimizations
@@ -415,7 +429,7 @@ impl OptimalExifParser {
     }
     
     /// Parse a specific tag from EXIF data
-    fn parse_tag_from_exif(&self, exif_data: &[u8], tag_id: u16, field_name: &str) -> Result<Option<String>, ExifError> {
+    fn parse_tag_from_exif(&self, _exif_data: &[u8], _tag_id: u16, field_name: &str) -> Result<Option<String>, ExifError> {
         // Simplified tag parsing - in practice this would need full TIFF parsing
         // For now, return a placeholder
         Ok(Some(format!("{}_value", field_name)))
@@ -432,7 +446,17 @@ impl OptimalExifParser {
         } else if (data[0] == 0x49 && data[1] == 0x49) || (data[0] == 0x4D && data[1] == 0x4D) {
             Ok(FileFormat::Tiff)
         } else if data.len() >= 8 && &data[4..8] == b"ftyp" {
-            Ok(FileFormat::Heic)
+            // Check for MP4 vs HEIC/MOV
+            if data.len() >= 12 {
+                let brand = &data[8..12];
+                if brand == b"mp42" || brand == b"mp41" || brand == b"isom" {
+                    Ok(FileFormat::Mp4)
+                } else {
+                    Ok(FileFormat::Heic)
+                }
+            } else {
+                Ok(FileFormat::Heic)
+            }
         } else {
             Err(ExifError::InvalidExif("Unsupported format".to_string()))
         }
@@ -452,7 +476,7 @@ impl OptimalExifParser {
     }
     
     /// Parse HEIC EXIF data
-    fn parse_heic_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
+    fn parse_heic_exif(&mut self, _data: &[u8]) -> Result<(), ExifError> {
         // Simplified HEIC parsing
         self.metadata_cache.insert("Format".to_string(), "HEIC".to_string());
         Ok(())
@@ -460,8 +484,15 @@ impl OptimalExifParser {
     
     /// Parse MOV EXIF data
     fn parse_mov_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
-        // Simplified MOV parsing
-        self.metadata_cache.insert("Format".to_string(), "MOV".to_string());
+        use crate::parsers::video::VideoParser;
+        VideoParser::parse_mov_exif(data, &mut self.metadata_cache)?;
+        Ok(())
+    }
+    
+    /// Parse MP4 EXIF data
+    fn parse_mp4_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
+        use crate::parsers::video::VideoParser;
+        VideoParser::parse_mp4_exif(data, &mut self.metadata_cache)?;
         Ok(())
     }
     
@@ -570,7 +601,7 @@ impl OptimalExifParser {
         };
         
         // Parse data type
-        let data_type = if is_little_endian {
+        let _data_type = if is_little_endian {
             u16::from_le_bytes([entry_data[2], entry_data[3]])
         } else {
             u16::from_be_bytes([entry_data[2], entry_data[3]])
