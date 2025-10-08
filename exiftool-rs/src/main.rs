@@ -100,6 +100,13 @@ enum OutputFormat {
     Csv,
 }
 
+#[derive(clap::ValueEnum, Clone)]
+enum BenchmarkFormat {
+    Text,
+    Json,
+    Csv,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     
@@ -120,6 +127,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Info => {
             show_info()?;
+        }
+        Commands::Benchmark { 
+            inputs, 
+            recursive, 
+            iterations, 
+            detailed, 
+            format 
+        } => {
+            benchmark_exif_extraction(inputs, recursive, iterations, detailed, format)?;
         }
     }
     
@@ -338,6 +354,243 @@ fn show_info() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn benchmark_exif_extraction(
+    inputs: Vec<String>,
+    recursive: bool,
+    iterations: u32,
+    detailed: bool,
+    format: BenchmarkFormat,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut reader = FastExifReader::new();
+    let mut all_files = Vec::new();
+    
+    // Collect all files to benchmark
+    for input in inputs {
+        let path = Path::new(&input);
+        
+        if path.is_file() {
+            if is_image_file(path) {
+                all_files.push(path.to_path_buf());
+            }
+        } else if path.is_dir() {
+            let walker = if recursive {
+                WalkDir::new(path).into_iter()
+            } else {
+                WalkDir::new(path).max_depth(1).into_iter()
+            };
+            
+            for entry in walker {
+                let entry = entry?;
+                let path = entry.path();
+                
+                if path.is_file() && is_image_file(path) {
+                    all_files.push(path.to_path_buf());
+                }
+            }
+        } else {
+            eprintln!("{}: File or directory not found", input.red());
+        }
+    }
+    
+    if all_files.is_empty() {
+        eprintln!("{}", "No valid image files found to benchmark".red());
+        return Ok(());
+    }
+    
+    println!("{}", "EXIF Extraction Benchmark".bold().blue());
+    println!("{}", "=========================".blue());
+    println!("Files to process: {}", all_files.len().to_string().green());
+    println!("Iterations: {}", iterations.to_string().green());
+    println!();
+    
+    let mut total_duration = Duration::new(0, 0);
+    let mut successful_files = 0;
+    let mut total_exif_fields = 0;
+    let mut file_timings = Vec::new();
+    
+    // Run benchmark iterations
+    for iteration in 1..=iterations {
+        if iterations > 1 {
+            println!("{}", format!("Iteration {}/{}", iteration, iterations).bold().yellow());
+        }
+        
+        let iteration_start = Instant::now();
+        let mut iteration_successful = 0;
+        let mut iteration_exif_fields = 0;
+        
+        for file_path in &all_files {
+            let file_start = Instant::now();
+            
+            match reader.read_file(file_path.to_str().unwrap()) {
+                Ok(metadata) => {
+                    let file_duration = file_start.elapsed();
+                    let field_count = metadata.len();
+                    
+                    iteration_successful += 1;
+                    iteration_exif_fields += field_count;
+                    
+                    if detailed {
+                        file_timings.push(FileTiming {
+                            filename: file_path.to_string_lossy().to_string(),
+                            duration: file_duration,
+                            exif_fields: field_count,
+                            iteration,
+                        });
+                    }
+                    
+                    if detailed && iterations == 1 {
+                        println!("  {}: {} fields in {:.3}ms", 
+                            file_path.file_name().unwrap().to_string_lossy().cyan(),
+                            field_count.to_string().green(),
+                            file_duration.as_secs_f64() * 1000.0
+                        );
+                    }
+                }
+                Err(e) => {
+                    if detailed {
+                        eprintln!("  {}: Error - {}", 
+                            file_path.file_name().unwrap().to_string_lossy().red(),
+                            e
+                        );
+                    }
+                }
+            }
+        }
+        
+        let iteration_duration = iteration_start.elapsed();
+        total_duration += iteration_duration;
+        successful_files += iteration_successful;
+        total_exif_fields += iteration_exif_fields;
+        
+        if iterations > 1 {
+            println!("  Iteration {}: {} files, {} fields, {:.3}s", 
+                iteration,
+                iteration_successful,
+                iteration_exif_fields,
+                iteration_duration.as_secs_f64()
+            );
+        }
+    }
+    
+    // Calculate statistics
+    let avg_duration = total_duration / iterations;
+    let files_per_second = if avg_duration.as_secs_f64() > 0.0 {
+        all_files.len() as f64 / avg_duration.as_secs_f64()
+    } else {
+        0.0
+    };
+    
+    let fields_per_second = if avg_duration.as_secs_f64() > 0.0 {
+        total_exif_fields as f64 / avg_duration.as_secs_f64()
+    } else {
+        0.0
+    };
+    
+    let success_rate = if !all_files.is_empty() {
+        (successful_files as f64 / (all_files.len() as f64 * iterations as f64)) * 100.0
+    } else {
+        0.0
+    };
+    
+    // Create benchmark results
+    let results = BenchmarkResults {
+        total_files: all_files.len(),
+        iterations,
+        total_duration: avg_duration,
+        successful_files: successful_files / iterations as usize,
+        total_exif_fields: total_exif_fields / iterations as usize,
+        files_per_second,
+        fields_per_second,
+        success_rate,
+        file_timings: if detailed { Some(file_timings) } else { None },
+    };
+    
+    // Output results
+    match format {
+        BenchmarkFormat::Text => output_benchmark_text(&results)?,
+        BenchmarkFormat::Json => output_benchmark_json(&results)?,
+        BenchmarkFormat::Csv => output_benchmark_csv(&results)?,
+    }
+    
+    Ok(())
+}
+
+fn output_benchmark_text(results: &BenchmarkResults) -> Result<(), Box<dyn std::error::Error>> {
+    println!();
+    println!("{}", "Benchmark Results".bold().green());
+    println!("{}", "================".green());
+    println!("Total files processed: {}", results.total_files.to_string().cyan());
+    println!("Iterations: {}", results.iterations.to_string().cyan());
+    println!("Total time: {:.3}s", results.total_duration.as_secs_f64().to_string().cyan());
+    println!("Successful files: {}", results.successful_files.to_string().green());
+    println!("Total EXIF fields: {}", results.total_exif_fields.to_string().green());
+    println!("Success rate: {:.1}%", results.success_rate.to_string().yellow());
+    println!();
+    println!("{}", "Performance Metrics".bold().blue());
+    println!("{}", "==================".blue());
+    println!("Files per second: {:.1}", results.files_per_second.to_string().green());
+    println!("Fields per second: {:.0}", results.fields_per_second.to_string().green());
+    println!("Average time per file: {:.3}ms", 
+        (results.total_duration.as_secs_f64() * 1000.0) / results.total_files as f64
+    );
+    
+    if let Some(ref timings) = results.file_timings {
+        println!();
+        println!("{}", "Detailed File Timings".bold().purple());
+        println!("{}", "=====================".purple());
+        
+        // Sort by duration (slowest first)
+        let mut sorted_timings = timings.clone();
+        sorted_timings.sort_by(|a, b| b.duration.cmp(&a.duration));
+        
+        for timing in sorted_timings.iter().take(10) {
+            println!("  {}: {:.3}ms ({} fields)", 
+                timing.filename.cyan(),
+                timing.duration.as_secs_f64() * 1000.0,
+                timing.exif_fields.to_string().green()
+            );
+        }
+        
+        if timings.len() > 10 {
+            println!("  ... and {} more files", timings.len() - 10);
+        }
+    }
+    
+    Ok(())
+}
+
+fn output_benchmark_json(results: &BenchmarkResults) -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", serde_json::to_string_pretty(results)?);
+    Ok(())
+}
+
+fn output_benchmark_csv(results: &BenchmarkResults) -> Result<(), Box<dyn std::error::Error>> {
+    println!("metric,value");
+    println!("total_files,{}", results.total_files);
+    println!("iterations,{}", results.iterations);
+    println!("total_duration_seconds,{:.6}", results.total_duration.as_secs_f64());
+    println!("successful_files,{}", results.successful_files);
+    println!("total_exif_fields,{}", results.total_exif_fields);
+    println!("files_per_second,{:.2}", results.files_per_second);
+    println!("fields_per_second,{:.0}", results.fields_per_second);
+    println!("success_rate_percent,{:.1}", results.success_rate);
+    
+    if let Some(ref timings) = results.file_timings {
+        println!();
+        println!("filename,duration_ms,exif_fields,iteration");
+        for timing in timings {
+            println!("{},{:.3},{},{}", 
+                timing.filename,
+                timing.duration.as_secs_f64() * 1000.0,
+                timing.exif_fields,
+                timing.iteration
+            );
+        }
+    }
+    
+    Ok(())
+}
+
 fn get_short_tag(tag: &str) -> String {
     let tags = get_known_exif_tags();
     if let Some(info) = tags.get(tag) {
@@ -351,6 +604,27 @@ fn get_short_tag(tag: &str) -> String {
 struct FileResult {
     filename: String,
     metadata: HashMap<String, String>,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct FileTiming {
+    filename: String,
+    duration: Duration,
+    exif_fields: usize,
+    iteration: u32,
+}
+
+#[derive(serde::Serialize)]
+struct BenchmarkResults {
+    total_files: usize,
+    iterations: u32,
+    total_duration: Duration,
+    successful_files: usize,
+    total_exif_fields: usize,
+    files_per_second: f64,
+    fields_per_second: f64,
+    success_rate: f64,
+    file_timings: Option<Vec<FileTiming>>,
 }
 
 #[derive(Clone)]
