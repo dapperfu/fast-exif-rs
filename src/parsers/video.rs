@@ -927,25 +927,38 @@ impl VideoParser {
         let mut pos = 0;
         while pos + 8 < data.len() {
             let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
             let atom_type = &data[pos + 4..pos + 8];
+            
+            // Handle extended size atoms (size == 1)
+            let actual_size = if size == 1 {
+                if pos + 16 < data.len() {
+                    let extended_size = ExifUtils::read_u64_be(data, pos + 8).unwrap_or(0);
+                    if extended_size > data.len() as u64 || extended_size < 16 {
+                        break;
+                    }
+                    extended_size as usize
+                } else {
+                    break;
+                }
+            } else if size == 0 || size > data.len() as u32 {
+                break;
+            } else {
+                size as usize
+            };
             
             if atom_type == b"mvhd" {
                 // Found mvhd atom, extract its data (skip size and type)
-                let mvhd_data = &data[pos + 8..pos + size as usize];
+                let mvhd_data = &data[pos + 8..pos + actual_size];
                 return callback(mvhd_data);
             } else if atom_type == b"moov" {
                 // Recursively search inside moov atom
-                let moov_data = &data[pos + 8..pos + size as usize];
+                let moov_data = &data[pos + 8..pos + actual_size];
                 if let Some(result) = Self::find_mvhd_atom_recursive(moov_data, callback) {
                     return Some(result);
                 }
             }
             
-            pos += size as usize;
+            pos += actual_size;
         }
         None
     }
@@ -996,23 +1009,36 @@ impl VideoParser {
         let mut pos = 0;
         while pos + 8 < data.len() {
             let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
             let atom_type = &data[pos + 4..pos + 8];
+            
+            // Handle extended size atoms (size == 1)
+            let actual_size = if size == 1 {
+                if pos + 16 < data.len() {
+                    let extended_size = ExifUtils::read_u64_be(data, pos + 8).unwrap_or(0);
+                    if extended_size > data.len() as u64 || extended_size < 16 {
+                        break;
+                    }
+                    extended_size as usize
+                } else {
+                    break;
+                }
+            } else if size == 0 || size > data.len() as u32 {
+                break;
+            } else {
+                size as usize
+            };
             
             if atom_type == b"trak" {
                 // Found trak atom, extract its data (skip size and type)
-                let trak_data = &data[pos + 8..pos + size as usize];
+                let trak_data = &data[pos + 8..pos + actual_size];
                 callback(trak_data);
             } else if atom_type == b"moov" {
                 // Recursively search inside moov atom
-                let moov_data = &data[pos + 8..pos + size as usize];
+                let moov_data = &data[pos + 8..pos + actual_size];
                 Self::find_trak_atoms_recursive(moov_data, callback);
             }
             
-            pos += size as usize;
+            pos += actual_size;
         }
     }
     
@@ -1057,27 +1083,40 @@ impl VideoParser {
         let mut pos = 0;
         while pos + 8 < data.len() {
             let size = ExifUtils::read_u32_be(data, pos).unwrap_or(0);
-            if size == 0 || size > data.len() as u32 {
-                break;
-            }
-            
             let atom_type = &data[pos + 4..pos + 8];
+            
+            // Handle extended size atoms (size == 1)
+            let actual_size = if size == 1 {
+                if pos + 16 < data.len() {
+                    let extended_size = ExifUtils::read_u64_be(data, pos + 8).unwrap_or(0);
+                    if extended_size > data.len() as u64 || extended_size < 16 {
+                        break;
+                    }
+                    extended_size as usize
+                } else {
+                    break;
+                }
+            } else if size == 0 || size > data.len() as u32 {
+                break;
+            } else {
+                size as usize
+            };
             
             if atom_type == b"mdia" {
                 // Found mdia atom, extract its data (skip size and type)
-                let mdia_data = &data[pos + 8..pos + size as usize];
+                let mdia_data = &data[pos + 8..pos + actual_size];
                 callback(mdia_data);
             } else if atom_type == b"trak" {
                 // Recursively search inside trak atom
-                let trak_data = &data[pos + 8..pos + size as usize];
+                let trak_data = &data[pos + 8..pos + actual_size];
                 Self::find_mdia_atoms_recursive(trak_data, callback);
             } else if atom_type == b"moov" {
                 // Recursively search inside moov atom
-                let moov_data = &data[pos + 8..pos + size as usize];
+                let moov_data = &data[pos + 8..pos + actual_size];
                 Self::find_mdia_atoms_recursive(moov_data, callback);
             }
             
-            pos += size as usize;
+            pos += actual_size;
         }
     }
     

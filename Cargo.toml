@@ -12,6 +12,18 @@ categories = ["multimedia", "development-tools"]
 name = "fast_exif_reader"
 crate-type = ["lib"]
 
+[[bin]]
+name = "test_mp4"
+path = "test_mp4.rs"
+
+[[bin]]
+name = "debug_mp4"
+path = "debug_mp4.rs"
+
+[[bin]]
+name = "examine_mp4"
+path = "examine_mp4.rs"
+
 [dependencies]
 # Core parsing
 nom = "7.1"
