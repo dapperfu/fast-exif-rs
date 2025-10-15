@@ -782,7 +782,15 @@ impl VideoParser {
                     // Read creation time from tkhd atom (offset 4-8 after version/flags)
                     let creation_time = ExifUtils::read_u32_be(tkhd_data, 4).unwrap_or(0);
                     if creation_time > 0 {
-                        let unix_timestamp = creation_time as i64 - 2082844800;
+                        // Try both Mac epoch and Unix epoch formats
+                        let unix_timestamp = if creation_time > 2082844800 {
+                            // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                            creation_time as i64 - 2082844800
+                        } else {
+                            // Likely already Unix epoch
+                            creation_time as i64
+                        };
+                        
                         if unix_timestamp > 0 {
                             if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
                                 let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
@@ -798,7 +806,14 @@ impl VideoParser {
                     // Read modification time from tkhd atom (offset 8-12 after version/flags)
                     let modification_time = ExifUtils::read_u32_be(tkhd_data, 8).unwrap_or(0);
                     if modification_time > 0 {
-                        let unix_timestamp = modification_time as i64 - 2082844800;
+                        // Try both Mac epoch and Unix epoch formats
+                        let unix_timestamp = if modification_time > 2082844800 {
+                            // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                            modification_time as i64 - 2082844800
+                        } else {
+                            // Likely already Unix epoch
+                            modification_time as i64
+                        };
                         if unix_timestamp > 0 {
                             if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
                                 let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
@@ -824,7 +839,15 @@ impl VideoParser {
                     // Read creation time from mdhd atom (offset 4-8 after version/flags)
                     let creation_time = ExifUtils::read_u32_be(mdhd_data, 4).unwrap_or(0);
                     if creation_time > 0 {
-                        let unix_timestamp = creation_time as i64 - 2082844800;
+                        // Try both Mac epoch and Unix epoch formats
+                        let unix_timestamp = if creation_time > 2082844800 {
+                            // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                            creation_time as i64 - 2082844800
+                        } else {
+                            // Likely already Unix epoch
+                            creation_time as i64
+                        };
+                        
                         if unix_timestamp > 0 {
                             if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
                                 let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
@@ -840,7 +863,14 @@ impl VideoParser {
                     // Read modification time from mdhd atom (offset 8-12 after version/flags)
                     let modification_time = ExifUtils::read_u32_be(mdhd_data, 8).unwrap_or(0);
                     if modification_time > 0 {
-                        let unix_timestamp = modification_time as i64 - 2082844800;
+                        // Try both Mac epoch and Unix epoch formats
+                        let unix_timestamp = if modification_time > 2082844800 {
+                            // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                            modification_time as i64 - 2082844800
+                        } else {
+                            // Likely already Unix epoch
+                            modification_time as i64
+                        };
                         if unix_timestamp > 0 {
                             if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
                                 let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
@@ -863,8 +893,16 @@ impl VideoParser {
             if mvhd_data.len() >= 16 {
                 // Read creation time from mvhd atom (offset 4-8 after version/flags)
                 let creation_time = ExifUtils::read_u32_be(mvhd_data, 4).unwrap_or(0);
-                // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
-                let unix_timestamp = creation_time as i64 - 2082844800;
+                
+                // Try both Mac epoch and Unix epoch formats
+                let unix_timestamp = if creation_time > 2082844800 {
+                    // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                    creation_time as i64 - 2082844800
+                } else {
+                    // Likely already Unix epoch
+                    creation_time as i64
+                };
+                
                 if unix_timestamp > 0 {
                     // Format as YYYY:MM:DD HH:MM:SS
                     if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {
@@ -882,8 +920,16 @@ impl VideoParser {
             if mvhd_data.len() >= 20 {
                 // Read modification time from mvhd atom (offset 8-12 after version/flags)
                 let modification_time = ExifUtils::read_u32_be(mvhd_data, 8).unwrap_or(0);
-                // Convert from Mac epoch (Jan 1, 1904) to Unix epoch (Jan 1, 1970)
-                let unix_timestamp = modification_time as i64 - 2082844800;
+                
+                // Try both Mac epoch and Unix epoch formats
+                let unix_timestamp = if modification_time > 2082844800 {
+                    // Likely Mac epoch (Jan 1, 1904), convert to Unix epoch
+                    modification_time as i64 - 2082844800
+                } else {
+                    // Likely already Unix epoch
+                    modification_time as i64
+                };
+                
                 if unix_timestamp > 0 {
                     // Format as YYYY:MM:DD HH:MM:SS
                     if let Some(datetime) = DateTime::from_timestamp(unix_timestamp, 0) {

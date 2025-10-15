@@ -12,6 +12,10 @@ categories = ["multimedia", "development-tools"]
 name = "fast_exif_reader"
 crate-type = ["lib"]
 
+[[bin]]
+name = "test_m4v"
+path = "src/bin/test_m4v.rs"
+
 [dependencies]
 # Core parsing
 nom = "7.1"
