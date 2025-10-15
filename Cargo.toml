@@ -1,6 +1,6 @@
 [package]
 name = "fast-exif-reader"
-version = "0.8.5"
+version = "0.8.6"
 edition = "2021"
 description = "Fast EXIF reader and writer with comprehensive multimedia support"
 license = "MIT"
@@ -11,10 +11,6 @@ categories = ["multimedia", "development-tools"]
 [lib]
 name = "fast_exif_reader"
 crate-type = ["lib"]
-
-[[bin]]
-name = "test_m4v"
-path = "src/bin/test_m4v.rs"
 
 [dependencies]
 # Core parsing
