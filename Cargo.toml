@@ -12,6 +12,7 @@ categories = ["multimedia", "development-tools"]
 name = "fast_exif_reader"
 crate-type = ["lib"]
 
+
 [dependencies]
 # Core parsing
 nom = "7.1"

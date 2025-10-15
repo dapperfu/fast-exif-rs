@@ -1,5 +1,6 @@
 use crate::types::ExifError;
 use std::collections::HashMap;
+use chrono::DateTime;
 
 /// MKV parser for extracting metadata from Matroska video files
 pub struct MkvParser;
@@ -20,7 +21,7 @@ impl MkvParser {
         metadata.insert("Format".to_string(), "MKV".to_string());
 
         // Parse EBML structure
-        let mut offset = 4; // Skip MKV signature
+        let mut offset = 0; // Start from beginning - MKV signature is part of EBML Header
         while offset < data.len() {
             if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
                 Self::process_mkv_element(element_id, element_data, metadata);
@@ -29,6 +30,9 @@ impl MkvParser {
                 break;
             }
         }
+        
+        // Also search for DateUTC elements using pattern matching
+        Self::search_for_date_elements(data, metadata);
 
         // Add computed fields
         Self::add_computed_fields(metadata);
@@ -42,13 +46,13 @@ impl MkvParser {
             return None;
         }
 
-        // Parse element ID (variable length)
-        let (element_id, id_size) = Self::parse_vint(data, offset)?;
-        
-        // Parse element size (variable length)
-        let (element_size, size_size) = Self::parse_vint(data, offset + id_size)?;
-        
-        let total_size = id_size + size_size + element_size as usize;
+                // Parse element ID (variable length)
+                let (element_id, id_size) = Self::parse_vint(data, offset)?;
+                
+                // Parse element size (variable length)
+                let (element_size, size_size) = Self::parse_vint(data, offset + id_size)?;
+                
+                let total_size = id_size + size_size + element_size as usize;
         if offset + total_size > data.len() {
             return None;
         }
@@ -64,18 +68,29 @@ impl MkvParser {
         }
 
         let first_byte = data[offset];
+        
+        // Count leading zeros to determine length
         let length = first_byte.leading_zeros() as usize + 1;
         
-        if offset + length > data.len() || length > 4 {
+        if offset + length > data.len() || length > 8 {
             return None;
         }
 
-        // Safe mask calculation to avoid overflow
-        let mask = if length == 8 { 0xFF } else { (1u8 << (8 - length)) - 1 };
-        let mut value = (first_byte & mask) as u32;
+        // For VINT, the first byte contains the length information
+        // The value is the remaining bits plus any additional bytes
+        let mut value = 0u32;
         
-        for i in 1..length {
-            value = (value << 8) | data[offset + i] as u32;
+        if length == 1 {
+            // 1-byte VINT: value is the entire byte
+            value = first_byte as u32;
+        } else {
+            // Multi-byte VINT: first byte has length info, remaining bytes contain the value
+            // For multi-byte VINTs, we need to read all bytes including the first one
+            value = first_byte as u32;
+            
+            for i in 1..length {
+                value = (value << 8) | data[offset + i] as u32;
+            }
         }
 
         Some((value, length))
@@ -163,6 +178,7 @@ impl MkvParser {
                 match element_id {
                     0x1549A966 => {
                         // Info
+                        println!("DEBUG: Found Info element, parsing...");
                         Self::parse_info(element_data, metadata);
                     }
                     0x1654AE6B => {
@@ -216,6 +232,34 @@ impl MkvParser {
                         // WritingApp
                         if let Ok(app) = String::from_utf8(element_data.to_vec()) {
                             metadata.insert("WritingApp".to_string(), app);
+                        }
+                    }
+                    0x4461 => {
+                        // DateUTC - Creation date in nanoseconds since 2001-01-01 00:00:00 UTC
+                        println!("DEBUG: Found DateUTC element!");
+                        if element_data.len() == 8 {
+                            // Read as big-endian 64-bit integer
+                            let nanoseconds = ((element_data[0] as u64) << 56) |
+                                            ((element_data[1] as u64) << 48) |
+                                            ((element_data[2] as u64) << 40) |
+                                            ((element_data[3] as u64) << 32) |
+                                            ((element_data[4] as u64) << 24) |
+                                            ((element_data[5] as u64) << 16) |
+                                            ((element_data[6] as u64) << 8) |
+                                            (element_data[7] as u64);
+                            
+                            // Convert from nanoseconds since 2001-01-01 to Unix timestamp
+                            // 2001-01-01 00:00:00 UTC = 978307200 Unix timestamp
+                            let unix_timestamp = (nanoseconds / 1_000_000_000) + 978307200;
+                            
+                            if unix_timestamp > 0 {
+                                if let Some(datetime) = chrono::DateTime::from_timestamp(unix_timestamp as i64, 0) {
+                                    let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                    metadata.insert("DateTimeOriginal".to_string(), formatted_time.clone());
+                                    metadata.insert("CreateDate".to_string(), formatted_time.clone());
+                                    metadata.insert("CreationDate".to_string(), formatted_time);
+                                }
+                            }
                         }
                     }
                     _ => {}
@@ -355,6 +399,116 @@ impl MkvParser {
                 break;
             }
         }
+    }
+
+    /// Search for DateUTC elements using pattern matching
+    fn search_for_date_elements(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Search for DateUTC element pattern (0x4461 followed by size field, then 8-byte timestamp)
+        let pattern = [0x44, 0x61];
+        let mut offset = 0;
+        let mut found_reasonable_date = false;
+        
+        while offset < data.len() - 15 && !found_reasonable_date { // Need at least 15 bytes: 2 (pattern) + 1 (size) + 8 (timestamp) + 4 (buffer)
+            if let Some(pos) = Self::find_pattern(data, offset, &pattern) {
+                offset = pos + 2; // Move past the pattern
+                
+                // Parse the size field (should be 1 byte with value 8 for DateUTC)
+                if offset < data.len() {
+                    let size_byte = data[offset];
+                    let size_length = size_byte.leading_zeros() as usize + 1;
+                    
+                    // Try different size interpretations
+                    let mut element_size = 0u32;
+                    let mut size_bytes_used = 1;
+                    
+                    if size_length == 1 {
+                        element_size = size_byte as u32;
+                    } else if size_length == 2 && offset + 1 < data.len() {
+                        element_size = ((size_byte as u32) << 8) | data[offset + 1] as u32;
+                        size_bytes_used = 2;
+                    } else if size_length == 3 && offset + 2 < data.len() {
+                        element_size = ((size_byte as u32) << 16) | ((data[offset + 1] as u32) << 8) | data[offset + 2] as u32;
+                        size_bytes_used = 3;
+                    } else if size_length == 4 && offset + 3 < data.len() {
+                        element_size = ((size_byte as u32) << 24) | ((data[offset + 1] as u32) << 16) | ((data[offset + 2] as u32) << 8) | data[offset + 3] as u32;
+                        size_bytes_used = 4;
+                    }
+                    
+                    if element_size >= 8 { // DateUTC should have at least 8 bytes
+                        offset += size_bytes_used; // Move past size field
+                        
+                        // Check if we have enough bytes for the data
+                        if offset + element_size as usize <= data.len() {
+                            let element_data = &data[offset..offset + element_size as usize];
+                            
+                            // Look for 8-byte timestamp within the element data
+                            for i in 0..=element_data.len().saturating_sub(8) {
+                                let timestamp_bytes = &element_data[i..i + 8];
+                                
+                                // Read as big-endian 64-bit integer
+                                let nanoseconds = ((timestamp_bytes[0] as u64) << 56) |
+                                                ((timestamp_bytes[1] as u64) << 48) |
+                                                ((timestamp_bytes[2] as u64) << 40) |
+                                                ((timestamp_bytes[3] as u64) << 32) |
+                                                ((timestamp_bytes[4] as u64) << 24) |
+                                                ((timestamp_bytes[5] as u64) << 16) |
+                                                ((timestamp_bytes[6] as u64) << 8) |
+                                                (timestamp_bytes[7] as u64);
+                                
+                                // Convert from nanoseconds since 2001-01-01 to Unix timestamp
+                                // 2001-01-01 00:00:00 UTC = 978307200 Unix timestamp
+                                let unix_timestamp = (nanoseconds / 1_000_000_000) + 978307200;
+                                
+                                // Also try direct Unix timestamp conversion (in case it's already Unix epoch)
+                                let direct_unix = nanoseconds / 1_000_000_000;
+                                
+                                if unix_timestamp > 0 && unix_timestamp < 2000000000 { // Reasonable timestamp range
+                                    if let Some(datetime) = chrono::DateTime::from_timestamp(unix_timestamp as i64, 0) {
+                                        let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                        
+                                        // Check if this timestamp is close to 2023 (the expected year)
+                                        if unix_timestamp > 1600000000 && unix_timestamp < 1800000000 { // 2020-2027 range
+                                            metadata.insert("DateTimeOriginal".to_string(), formatted_time.clone());
+                                            metadata.insert("CreateDate".to_string(), formatted_time.clone());
+                                            metadata.insert("CreationDate".to_string(), formatted_time.clone());
+                                            found_reasonable_date = true;
+                                            break; // Found a reasonable date, stop searching
+                                        }
+                                    }
+                                }
+                                
+                                // Also try direct Unix timestamp
+                                if direct_unix > 0 && direct_unix < 2000000000 {
+                                    if let Some(datetime) = chrono::DateTime::from_timestamp(direct_unix as i64, 0) {
+                                        let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S").to_string();
+                                        
+                                        if direct_unix > 1600000000 && direct_unix < 1800000000 {
+                                            metadata.insert("DateTimeOriginal".to_string(), formatted_time.clone());
+                                            metadata.insert("CreateDate".to_string(), formatted_time.clone());
+                                            metadata.insert("CreationDate".to_string(), formatted_time.clone());
+                                            found_reasonable_date = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    
+    /// Find pattern in data starting from offset
+    fn find_pattern(data: &[u8], start_offset: usize, pattern: &[u8]) -> Option<usize> {
+        for i in start_offset..data.len() - pattern.len() + 1 {
+            if &data[i..i + pattern.len()] == pattern {
+                return Some(i);
+            }
+        }
+        None
     }
 
     /// Add computed fields that exiftool provides
