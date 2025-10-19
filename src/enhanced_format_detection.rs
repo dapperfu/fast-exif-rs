@@ -232,7 +232,10 @@ impl EnhancedFormatDetector {
     /// Check if data represents a Nikon NEF file
     pub fn is_nikon_nef(data: &[u8]) -> bool {
         let search_len = std::cmp::min(1024, data.len());
-        data[..search_len].windows(5).any(|w| w == b"Nikon")
+        // Look for "Nikon" or "NIKON CORPORATION" in the first 1KB
+        data[..search_len].windows(5).any(|w| w == b"Nikon") ||
+        data[..search_len].windows(5).any(|w| w == b"NIKON") ||
+        data[..search_len].windows(15).any(|w| w == b"NIKON CORPORATION")
     }
 
     /// Check if data represents a Sony ARW file

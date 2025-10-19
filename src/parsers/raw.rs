@@ -32,6 +32,13 @@ impl RawParser {
         // NEF is TIFF-based
         TiffParser::parse_tiff_exif(data, metadata)?;
         Self::extract_nikon_specific_tags(data, metadata);
+
+        // Add computed fields that exiftool provides
+        Self::add_computed_fields(metadata);
+
+        // Post-process problematic fields to match exiftool output
+        Self::post_process_problematic_fields(metadata);
+
         Ok(())
     }
 
@@ -79,6 +86,251 @@ impl RawParser {
         // Detect specific Nikon models
         if data.windows(10).any(|w| w == b"NIKON Z50") {
             metadata.insert("Model".to_string(), "NIKON Z50_2".to_string());
+        }
+
+        // Parse Nikon maker notes for additional metadata
+        Self::parse_nikon_maker_notes(data, metadata);
+    }
+
+    /// Parse Nikon maker notes for lens and camera settings
+    fn parse_nikon_maker_notes(data: &[u8], metadata: &mut HashMap<String, String>) {
+        // Look for Nikon maker note signature "Nikon\0\0\0\0\0\0\0\0"
+        let nikon_signature = b"Nikon\0\0\0\0\0\0\0\0";
+        if let Some(offset) = data.windows(nikon_signature.len()).position(|w| w == nikon_signature) {
+            let maker_note_start = offset + nikon_signature.len();
+            
+            // Nikon maker notes use IFD structure starting after signature
+            if maker_note_start + 2 < data.len() {
+                // Read entry count (little-endian)
+                let entry_count = u16::from_le_bytes([
+                    data[maker_note_start],
+                    data[maker_note_start + 1],
+                ]) as usize;
+
+                // Parse maker note entries
+                let mut entry_offset = maker_note_start + 2;
+                for _ in 0..entry_count {
+                    if entry_offset + 12 <= data.len() {
+                        let tag_id = u16::from_le_bytes([
+                            data[entry_offset],
+                            data[entry_offset + 1],
+                        ]);
+                        let data_type = u16::from_le_bytes([
+                            data[entry_offset + 2],
+                            data[entry_offset + 3],
+                        ]);
+                        let count = u32::from_le_bytes([
+                            data[entry_offset + 4],
+                            data[entry_offset + 5],
+                            data[entry_offset + 6],
+                            data[entry_offset + 7],
+                        ]);
+                        let value_offset = u32::from_le_bytes([
+                            data[entry_offset + 8],
+                            data[entry_offset + 9],
+                            data[entry_offset + 10],
+                            data[entry_offset + 11],
+                        ]);
+
+                        // Parse specific Nikon maker note tags
+                        Self::parse_nikon_maker_tag(data, tag_id, data_type, count, value_offset, metadata);
+                        
+                        entry_offset += 12;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Parse individual Nikon maker note tag
+    fn parse_nikon_maker_tag(
+        data: &[u8],
+        tag_id: u16,
+        data_type: u16,
+        count: u32,
+        value_offset: u32,
+        metadata: &mut HashMap<String, String>,
+    ) {
+        match tag_id {
+            0x0001 => {
+                // Nikon LensType
+                if data_type == 3 && count == 1 { // SHORT
+                    let lens_type = value_offset as u16;
+                    let lens_name = Self::format_nikon_lens_type(lens_type);
+                    metadata.insert("LensType".to_string(), lens_name);
+                }
+            }
+            0x0002 => {
+                // Nikon LensModel
+                if data_type == 2 && count > 0 { // ASCII
+                    let offset = value_offset as usize;
+                    if offset + count as usize <= data.len() {
+                        if let Ok(lens_model) = String::from_utf8(
+                            data[offset..offset + count as usize].to_vec()
+                        ) {
+                            let cleaned = lens_model.trim_end_matches('\0').trim().to_string();
+                            if !cleaned.is_empty() {
+                                metadata.insert("LensModel".to_string(), cleaned);
+                            }
+                        }
+                    }
+                }
+            }
+            0x0003 => {
+                // Nikon LensFStops
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let f_stops = numerator as f64 / denominator as f64;
+                            metadata.insert("LensFStops".to_string(), format!("f/{:.1}", f_stops));
+                        }
+                    }
+                }
+            }
+            0x0004 => {
+                // Nikon MinFocalLength
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let focal_length = numerator as f64 / denominator as f64;
+                            metadata.insert("MinFocalLength".to_string(), format!("{:.0} mm", focal_length));
+                        }
+                    }
+                }
+            }
+            0x0005 => {
+                // Nikon MaxFocalLength
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let focal_length = numerator as f64 / denominator as f64;
+                            metadata.insert("MaxFocalLength".to_string(), format!("{:.0} mm", focal_length));
+                        }
+                    }
+                }
+            }
+            0x0006 => {
+                // Nikon MaxApertureAtMinFocal
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let aperture = numerator as f64 / denominator as f64;
+                            metadata.insert("MaxApertureAtMinFocal".to_string(), format!("f/{:.1}", aperture));
+                        }
+                    }
+                }
+            }
+            0x0007 => {
+                // Nikon MaxApertureAtMaxFocal
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let aperture = numerator as f64 / denominator as f64;
+                            metadata.insert("MaxApertureAtMaxFocal".to_string(), format!("f/{:.1}", aperture));
+                        }
+                    }
+                }
+            }
+            0x0008 => {
+                // Nikon LensSerialNumber
+                if data_type == 2 && count > 0 { // ASCII
+                    let offset = value_offset as usize;
+                    if offset + count as usize <= data.len() {
+                        if let Ok(serial) = String::from_utf8(
+                            data[offset..offset + count as usize].to_vec()
+                        ) {
+                            let cleaned = serial.trim_end_matches('\0').trim().to_string();
+                            if !cleaned.is_empty() {
+                                metadata.insert("LensSerialNumber".to_string(), cleaned);
+                            }
+                        }
+                    }
+                }
+            }
+            0x0009 => {
+                // Nikon LensFirmwareVersion
+                if data_type == 2 && count > 0 { // ASCII
+                    let offset = value_offset as usize;
+                    if offset + count as usize <= data.len() {
+                        if let Ok(version) = String::from_utf8(
+                            data[offset..offset + count as usize].to_vec()
+                        ) {
+                            let cleaned = version.trim_end_matches('\0').trim().to_string();
+                            if !cleaned.is_empty() {
+                                metadata.insert("LensFirmwareVersion".to_string(), cleaned);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Handle other Nikon maker note tags as needed
+            }
+        }
+    }
+
+    /// Format Nikon lens type to human-readable string
+    fn format_nikon_lens_type(lens_type: u16) -> String {
+        match lens_type {
+            0 => "Unknown".to_string(),
+            1 => "AF".to_string(),
+            2 => "MF".to_string(),
+            3 => "AF-I".to_string(),
+            4 => "AF-S".to_string(),
+            5 => "AF-P".to_string(),
+            6 => "AF-D".to_string(),
+            7 => "AF-G".to_string(),
+            8 => "AF-VR".to_string(),
+            9 => "AF-S VR".to_string(),
+            10 => "AF-P VR".to_string(),
+            11 => "AF-S NIKKOR".to_string(),
+            12 => "AF-S NIKKOR VR".to_string(),
+            13 => "AF-S NIKKOR VR II".to_string(),
+            14 => "AF-S NIKKOR VR III".to_string(),
+            15 => "AF-S NIKKOR VR S".to_string(),
+            16 => "AF-S NIKKOR VR Z".to_string(),
+            17 => "AF-S NIKKOR Z".to_string(),
+            18 => "AF-S NIKKOR Z VR".to_string(),
+            19 => "AF-S NIKKOR Z VR S".to_string(),
+            20 => "AF-S NIKKOR Z VR II".to_string(),
+            _ => format!("Unknown ({})", lens_type),
         }
     }
 
