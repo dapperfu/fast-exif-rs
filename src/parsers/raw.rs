@@ -300,6 +300,220 @@ impl RawParser {
                     }
                 }
             }
+            0x000A => {
+                // Nikon ActiveD-Lighting
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let active_d_lighting = match value {
+                        0 => "Off",
+                        1 => "Low",
+                        2 => "Normal", 
+                        3 => "High",
+                        4 => "Extra High",
+                        5 => "Auto",
+                        6 => "Extra High 2",
+                        7 => "Extra High 3",
+                        8 => "Extra High 4",
+                        9 => "Extra High 5",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("ActiveD-Lighting".to_string(), active_d_lighting.to_string());
+                }
+            }
+            0x000B => {
+                // Nikon AFAreaMode
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let af_area_mode = match value {
+                        0 => "Single Area",
+                        1 => "Dynamic Area",
+                        2 => "Dynamic Area (closest subject)",
+                        3 => "Dynamic Area (9 points)",
+                        4 => "Dynamic Area (21 points)",
+                        5 => "Dynamic Area (51 points)",
+                        6 => "Dynamic Area (51 points, 3D tracking)",
+                        7 => "Auto Area",
+                        8 => "3D Tracking",
+                        9 => "Group Area",
+                        10 => "Group Area (closest subject)",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("AFAreaMode".to_string(), af_area_mode.to_string());
+                }
+            }
+            0x000C => {
+                // Nikon AFFineTune
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFFineTune".to_string(), value.to_string());
+                }
+            }
+            0x000D => {
+                // Nikon AFFineTuneAdj
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFFineTuneAdj".to_string(), value.to_string());
+                }
+            }
+            0x000E => {
+                // Nikon AFFineTuneAdjTele
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFFineTuneAdjTele".to_string(), value.to_string());
+                }
+            }
+            0x000F => {
+                // Nikon AFFineTuneIndex
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFFineTuneIndex".to_string(), value.to_string());
+                }
+            }
+            0x0010 => {
+                // Nikon AFInfo2Version
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFInfo2Version".to_string(), value.to_string());
+                }
+            }
+            0x0011 => {
+                // Nikon AFPointsUsed
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    metadata.insert("AFPointsUsed".to_string(), value.to_string());
+                }
+            }
+            0x0012 => {
+                // Nikon ContrastDetectAF
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let contrast_detect_af = match value {
+                        0 => "Off",
+                        1 => "On",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("ContrastDetectAF".to_string(), contrast_detect_af.to_string());
+                }
+            }
+            0x0013 => {
+                // Nikon FocusDistance
+                if data_type == 5 && count == 1 { // RATIONAL
+                    let offset = value_offset as usize;
+                    if offset + 8 <= data.len() {
+                        let numerator = u32::from_le_bytes([
+                            data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+                        ]);
+                        let denominator = u32::from_le_bytes([
+                            data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]
+                        ]);
+                        if denominator != 0 {
+                            let focus_distance = numerator as f64 / denominator as f64;
+                            metadata.insert("FocusDistance".to_string(), format!("{:.2} m", focus_distance));
+                        }
+                    }
+                }
+            }
+            0x0014 => {
+                // Nikon VRMode
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let vr_mode = match value {
+                        0 => "Off",
+                        1 => "On",
+                        2 => "Sport",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("VRMode".to_string(), vr_mode.to_string());
+                }
+            }
+            0x0015 => {
+                // Nikon ShootingMode
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let shooting_mode = match value {
+                        0 => "Single Frame",
+                        1 => "Continuous",
+                        2 => "Self Timer",
+                        3 => "Bracketing",
+                        4 => "Interval Timer",
+                        5 => "Multiple Exposure",
+                        6 => "Movie",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("ShootingMode".to_string(), shooting_mode.to_string());
+                }
+            }
+            0x0016 => {
+                // Nikon ColorSpace
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let color_space = match value {
+                        0 => "sRGB",
+                        1 => "Adobe RGB",
+                        2 => "ProPhoto RGB",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("ColorSpace".to_string(), color_space.to_string());
+                }
+            }
+            0x0017 => {
+                // Nikon NoiseReduction
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let noise_reduction = match value {
+                        0 => "Off",
+                        1 => "On",
+                        2 => "High",
+                        3 => "Low",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("NoiseReduction".to_string(), noise_reduction.to_string());
+                }
+            }
+            0x0018 => {
+                // Nikon FlashSetting
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let flash_setting = match value {
+                        0 => "None",
+                        1 => "Built-in Flash",
+                        2 => "External Flash",
+                        3 => "Commander Mode",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("FlashSetting".to_string(), flash_setting.to_string());
+                }
+            }
+            0x0019 => {
+                // Nikon FlashMode
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let flash_mode = match value {
+                        0 => "Off",
+                        1 => "Auto",
+                        2 => "Fill Flash",
+                        3 => "Rear Curtain",
+                        4 => "Slow Sync",
+                        5 => "Red Eye Reduction",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("FlashMode".to_string(), flash_mode.to_string());
+                }
+            }
+            0x001A => {
+                // Nikon FlashType
+                if data_type == 3 && count == 1 { // SHORT
+                    let value = value_offset as u16;
+                    let flash_type = match value {
+                        0 => "None",
+                        1 => "Built-in Flash",
+                        2 => "External Flash",
+                        3 => "Commander Mode",
+                        _ => "Unknown",
+                    };
+                    metadata.insert("FlashType".to_string(), flash_type.to_string());
+                }
+            }
             _ => {
                 // Handle other Nikon maker note tags as needed
             }

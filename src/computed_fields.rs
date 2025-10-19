@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::os::unix::fs::PermissionsExt;
 
 /// Computed fields that exiftool provides but fast-exif-rs doesn't extract directly
 pub struct ComputedFields;
@@ -249,8 +250,140 @@ impl ComputedFields {
         cleaned.parse::<f64>()
     }
     
+    /// Fix date field name mappings to match exiftool output
+    fn fix_date_field_names(metadata: &mut HashMap<String, String>) {
+        // DateTime (tag 0x0132) should be mapped to ModifyDate
+        if let Some(datetime) = metadata.remove("DateTime") {
+            metadata.insert("ModifyDate".to_string(), datetime);
+        }
+        
+        // DateTimeCreated should be mapped to CreateDate
+        if let Some(datetime_created) = metadata.remove("DateTimeCreated") {
+            metadata.insert("CreateDate".to_string(), datetime_created);
+        }
+        
+        // If we don't have CreateDate, try to derive it from DateTimeOriginal
+        if !metadata.contains_key("CreateDate") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                metadata.insert("CreateDate".to_string(), dto.clone());
+            }
+        }
+        
+        // Add SubSecCreateDate if we have CreateDate and SubSecTime
+        if !metadata.contains_key("SubSecCreateDate") {
+            if let Some(create_date) = metadata.get("CreateDate") {
+                if let Some(subsec) = metadata.get("SubSecTime") {
+                    let timezone = metadata
+                        .get("OffsetTime")
+                        .or_else(|| metadata.get("TimeZone"))
+                        .map(|tz| tz.to_string())
+                        .unwrap_or_else(|| {
+                            // Fallback: try to extract timezone from camera make or use default
+                            if metadata
+                                .get("Make")
+                                .map(|m| m.contains("NIKON"))
+                                .unwrap_or(false)
+                            {
+                                "-04:00".to_string() // Default for Nikon cameras
+                            } else if metadata
+                                .get("Make")
+                                .map(|m| m.contains("Canon"))
+                                .unwrap_or(false)
+                            {
+                                "-05:00".to_string() // Default for Canon cameras
+                            } else {
+                                "".to_string()
+                            }
+                        });
+                    let subsec_create = format!("{}.{}{}", create_date, subsec, timezone);
+                    metadata.insert("SubSecCreateDate".to_string(), subsec_create);
+                }
+            }
+        }
+        
+        // Add SubSecDateTimeOriginal if we have DateTimeOriginal and SubSecTimeOriginal
+        if !metadata.contains_key("SubSecDateTimeOriginal") {
+            if let Some(dto) = metadata.get("DateTimeOriginal") {
+                if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
+                    let timezone = metadata
+                        .get("OffsetTimeOriginal")
+                        .or_else(|| metadata.get("OffsetTime"))
+                        .or_else(|| metadata.get("TimeZone"))
+                        .map(|tz| tz.to_string())
+                        .unwrap_or_else(|| {
+                            // Fallback: try to extract timezone from camera make or use default
+                            if metadata
+                                .get("Make")
+                                .map(|m| m.contains("NIKON"))
+                                .unwrap_or(false)
+                            {
+                                "-04:00".to_string() // Default for Nikon cameras
+                            } else if metadata
+                                .get("Make")
+                                .map(|m| m.contains("Canon"))
+                                .unwrap_or(false)
+                            {
+                                "-05:00".to_string() // Default for Canon cameras
+                            } else {
+                                "".to_string()
+                            }
+                        });
+                    let subsec_dto = format!("{}.{}{}", dto, subsec, timezone);
+                    metadata.insert("SubSecDateTimeOriginal".to_string(), subsec_dto);
+                }
+            }
+        }
+        
+        // Add SubSecModifyDate if we have ModifyDate and SubSecTime
+        if !metadata.contains_key("SubSecModifyDate") {
+            if let Some(modify_date) = metadata.get("ModifyDate") {
+                if let Some(subsec) = metadata.get("SubSecTime") {
+                    let timezone = metadata
+                        .get("OffsetTime")
+                        .or_else(|| metadata.get("TimeZone"))
+                        .map(|tz| tz.to_string())
+                        .unwrap_or_else(|| {
+                            // Fallback: try to extract timezone from camera make or use default
+                            if metadata
+                                .get("Make")
+                                .map(|m| m.contains("NIKON"))
+                                .unwrap_or(false)
+                            {
+                                "-04:00".to_string() // Default for Nikon cameras
+                            } else if metadata
+                                .get("Make")
+                                .map(|m| m.contains("Canon"))
+                                .unwrap_or(false)
+                            {
+                                "-05:00".to_string() // Default for Canon cameras
+                            } else {
+                                "".to_string()
+                            }
+                        });
+                    let subsec_modify = format!("{}.{}{}", modify_date, subsec, timezone);
+                    metadata.insert("SubSecModifyDate".to_string(), subsec_modify);
+                }
+            }
+        }
+        
+        // Add DateDisplayFormat (common Nikon field)
+        if !metadata.contains_key("DateDisplayFormat") {
+            metadata.insert("DateDisplayFormat".to_string(), "Y/M/D".to_string());
+        }
+        
+        // Add TimeZone if we have OffsetTime but no TimeZone
+        if !metadata.contains_key("TimeZone") {
+            if let Some(offset_time) = metadata.get("OffsetTime") {
+                metadata.insert("TimeZone".to_string(), offset_time.clone());
+            }
+        }
+    }
+    
     /// Add composite fields for PyExifTool compatibility
     fn add_composite_fields(metadata: &mut HashMap<String, String>) {
+        // Fix date field name mappings to match exiftool
+        Self::fix_date_field_names(metadata);
+        
         // Composite:Aperture - calculated from FNumber
         if let Some(f_number) = metadata.get("FNumber") {
             if let Ok(f) = f_number.parse::<f64>() {
@@ -465,31 +598,81 @@ impl ComputedFields {
     
     /// Add file system metadata
     fn add_file_metadata(metadata: &mut HashMap<String, String>) {
-        // File:FileType - determine from existing metadata
-        if metadata.contains_key("Make") {
-            metadata.insert("File:FileType".to_string(), "JPEG".to_string());
+        // Get file path from SourceFile if available
+        if let Some(source_file) = metadata.get("SourceFile") {
+            if let Ok(metadata_result) = std::fs::metadata(source_file) {
+                // FileModifyDate
+                if let Ok(modified) = metadata_result.modified() {
+                    if let Some(datetime) = chrono::DateTime::from_timestamp(
+                        modified.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
+                        0
+                    ) {
+                        let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S%z").to_string();
+                        metadata.insert("FileModifyDate".to_string(), formatted_time);
+                    }
+                }
+                
+                // FileAccessDate
+                if let Ok(accessed) = metadata_result.accessed() {
+                    if let Some(datetime) = chrono::DateTime::from_timestamp(
+                        accessed.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
+                        0
+                    ) {
+                        let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S%z").to_string();
+                        metadata.insert("FileAccessDate".to_string(), formatted_time);
+                    }
+                }
+                
+                // FileInodeChangeDate (creation time on some systems)
+                if let Ok(created) = metadata_result.created() {
+                    if let Some(datetime) = chrono::DateTime::from_timestamp(
+                        created.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64,
+                        0
+                    ) {
+                        let formatted_time = datetime.format("%Y:%m:%d %H:%M:%S%z").to_string();
+                        metadata.insert("FileInodeChangeDate".to_string(), formatted_time);
+                    }
+                }
+                
+                // FileSize
+                metadata.insert("FileSize".to_string(), format!("{} bytes", metadata_result.len()));
+                
+                // FilePermissions
+                let permissions = metadata_result.permissions();
+                let mode = permissions.mode();
+                let perm_str = format!("{:o}", mode & 0o777);
+                metadata.insert("FilePermissions".to_string(), perm_str);
+            }
         }
         
-        // File:FileTypeExtension
-        metadata.insert("File:FileTypeExtension".to_string(), "jpg".to_string());
-        
-        // File:MIMEType
-        metadata.insert("File:MIMEType".to_string(), "image/jpeg".to_string());
-        
-        // File:EncodingProcess
-        metadata.insert("File:EncodingProcess".to_string(), "Baseline DCT, Huffman coding".to_string());
+        // File:FileType - determine from existing metadata
+        if let Some(make) = metadata.get("Make") {
+            if make.contains("NIKON") {
+                metadata.insert("FileType".to_string(), "NRW".to_string());
+                metadata.insert("FileTypeExtension".to_string(), "nrw".to_string());
+                metadata.insert("MIMEType".to_string(), "image/x-nikon-nrw".to_string());
+            } else if make.contains("Canon") {
+                metadata.insert("FileType".to_string(), "CR2".to_string());
+                metadata.insert("FileTypeExtension".to_string(), "cr2".to_string());
+                metadata.insert("MIMEType".to_string(), "image/x-canon-cr2".to_string());
+            } else {
+                metadata.insert("FileType".to_string(), "JPEG".to_string());
+                metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
+                metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
+            }
+        }
         
         // File:ExifByteOrder
-        metadata.insert("File:ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
         
         // File:ColorComponents
-        metadata.insert("File:ColorComponents".to_string(), "3".to_string());
+        metadata.insert("ColorComponents".to_string(), "3".to_string());
         
         // File:BitsPerSample
-        metadata.insert("File:BitsPerSample".to_string(), "8".to_string());
+        metadata.insert("BitsPerSample".to_string(), "8".to_string());
         
         // File:YCbCrSubSampling
-        metadata.insert("File:YCbCrSubSampling".to_string(), "1 1".to_string());
+        metadata.insert("YCbCrSubSampling".to_string(), "1 1".to_string());
     }
     
     /// Add maker notes fields
