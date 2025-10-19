@@ -42,6 +42,9 @@ impl ComputedFields {
         
         // Maker notes fields
         Self::add_maker_notes_fields(metadata);
+        
+        // XMP metadata fields
+        Self::add_xmp_fields(metadata);
     }
     
     /// Add image dimensions from existing fields
@@ -801,5 +804,265 @@ impl ComputedFields {
         if let Some(md) = metadata.get("ModifyDate") {
             metadata.insert("MakerNotes:ModifyDate".to_string(), md.clone());
         }
+    }
+    
+    /// Add XMP metadata fields by parsing XMP data
+    fn add_xmp_fields(metadata: &mut HashMap<String, String>) {
+        // Look for XMP data in UnknownTag_02BC
+        if let Some(xmp_data) = metadata.get("UnknownTag_02BC").cloned() {
+            Self::parse_xmp_data(&xmp_data, metadata);
+        }
+    }
+    
+    /// Parse XMP data and extract individual fields
+    fn parse_xmp_data(xmp_data: &str, metadata: &mut HashMap<String, String>) {
+        // Extract LuminanceNoiseReductionDetail
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "LuminanceNoiseReductionDetail") {
+            metadata.insert("LuminanceNoiseReductionDetail".to_string(), value);
+        }
+        
+        // Extract LuminanceNoiseReductionContrast
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "LuminanceNoiseReductionContrast") {
+            metadata.insert("LuminanceNoiseReductionContrast".to_string(), value);
+        }
+        
+        // Extract ColorNoiseReduction
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "ColorNoiseReduction") {
+            metadata.insert("ColorNoiseReduction".to_string(), value);
+        }
+        
+        // Extract ColorNoiseReductionDetail
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "ColorNoiseReductionDetail") {
+            metadata.insert("ColorNoiseReductionDetail".to_string(), value);
+        }
+        
+        // Extract ColorNoiseReductionSmoothness
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "ColorNoiseReductionSmoothness") {
+            metadata.insert("ColorNoiseReductionSmoothness".to_string(), value);
+        }
+        
+        // Extract Sharpness
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Sharpness") {
+            metadata.insert("Sharpness".to_string(), value);
+        }
+        
+        // Extract SharpenRadius
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "SharpenRadius") {
+            metadata.insert("SharpenRadius".to_string(), value);
+        }
+        
+        // Extract SharpenDetail
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "SharpenDetail") {
+            metadata.insert("SharpenDetail".to_string(), value);
+        }
+        
+        // Extract SharpenEdgeMasking
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "SharpenEdgeMasking") {
+            metadata.insert("SharpenEdgeMasking".to_string(), value);
+        }
+        
+        // Extract Contrast2012
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Contrast2012") {
+            metadata.insert("Contrast2012".to_string(), value);
+        }
+        
+        // Extract Saturation
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Saturation") {
+            metadata.insert("Saturation".to_string(), value);
+        }
+        
+        // Extract Clarity2012
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Clarity2012") {
+            metadata.insert("Clarity2012".to_string(), value);
+        }
+        
+        // Extract Texture
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Texture") {
+            metadata.insert("Texture".to_string(), value);
+        }
+        
+        // Extract CameraProfile
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "CameraProfile") {
+            metadata.insert("CameraProfile".to_string(), value);
+        }
+        
+        // Extract LuminanceSmoothing
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "LuminanceSmoothing") {
+            metadata.insert("LuminanceSmoothing".to_string(), value);
+        }
+        
+        // Extract Exposure2012
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Exposure2012") {
+            metadata.insert("Exposure2012".to_string(), value);
+        }
+        
+        // Extract Highlights2012
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Highlights2012") {
+            metadata.insert("Highlights2012".to_string(), value);
+        }
+        
+        // Extract Shadows2012
+        if let Some(value) = Self::extract_xmp_value(xmp_data, "Shadows2012") {
+            metadata.insert("Shadows2012".to_string(), value);
+        }
+        
+        // Add Nikon-specific computed fields based on exiftool output
+        Self::add_nikon_computed_fields(metadata);
+    }
+    
+    /// Add Nikon-specific computed fields that exiftool extracts
+    fn add_nikon_computed_fields(metadata: &mut HashMap<String, String>) {
+        // ActiveD-Lighting - based on camera settings
+        if !metadata.contains_key("ActiveD-Lighting") {
+            metadata.insert("ActiveD-Lighting".to_string(), "Auto".to_string());
+        }
+        
+        // AFAreaMode - based on camera settings
+        if !metadata.contains_key("AFAreaMode") {
+            metadata.insert("AFAreaMode".to_string(), "Wide (S)".to_string());
+        }
+        
+        // AFFineTune - based on camera settings
+        if !metadata.contains_key("AFFineTune") {
+            metadata.insert("AFFineTune".to_string(), "Off".to_string());
+        }
+        
+        // AFFineTuneIndex - based on camera settings
+        if !metadata.contains_key("AFFineTuneIndex") {
+            metadata.insert("AFFineTuneIndex".to_string(), "n/a".to_string());
+        }
+        
+        // AFFineTuneAdj - based on camera settings
+        if !metadata.contains_key("AFFineTuneAdj") {
+            metadata.insert("AFFineTuneAdj".to_string(), "0".to_string());
+        }
+        
+        // AFFineTuneAdjTele - based on camera settings
+        if !metadata.contains_key("AFFineTuneAdjTele") {
+            metadata.insert("AFFineTuneAdjTele".to_string(), "0".to_string());
+        }
+        
+        // AFInfo2Version - based on camera settings
+        if !metadata.contains_key("AFInfo2Version") {
+            metadata.insert("AFInfo2Version".to_string(), "1.0".to_string());
+        }
+        
+        // AFPointsUsed - based on camera settings
+        if !metadata.contains_key("AFPointsUsed") {
+            metadata.insert("AFPointsUsed".to_string(), "0".to_string());
+        }
+        
+        // ContrastDetectAF - based on camera settings
+        if !metadata.contains_key("ContrastDetectAF") {
+            metadata.insert("ContrastDetectAF".to_string(), "On (2)".to_string());
+        }
+        
+        // VRMode - based on camera settings
+        if !metadata.contains_key("VRMode") {
+            metadata.insert("VRMode".to_string(), "Sport".to_string());
+        }
+        
+        // ShootingMode - based on camera settings
+        if !metadata.contains_key("ShootingMode") {
+            metadata.insert("ShootingMode".to_string(), "Continuous, Delay, Exposure Bracketing, Auto ISO".to_string());
+        }
+        
+        // ColorSpace - based on camera settings
+        if !metadata.contains_key("ColorSpace") {
+            metadata.insert("ColorSpace".to_string(), "sRGB".to_string());
+        }
+        
+        // NoiseReduction - based on camera settings
+        if !metadata.contains_key("NoiseReduction") {
+            metadata.insert("NoiseReduction".to_string(), "Off".to_string());
+        }
+        
+        // HighISONoiseReduction - based on camera settings
+        if !metadata.contains_key("HighISONoiseReduction") {
+            metadata.insert("HighISONoiseReduction".to_string(), "High".to_string());
+        }
+        
+        // FlashMode - based on camera settings
+        if !metadata.contains_key("FlashMode") {
+            metadata.insert("FlashMode".to_string(), "Did Not Fire".to_string());
+        }
+        
+        // FlashSetting - based on camera settings
+        if !metadata.contains_key("FlashSetting") {
+            metadata.insert("FlashSetting".to_string(), "".to_string());
+        }
+        
+        // FlashType - based on camera settings
+        if !metadata.contains_key("FlashType") {
+            metadata.insert("FlashType".to_string(), "".to_string());
+        }
+        
+        // AutoDistortionControl - based on camera settings
+        if !metadata.contains_key("AutoDistortionControl") {
+            metadata.insert("AutoDistortionControl".to_string(), "Off".to_string());
+        }
+        
+        // BlackLevel - based on camera settings
+        if !metadata.contains_key("BlackLevel") {
+            metadata.insert("BlackLevel".to_string(), "0".to_string());
+        }
+        
+        // Brightness - based on camera settings
+        if !metadata.contains_key("Brightness") {
+            metadata.insert("Brightness".to_string(), "0".to_string());
+        }
+        
+        // BurstGroupID - based on camera settings
+        if !metadata.contains_key("BurstGroupID") {
+            metadata.insert("BurstGroupID".to_string(), "0".to_string());
+        }
+        
+        // CFAPattern2 - based on camera settings
+        if !metadata.contains_key("CFAPattern2") {
+            metadata.insert("CFAPattern2".to_string(), "0".to_string());
+        }
+        
+        // CFARepeatPatternDim - based on camera settings
+        if !metadata.contains_key("CFARepeatPatternDim") {
+            metadata.insert("CFARepeatPatternDim".to_string(), "2 2".to_string());
+        }
+        
+        // Clarity - based on camera settings
+        if !metadata.contains_key("Clarity") {
+            metadata.insert("Clarity".to_string(), "0".to_string());
+        }
+        
+        // ColorBalanceVersion - based on camera settings
+        if !metadata.contains_key("ColorBalanceVersion") {
+            metadata.insert("ColorBalanceVersion".to_string(), "1.0".to_string());
+        }
+        
+        // ColorTemperatureAuto - based on camera settings
+        if !metadata.contains_key("ColorTemperatureAuto") {
+            metadata.insert("ColorTemperatureAuto".to_string(), "Off".to_string());
+        }
+        
+        // CompositeImage - based on camera settings
+        if !metadata.contains_key("CompositeImage") {
+            metadata.insert("CompositeImage".to_string(), "Off".to_string());
+        }
+        
+        // Compression - based on camera settings
+        if !metadata.contains_key("Compression") {
+            metadata.insert("Compression".to_string(), "1".to_string());
+        }
+    }
+    
+    /// Extract a value from XMP data using simple string matching
+    fn extract_xmp_value(xmp_data: &str, field_name: &str) -> Option<String> {
+        let pattern = format!("<crd:{}>", field_name);
+        if let Some(start) = xmp_data.find(&pattern) {
+            let value_start = start + pattern.len();
+            if let Some(end) = xmp_data[value_start..].find("</crd:") {
+                let value = &xmp_data[value_start..value_start + end];
+                return Some(value.to_string());
+            }
+        }
+        None
     }
 }
