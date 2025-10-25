@@ -163,9 +163,20 @@ impl TiffParser {
             u16::from_be_bytes([data[offset], data[offset + 1]])
         };
 
-        if entry_count == 0 || entry_count > 1000 {
+        // Check for reasonable entry count bounds
+        // Allow 0 entries (valid per TIFF spec) but reject unreasonably high counts
+        // that could cause buffer overflows or indicate corrupted data
+        if entry_count > 1000 {
             return Err(ExifError::InvalidExif(
                 "Invalid IFD entry count".to_string(),
+            ));
+        }
+        
+        // Check if we have enough data for the claimed number of entries
+        let required_bytes = 2 + (entry_count as usize * 12) + 4; // header + entries + next IFD offset
+        if offset + required_bytes > data.len() {
+            return Err(ExifError::InvalidExif(
+                "IFD data incomplete".to_string(),
             ));
         }
 
