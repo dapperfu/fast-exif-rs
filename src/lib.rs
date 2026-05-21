@@ -3,9 +3,7 @@
 //! A high-performance EXIF metadata extraction library written in Rust.
 //! Provides comprehensive support for image and video formats with exceptional performance.
 
-use memmap2::Mmap;
 use std::collections::HashMap;
-use std::fs::File;
 use rayon::prelude::*;
 
 // Module declarations
@@ -15,9 +13,9 @@ mod types;
 mod utils;
 mod writer;
 mod exif_copier;
+mod memory_optimized_reader;
 
 // Enhanced format support modules
-mod enhanced_format_detection;
 mod enhanced_raw_parser;
 mod enhanced_video_parser;
 mod enhanced_image_parser;
@@ -29,15 +27,17 @@ mod computed_fields;
 mod value_formatter;
 
 // Re-export commonly used types
-pub use format_detection::FormatDetector;
-pub use parsers::{OptimalExifParser, OptimalBatchProcessor, BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
+pub use format_detection::{EnhancedFormatDetector, FormatDetector};
+pub use parsers::{OptimalExifParser, OptimalBatchProcessor, BmpParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
 pub use types::{ExifError, ExifResult, ProcessingStats};
 pub use utils::ExifUtils;
 pub use writer::ExifWriter;
 pub use exif_copier::ExifCopier;
+pub use memory_optimized_reader::{
+    benchmark_memory_optimization, profile_memory_usage, MemoryOptimizedExifReader,
+};
 
 // Re-export enhanced parsers
-pub use enhanced_format_detection::EnhancedFormatDetector;
 pub use enhanced_raw_parser::EnhancedRawParser;
 pub use enhanced_video_parser::EnhancedVideoParser;
 pub use enhanced_image_parser::EnhancedImageParser;
@@ -58,81 +58,55 @@ impl FastExifReader {
         }
     }
 
+    /// Access I/O strategy statistics from the underlying optimal parser.
+    pub fn parser_stats(&self) -> HashMap<String, String> {
+        self.parser.get_stats()
+    }
+
     /// Read EXIF data from file path
     pub fn read_file(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = self.read_exif_fast(file_path)?;
-        
-        // Add computed fields for comprehensive metadata
-        crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-        
-        // Normalize field names to standard format
-        FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-        
-        // Normalize values to standard format
-        crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-        
+        Self::apply_post_processing(&mut metadata);
         Ok(metadata)
     }
 
     /// Read EXIF data from bytes
     pub fn read_bytes(&mut self, data: &[u8]) -> Result<HashMap<String, String>, ExifError> {
         let mut metadata = self.read_exif_from_bytes(data)?;
-        
-        // Add computed fields for comprehensive metadata
-        crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-        
-        // Normalize field names to standard format
-        FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-        
-        // Normalize values to standard format
-        crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-        
+        Self::apply_post_processing(&mut metadata);
         Ok(metadata)
     }
 
     /// Read EXIF data from multiple files in parallel
     pub fn read_files_parallel(&mut self, file_paths: Vec<String>) -> Result<Vec<HashMap<String, String>>, ExifError> {
-        // Use Rayon for true parallel processing across multiple files
         let results: Result<Vec<_>, _> = file_paths
             .par_iter()
             .map(|file_path| {
-                let file = File::open(file_path)?;
-                let mmap = unsafe { Mmap::map(&file)? };
-                
-                // Create a temporary reader for this thread
                 let mut temp_reader = FastExifReader::new();
-                let mut metadata = temp_reader.read_exif_from_bytes(&mmap)?;
-                
-                // Add file system information that exiftool provides
+                let data = temp_reader.parser.load_file_data(file_path)?;
+                let mut metadata = temp_reader.read_exif_from_bytes(&data)?;
                 Self::add_file_system_metadata(file_path, &mut metadata);
-                
-                // Add computed fields for 1:1 exiftool compatibility
-                crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
-                
-                // Normalize field names to exiftool standard for 1:1 compatibility
-                FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
-                
-                // Normalize values to match PyExifTool raw format
-                crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
-                
+                Self::apply_post_processing(&mut metadata);
                 Ok(metadata)
             })
             .collect();
-        
+
         results
     }
 
-    /// Read EXIF data from file path (internal implementation)
-    fn read_exif_fast(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        let file = File::open(file_path)?;
-        let mmap = unsafe { Mmap::map(&file)? };
-
-        let mut metadata = self.read_exif_from_bytes(&mmap)?;
-        
-        // Add file system information
+    /// Read EXIF data from file path without ExifTool post-processing.
+    pub(crate) fn read_exif_fast(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
+        let data = self.parser.load_file_data(file_path)?;
+        let mut metadata = self.read_exif_from_bytes(&data)?;
         Self::add_file_system_metadata(file_path, &mut metadata);
-        
         Ok(metadata)
+    }
+
+    /// Apply ExifTool-compatible field names, values, and computed fields.
+    fn apply_post_processing(metadata: &mut HashMap<String, String>) {
+        crate::computed_fields::ComputedFields::add_computed_fields(metadata);
+        FieldMapper::normalize_metadata_to_exiftool(metadata);
+        crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(metadata);
     }
 
     /// Add file system metadata
@@ -221,13 +195,12 @@ impl FastExifReader {
     
     /// Convert Unix timestamp to EXIF datetime format
     fn timestamp_to_datetime(timestamp: u64) -> String {
-        use std::time::{SystemTime, UNIX_EPOCH};
+        use std::time::UNIX_EPOCH;
         
         let datetime = UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
-        let system_time = SystemTime::from(datetime);
-        
+
         // Format as "YYYY:MM:DD HH:MM:SS"
-        let datetime_chrono = chrono::DateTime::<chrono::Utc>::from(system_time);
+        let datetime_chrono = chrono::DateTime::<chrono::Utc>::from(datetime);
         datetime_chrono.format("%Y:%m:%d %H:%M:%S").to_string()
     }
 
@@ -236,7 +209,7 @@ impl FastExifReader {
         let mut metadata = HashMap::new();
 
         // Detect file format
-        let format = EnhancedFormatDetector::detect_format(data)?;
+        let format = FormatDetector::detect_format(data)?;
         metadata.insert("Format".to_string(), format.clone());
 
         // Parse EXIF based on format

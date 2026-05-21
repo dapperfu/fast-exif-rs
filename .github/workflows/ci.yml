@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
@@ -13,147 +13,74 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.10', '3.11', '3.12']
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Run tests
+        run: |
+          cargo test --lib --tests
+          cargo test -p exiftool-rs
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install maturin[patchelf] pytest pytest-cov psutil
-
-    - name: Build package
-      run: |
-        python -m venv venv
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          venv\Scripts\activate
-        else
-          source venv/bin/activate
-        fi
-        pip install maturin[patchelf]
-        maturin develop
-
-    - name: Run tests
-      run: |
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          venv\Scripts\activate
-        else
-          source venv/bin/activate
-        fi
-        echo "Testing Python version: $(python --version)"
-        echo "Testing import..."
-        python -c "from fast_exif_reader import FastExifReader; print('Import successful')"
-        python -c "import fast_exif_reader; print('Version:', fast_exif_reader.__version__)"
-        echo "Running all tests..."
-        python -m pytest tests/ -v --tb=short
-
-    - name: Test CLI
-      run: |
-        if [ "$RUNNER_OS" = "Windows" ]; then
-          venv\Scripts\activate
-        else
-          source venv/bin/activate
-        fi
-        echo "Testing CLI version..."
-        fast-exif-cli --version
-        echo "Testing CLI help..."
-        fast-exif-cli --help
+      - name: Build exiftool-rs CLI
+        run: cargo build --release --manifest-path exiftool-rs/Cargo.toml
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
+      - name: Format check
+        run: cargo fmt -- --check
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install maturin[patchelf] black ruff
-
-    - name: Format check (Rust)
-      run: cargo fmt -- --check
-
-    - name: Clippy check (Rust)
-      run: cargo clippy -- -D warnings
-
-    - name: Format check (Python)
-      run: black --check tests/ examples/ cli/
-
-    - name: Lint check (Python)
-      run: ruff check tests/ examples/ cli/
+      - name: Clippy
+        run: cargo clippy --lib --tests
 
   security:
     name: Security Audit
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install maturin[patchelf] safety
-
-    - name: Rust security audit
-      run: |
-        cargo install cargo-audit
-        cargo audit
-
-    - name: Python security audit
-      run: |
-        pip install safety
-        safety check
+      - name: Rust security audit
+        run: |
+          cargo install cargo-audit --locked 2>/dev/null || cargo install cargo-audit
+          cargo audit

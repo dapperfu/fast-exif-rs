@@ -7,7 +7,6 @@
 
 pub mod optimal;
 pub mod bmp;
-pub mod heif;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;
@@ -21,7 +20,6 @@ pub use optimal::{OptimalExifParser, OptimalBatchProcessor};
 
 // Re-export format-specific parsers
 pub use bmp::BmpParser;
-pub use heif::HeifParser;
 pub use jpeg::JpegParser;
 pub use mkv::MkvParser;
 pub use png::PngParser;

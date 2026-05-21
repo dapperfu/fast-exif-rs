@@ -1,6 +1,5 @@
 use crate::types::ExifError;
 use std::collections::HashMap;
-use chrono::DateTime;
 
 /// MKV parser for extracting metadata from Matroska video files
 pub struct MkvParser;

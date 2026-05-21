@@ -1,6 +1,6 @@
 [package]
 name = "fast-exif-reader"
-version = "0.9.3"
+version = "0.10.0"
 edition = "2021"
 description = "Fast EXIF reader and writer with comprehensive multimedia support"
 license = "MIT"
@@ -14,8 +14,6 @@ crate-type = ["lib"]
 
 
 [dependencies]
-# Core parsing
-nom = "7.1"
 byteorder = "1.4"
 chrono = "0.4"
 

@@ -1,4 +1,4 @@
-# 🚀 Fast EXIF Reader v0.7.0
+# 🚀 Fast EXIF Reader v0.10.0
 
 **The fastest EXIF metadata reader on the planet** - Built in pure Rust with automatic parallelization. Extract camera information, timestamps, GPS data, and technical settings from photos and videos with **55.6x speedup** on large datasets.
 
@@ -137,7 +137,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-fast-exif-reader = "0.6.2"
+fast-exif-reader = "0.10.0"
 ```
 
 Then run:

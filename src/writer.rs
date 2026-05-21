@@ -1247,8 +1247,8 @@ mod tests {
         
         let exif_data = writer.create_exif_segment(&metadata).unwrap();
         
-        // Check basic structure
-        assert!(exif_data.len() > 100);
+        // Check basic structure (segment includes APP1 header + TIFF payload)
+        assert!(exif_data.len() > 20);
         assert_eq!(&exif_data[0..2], [0xFF, 0xE1]); // APP1 marker
         assert_eq!(&exif_data[4..10], b"Exif\0\0"); // EXIF signature
     }

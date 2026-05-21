@@ -1,4 +1,4 @@
-# Integration Guide for fast-exif-reader v0.7.0
+# Integration Guide for fast-exif-reader v0.10.0
 
 This crate is now a **pure Rust library** ready for integration into other Rust projects.
 
@@ -149,7 +149,7 @@ let comparison = benchmark_hybrid_vs_standard(file_paths)?;
 ## 📦 Crate Information
 
 - **Name**: `fast-exif-reader`
-- **Version**: `0.7.0`
+- **Version**: `0.10.0`
 - **License**: MIT
 - **Repository**: https://github.com/dapperfu/fast-exif-rs
 - **Categories**: multimedia, development-tools

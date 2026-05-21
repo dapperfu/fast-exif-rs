@@ -6,9 +6,6 @@ use memmap2::{Mmap, MmapOptions};
 use crate::types::ExifError;
 use crate::parsers::tiff::TiffParser;
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 /// Optimal EXIF parser that automatically chooses the best strategy
 /// 
 /// This parser combines the best features from all implementations:
@@ -130,11 +127,48 @@ impl OptimalExifParser {
         }
     }
     
+    /// Load file contents using size-adaptive I/O (mmap, hybrid, or buffered read).
+    ///
+    /// Used by [`crate::FastExifReader`] before format-specific parsing so large files
+    /// avoid unnecessary full mmap when a buffered read is preferable.
+    pub fn load_file_data<P: AsRef<Path>>(&mut self, path: P) -> Result<Vec<u8>, ExifError> {
+        let path = path.as_ref();
+        let file = File::open(path)?;
+        let file_size = file.metadata()?.len() as usize;
+
+        let strategy = self.determine_strategy(file_size);
+
+        match strategy {
+            ParseStrategy::MemoryMap => {
+                self.stats.mmap_count += 1;
+                let mmap = unsafe { Mmap::map(&file)? };
+                self.stats.total_bytes_read += mmap.len();
+                Ok(mmap.to_vec())
+            }
+            ParseStrategy::Hybrid | ParseStrategy::SeekOptimized => {
+                if matches!(strategy, ParseStrategy::Hybrid) {
+                    self.stats.hybrid_count += 1;
+                } else {
+                    self.stats.seek_count += 1;
+                }
+                self.read_full_file(file, file_size)
+            }
+        }
+    }
+
+    /// Read entire file into memory with a pre-sized buffer.
+    fn read_full_file(&mut self, mut file: File, file_size: usize) -> Result<Vec<u8>, ExifError> {
+        let mut buffer = Vec::with_capacity(file_size);
+        file.read_to_end(&mut buffer)?;
+        self.stats.total_bytes_read += buffer.len();
+        Ok(buffer)
+    }
+
     /// Parse EXIF data with optimal strategy selection
     pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, ExifError> {
         let start_time = std::time::Instant::now();
         
-        let mut file = File::open(path)?;
+        let file = File::open(path)?;
         let file_size = file.metadata()?.len() as usize;
         
         // Clear cache for new file
