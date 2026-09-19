@@ -88,24 +88,20 @@ impl TiffParser {
         };
 
         // Parse the first IFD
-        Self::parse_ifd(
-            data,
-            tiff_start + ifd_offset as usize,
-            is_little_endian,
-            tiff_start,
-            metadata,
-            scope,
-        )?;
+        let ifd0 = tiff_start + ifd_offset as usize;
+        Self::parse_ifd(data, ifd0, is_little_endian, tiff_start, metadata, scope)?;
 
-        // Parse EXIF IFD if present (contains DateTimeOriginal, ExposureTime, etc.)
+        // Parse EXIF IFD if present (contains DateTimeOriginal, ExposureTime, etc.).
+        // Adobe DNG often stores this directory at EOF while IFD0/values stay near
+        // the start — skip it here if the current buffer is only a prefix.
         if let Some(exif_ifd_offset) = Self::find_sub_ifd_offset(
             data,
-            tiff_start + ifd_offset as usize,
+            ifd0,
             0x8769,
             is_little_endian,
             tiff_start,
         ) {
-            Self::parse_ifd(
+            Self::parse_ifd_if_present(
                 data,
                 tiff_start + exif_ifd_offset as usize,
                 is_little_endian,
@@ -119,12 +115,12 @@ impl TiffParser {
         if scope.gps {
             if let Some(gps_ifd_offset) = Self::find_sub_ifd_offset(
                 data,
-                tiff_start + ifd_offset as usize,
+                ifd0,
                 0x8825,
                 is_little_endian,
                 tiff_start,
             ) {
-                Self::parse_ifd(
+                Self::parse_ifd_if_present(
                     data,
                     tiff_start + gps_ifd_offset as usize,
                     is_little_endian,
@@ -139,14 +135,14 @@ impl TiffParser {
         if scope.interop {
             let interop_from_ifd0 = Self::find_sub_ifd_offset(
                 data,
-                tiff_start + ifd_offset as usize,
+                ifd0,
                 0xA005,
                 is_little_endian,
                 tiff_start,
             );
             let interop_from_exif = Self::find_sub_ifd_offset(
                 data,
-                tiff_start + ifd_offset as usize,
+                ifd0,
                 0x8769,
                 is_little_endian,
                 tiff_start,
@@ -161,7 +157,7 @@ impl TiffParser {
                 )
             });
             if let Some(interop_ifd_offset) = interop_from_exif.or(interop_from_ifd0) {
-                Self::parse_ifd(
+                Self::parse_ifd_if_present(
                     data,
                     tiff_start + interop_ifd_offset as usize,
                     is_little_endian,
@@ -177,6 +173,157 @@ impl TiffParser {
         }
 
         Ok(())
+    }
+
+    /// True when IFD0 points at Exif/GPS/Interop/SubIFD/MakerNote directories
+    /// that lie past `data`. Large Adobe DNG files do this: IFD0 is at offset 8
+    /// and ExifIFD sits in the last few hundred bytes of a multi-megabyte file.
+    pub(crate) fn has_out_of_range_ifd(data: &[u8]) -> bool {
+        Self::collect_ifd_pointers(data)
+            .into_iter()
+            .any(|off| off.saturating_add(2) > data.len())
+    }
+
+    fn collect_ifd_pointers(data: &[u8]) -> Vec<usize> {
+        if data.len() < 8 {
+            return Vec::new();
+        }
+
+        let mut tiff_start = 0;
+        for i in 0..data.len().saturating_sub(8) {
+            if &data[i..i + 2] == b"II" || &data[i..i + 2] == b"MM" {
+                tiff_start = i;
+                break;
+            }
+        }
+        if tiff_start + 8 > data.len() {
+            return Vec::new();
+        }
+
+        let is_little_endian = &data[tiff_start..tiff_start + 2] == b"II";
+        let version = Self::read_u16(data, tiff_start + 2, is_little_endian);
+        if version != 42 {
+            return Vec::new();
+        }
+        let ifd_offset = Self::read_u32(data, tiff_start + 4, is_little_endian) as usize;
+        let ifd0 = tiff_start.saturating_add(ifd_offset);
+        if ifd0 + 2 > data.len() {
+            return vec![ifd0];
+        }
+
+        let mut pointers = Vec::new();
+        Self::collect_ifd_pointers_from(data, ifd0, is_little_endian, tiff_start, &mut pointers);
+        if let Some(exif_off) = Self::find_sub_ifd_offset(data, ifd0, 0x8769, is_little_endian, tiff_start)
+        {
+            let exif_abs = tiff_start.saturating_add(exif_off as usize);
+            if exif_abs + 2 <= data.len() {
+                Self::collect_ifd_pointers_from(
+                    data,
+                    exif_abs,
+                    is_little_endian,
+                    tiff_start,
+                    &mut pointers,
+                );
+            }
+        }
+        pointers
+    }
+
+    fn collect_ifd_pointers_from(
+        data: &[u8],
+        ifd_offset: usize,
+        is_little_endian: bool,
+        tiff_start: usize,
+        out: &mut Vec<usize>,
+    ) {
+        for tag in [0x014A, 0x8769, 0x8825, 0xA005, 0x927C] {
+            if let Some(value) =
+                Self::find_sub_ifd_offset(data, ifd_offset, tag, is_little_endian, tiff_start)
+            {
+                if tag == 0x014A {
+                    if let Some(count) =
+                        Self::find_sub_ifd_count(data, ifd_offset, tag, is_little_endian)
+                    {
+                        if count > 1 {
+                            let table = tiff_start.saturating_add(value as usize);
+                            let bytes = (count as usize).saturating_mul(4);
+                            if table.saturating_add(bytes) <= data.len() {
+                                for i in 0..count as usize {
+                                    let off = Self::read_u32(data, table + i * 4, is_little_endian)
+                                        as usize;
+                                    out.push(tiff_start.saturating_add(off));
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                }
+                out.push(tiff_start.saturating_add(value as usize));
+            }
+        }
+    }
+
+    fn find_sub_ifd_count(
+        data: &[u8],
+        ifd_offset: usize,
+        target_tag: u16,
+        is_little_endian: bool,
+    ) -> Option<u32> {
+        if ifd_offset + 2 > data.len() {
+            return None;
+        }
+        let entry_count = Self::read_u16(data, ifd_offset, is_little_endian);
+        for i in 0..entry_count {
+            let entry_offset = ifd_offset + 2 + (i as usize * 12);
+            if entry_offset + 12 > data.len() {
+                continue;
+            }
+            let tag_id = Self::read_u16(data, entry_offset, is_little_endian);
+            if tag_id == target_tag {
+                return Some(Self::read_u32(data, entry_offset + 4, is_little_endian));
+            }
+        }
+        None
+    }
+
+    fn read_u16(data: &[u8], offset: usize, is_little_endian: bool) -> u16 {
+        if is_little_endian {
+            u16::from_le_bytes([data[offset], data[offset + 1]])
+        } else {
+            u16::from_be_bytes([data[offset], data[offset + 1]])
+        }
+    }
+
+    fn read_u32(data: &[u8], offset: usize, is_little_endian: bool) -> u32 {
+        if is_little_endian {
+            u32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ])
+        } else {
+            u32::from_be_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ])
+        }
+    }
+
+    fn parse_ifd_if_present(
+        data: &[u8],
+        offset: usize,
+        is_little_endian: bool,
+        tiff_start: usize,
+        metadata: &mut HashMap<String, String>,
+        scope: &ParseScope,
+    ) -> Result<(), ExifError> {
+        if offset + 2 > data.len() {
+            return Ok(());
+        }
+        Self::parse_ifd(data, offset, is_little_endian, tiff_start, metadata, scope)
     }
 
     /// Parse Image File Directory (IFD)
@@ -1985,5 +2132,77 @@ mod tests {
             "2026:05:10 15:03:55.95-05:00"
         );
         assert!(!metadata.values().any(|v| v == "SIMD_ACCELERATED"));
+    }
+
+    #[test]
+    fn skips_exif_ifd_past_end_of_buffer() {
+        let mut data = vec![0u8; 80];
+        data[0] = b'I';
+        data[1] = b'I';
+        put_u16(&mut data, 2, 42);
+        put_u32(&mut data, 4, 8);
+
+        let ifd0 = 8usize;
+        put_u16(&mut data, ifd0, 2);
+        put_entry(&mut data, ifd0 + 2, 0x010F, 2, 6, 50);
+        // ExifIFD lives far past this prefix, as in Lightroom DNG.
+        put_entry(&mut data, ifd0 + 14, 0x8769, 4, 1, 26_000_000);
+        put_u32(&mut data, ifd0 + 26, 0);
+        data[50..56].copy_from_slice(b"Canon\0");
+
+        let mut metadata = HashMap::new();
+        TiffParser::parse_tiff_exif(&data, &mut metadata).unwrap();
+        assert_eq!(metadata.get("Make").unwrap(), "Canon");
+        assert!(TiffParser::has_out_of_range_ifd(&data));
+    }
+
+    #[test]
+    fn parses_exif_ifd_placed_at_end_of_buffer() {
+        let mut data = vec![0u8; 200];
+        data[0] = b'I';
+        data[1] = b'I';
+        put_u16(&mut data, 2, 42);
+        put_u32(&mut data, 4, 8);
+
+        let ifd0 = 8usize;
+        put_u16(&mut data, ifd0, 2);
+        put_entry(&mut data, ifd0 + 2, 0x010F, 2, 6, 50);
+        put_entry(&mut data, ifd0 + 14, 0x8769, 4, 1, 80);
+        put_u32(&mut data, ifd0 + 26, 0);
+        data[50..56].copy_from_slice(b"Canon\0");
+        data[56..76].copy_from_slice(b"2015:06:14 01:58:40\0");
+
+        let exif_ifd = 80usize;
+        put_u16(&mut data, exif_ifd, 1);
+        put_entry(&mut data, exif_ifd + 2, 0x9003, 2, 20, 56);
+        put_u32(&mut data, exif_ifd + 14, 0);
+
+        let mut metadata = HashMap::new();
+        TiffParser::parse_tiff_exif(&data, &mut metadata).unwrap();
+        assert_eq!(metadata.get("Make").unwrap(), "Canon");
+        assert_eq!(
+            metadata.get("DateTimeOriginal").unwrap(),
+            "2015:06:14 01:58:40"
+        );
+        assert!(!TiffParser::has_out_of_range_ifd(&data));
+    }
+
+    #[test]
+    fn parses_lightroom_dng_with_trailing_exif_ifd() {
+        let path = "/keg/pictures/2015/06-Jun/20150614_015840.130-3.dng";
+        if !std::path::Path::new(path).exists() {
+            return;
+        }
+        let mut reader = crate::FastExifReader::new();
+        let metadata = reader.read_file(path).expect("DNG should parse");
+        assert_eq!(
+            metadata.get("DateTimeOriginal").map(String::as_str),
+            Some("2015:06:14 01:58:40")
+        );
+        assert_eq!(metadata.get("Make").map(String::as_str), Some("Canon"));
+        assert_eq!(
+            metadata.get("Model").map(String::as_str),
+            Some("Canon EOS 70D")
+        );
     }
 }

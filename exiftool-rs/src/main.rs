@@ -19,7 +19,7 @@ use walkdir::WalkDir;
 /// A fast EXIF metadata extraction tool written in Rust
 #[derive(Parser)]
 #[command(name = "exiftool-rs")]
-#[command(version = "0.4.0")]
+#[command(version = "0.4.1")]
 #[command(about = "A fast EXIF metadata extraction tool")]
 #[command(long_about = "A high-performance EXIF metadata extraction tool that supports short tags, known parameters, and multiple output formats.")]
 struct Cli {

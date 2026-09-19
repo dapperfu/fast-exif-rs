@@ -283,6 +283,15 @@ impl OptimalExifParser {
         
         // Read only the EXIF segment
         let exif_data = self.read_exif_segment(&mut file, &exif_info)?;
+
+        // TIFF/DNG IFD pointers are file-absolute. Adobe DNG commonly puts
+        // ExifIFD at EOF (past max_exif_size) while DateTime strings stay near
+        // the start — mmap the whole file so those offsets resolve.
+        if matches!(exif_info.format, FileFormat::Tiff)
+            && TiffParser::has_out_of_range_ifd(&exif_data)
+        {
+            return self.parse_with_memory_map(file, file_size);
+        }
         
         // Parse EXIF data
         self.parse_exif_data_optimized(&exif_data)?;
@@ -711,5 +720,57 @@ mod tests {
         assert_eq!(parser.field_name_to_tag_id("Make").unwrap(), 0x010F);
         assert_eq!(parser.field_name_to_tag_id("Model").unwrap(), 0x0110);
         assert_eq!(parser.field_name_to_tag_id("DateTime").unwrap(), 0x0132);
+    }
+
+    fn put_u16(buf: &mut [u8], at: usize, v: u16) {
+        buf[at..at + 2].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_u32(buf: &mut [u8], at: usize, v: u32) {
+        buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_entry(buf: &mut [u8], at: usize, tag: u16, dtype: u16, count: u32, value: u32) {
+        put_u16(buf, at, tag);
+        put_u16(buf, at + 2, dtype);
+        put_u32(buf, at + 4, count);
+        put_u32(buf, at + 8, value);
+    }
+
+    #[test]
+    fn seek_path_follows_trailing_exif_ifd() {
+        // Force SeekOptimized (file > mmap_threshold * 4) with a small EXIF
+        // window so ExifIFD at EOF is initially out of range — the same layout
+        // as Adobe DNG converted from CR2.
+        let mut parser = OptimalExifParser::with_thresholds(1024, 2048);
+        let exif_ifd = 20_000usize;
+        let mut data = vec![0u8; exif_ifd + 40];
+        data[0] = b'I';
+        data[1] = b'I';
+        put_u16(&mut data, 2, 42);
+        put_u32(&mut data, 4, 8);
+
+        put_u16(&mut data, 8, 2);
+        put_entry(&mut data, 10, 0x010F, 2, 6, 50);
+        put_entry(&mut data, 22, 0x8769, 4, 1, exif_ifd as u32);
+        put_u32(&mut data, 34, 0);
+        data[50..56].copy_from_slice(b"Canon\0");
+        data[56..76].copy_from_slice(b"2015:06:14 01:58:40\0");
+
+        put_u16(&mut data, exif_ifd, 1);
+        put_entry(&mut data, exif_ifd + 2, 0x9003, 2, 20, 56);
+        put_u32(&mut data, exif_ifd + 14, 0);
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("fast_exif_trailing_exif_ifd.tif");
+        std::fs::write(&path, &data).unwrap();
+        let metadata = parser.parse_file(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(metadata.get("Make").unwrap(), "Canon");
+        assert_eq!(
+            metadata.get("DateTimeOriginal").unwrap(),
+            "2015:06:14 01:58:40"
+        );
     }
 }
