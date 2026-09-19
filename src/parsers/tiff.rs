@@ -135,15 +135,32 @@ impl TiffParser {
             }
         }
 
-        // Parse Interoperability IFD if present (contains InteropIndex, InteropVersion, etc.)
+        // Parse Interoperability IFD if present (pointer lives in ExifIFD, sometimes IFD0)
         if scope.interop {
-            if let Some(interop_ifd_offset) = Self::find_sub_ifd_offset(
+            let interop_from_ifd0 = Self::find_sub_ifd_offset(
                 data,
                 tiff_start + ifd_offset as usize,
                 0xA005,
                 is_little_endian,
                 tiff_start,
-            ) {
+            );
+            let interop_from_exif = Self::find_sub_ifd_offset(
+                data,
+                tiff_start + ifd_offset as usize,
+                0x8769,
+                is_little_endian,
+                tiff_start,
+            )
+            .and_then(|exif_off| {
+                Self::find_sub_ifd_offset(
+                    data,
+                    tiff_start + exif_off as usize,
+                    0xA005,
+                    is_little_endian,
+                    tiff_start,
+                )
+            });
+            if let Some(interop_ifd_offset) = interop_from_exif.or(interop_from_ifd0) {
                 Self::parse_ifd(
                     data,
                     tiff_start + interop_ifd_offset as usize,
@@ -1026,6 +1043,8 @@ impl TiffParser {
             0x0101 => "ImageHeight".to_string(),
             0x0103 => "Compression".to_string(),
             0x0106 => "PhotometricInterpretation".to_string(),
+            0x0001 => "InteropIndex".to_string(),
+            0x0002 => "InteropVersion".to_string(),
             0x010E => "ImageDescription".to_string(),
             0x010F => "Make".to_string(),
             0x0110 => "Model".to_string(),

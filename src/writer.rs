@@ -4,7 +4,7 @@ use crate::format_detection::FormatDetector;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
-use byteorder::{LittleEndian, BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, WriteBytesExt};
 
 /// EXIF writer for adding/modifying EXIF metadata in images
 #[derive(Clone)]
@@ -358,413 +358,7 @@ impl ExifWriter {
 
     /// Create EXIF segment with metadata
     fn create_exif_segment(&self, metadata: &HashMap<String, String>) -> Result<Vec<u8>, ExifError> {
-        let mut exif_data = Vec::new();
-        
-        // APP1 marker (0xFF 0xE1)
-        exif_data.write_u8(0xFF)?;
-        exif_data.write_u8(0xE1)?;
-        
-        // Calculate segment length (will be updated later)
-        let length_pos = exif_data.len();
-        exif_data.write_u16::<BigEndian>(0)?; // Placeholder for length
-        
-        // EXIF signature
-        exif_data.extend_from_slice(b"Exif\0\0");
-        
-        // TIFF header
-        let _tiff_header_pos = exif_data.len();
-        if self.little_endian {
-            exif_data.extend_from_slice(b"II"); // Little-endian
-        } else {
-            exif_data.extend_from_slice(b"MM"); // Big-endian
-        }
-        
-        // TIFF version (42)
-        if self.little_endian {
-            exif_data.write_u16::<LittleEndian>(42)?;
-        } else {
-            exif_data.write_u16::<BigEndian>(42)?;
-        }
-        
-        // IFD offset (will be updated later)
-        let ifd_offset_pos = exif_data.len();
-        if self.little_endian {
-            exif_data.write_u32::<LittleEndian>(0)?; // Placeholder
-        } else {
-            exif_data.write_u32::<BigEndian>(0)?; // Placeholder
-        }
-        
-        // Create IFD entries
-        let (ifd_data, value_data) = self.create_ifd_entries(metadata)?;
-        
-        // Update IFD offset (relative to TIFF header start)
-        let tiff_header_start = 8; // After "Exif\0\0"
-        let ifd_offset = (exif_data.len() - tiff_header_start) as u32;
-        if self.little_endian {
-            exif_data[ifd_offset_pos..ifd_offset_pos + 4].copy_from_slice(&ifd_offset.to_le_bytes());
-        } else {
-            exif_data[ifd_offset_pos..ifd_offset_pos + 4].copy_from_slice(&ifd_offset.to_be_bytes());
-        }
-        
-        // Add IFD data
-        exif_data.extend_from_slice(&ifd_data);
-        
-        // Add value data
-        exif_data.extend_from_slice(&value_data);
-        
-        // Update segment length
-        let segment_length = (exif_data.len() - 2) as u16; // Exclude APP1 marker
-        exif_data[length_pos..length_pos + 2].copy_from_slice(&segment_length.to_be_bytes());
-        
-        Ok(exif_data)
-    }
-
-    /// Create IFD entries for comprehensive EXIF fields
-    fn create_ifd_entries(&self, metadata: &HashMap<String, String>) -> Result<(Vec<u8>, Vec<u8>), ExifError> {
-        let mut ifd_data = Vec::new();
-        let mut value_data = Vec::new();
-        
-        // Count of directory entries
-        let mut entries = Vec::new();
-        
-        // Comprehensive EXIF field mapping based on exiftool compatibility
-        let exif_fields = [
-            // Basic image information (IFD0)
-            ("ImageDescription", 0x010E, 2), // ASCII
-            ("Make", 0x010F, 2), // ASCII
-            ("Model", 0x0110, 2), // ASCII
-            ("Orientation", 0x0112, 3), // SHORT
-            ("XResolution", 0x011A, 5), // RATIONAL
-            ("YResolution", 0x011B, 5), // RATIONAL
-            ("ResolutionUnit", 0x0128, 3), // SHORT
-            ("Software", 0x0131, 2), // ASCII
-            ("DateTime", 0x0132, 2), // ASCII
-            ("Artist", 0x013B, 2), // ASCII
-            ("WhitePoint", 0x013E, 5), // RATIONAL
-            ("PrimaryChromaticities", 0x013F, 5), // RATIONAL
-            ("YCbCrCoefficients", 0x0211, 5), // RATIONAL
-            ("YCbCrSubSampling", 0x0212, 3), // SHORT
-            ("YCbCrPositioning", 0x0213, 3), // SHORT
-            ("ReferenceBlackWhite", 0x0214, 5), // RATIONAL
-            ("Copyright", 0x8298, 2), // ASCII
-            
-            // EXIF-specific fields (ExifIFD)
-            ("ExposureTime", 0x829A, 5), // RATIONAL
-            ("FNumber", 0x829D, 5), // RATIONAL
-            ("ExposureProgram", 0x8822, 3), // SHORT
-            ("SpectralSensitivity", 0x8824, 2), // ASCII
-            ("ISOSpeedRatings", 0x8827, 3), // SHORT
-            ("OECF", 0x8828, 7), // UNDEFINED
-            ("ExifVersion", 0x9000, 7), // UNDEFINED
-            ("DateTimeOriginal", 0x9003, 2), // ASCII
-            ("DateTimeDigitized", 0x9004, 2), // ASCII
-            ("ComponentsConfiguration", 0x9101, 7), // UNDEFINED
-            ("CompressedBitsPerPixel", 0x9102, 5), // RATIONAL
-            ("BrightnessValue", 0x9203, 10), // SRATIONAL
-            ("ExposureBiasValue", 0x9204, 10), // SRATIONAL
-            ("MaxApertureValue", 0x9205, 5), // RATIONAL
-            ("SubjectDistance", 0x9206, 5), // RATIONAL
-            ("MeteringMode", 0x9207, 3), // SHORT
-            ("LightSource", 0x9208, 3), // SHORT
-            ("Flash", 0x9209, 3), // SHORT
-            ("FocalLength", 0x920A, 5), // RATIONAL
-            ("SubjectArea", 0x9214, 3), // SHORT
-            ("MakerNote", 0x927C, 7), // UNDEFINED
-            ("UserComment", 0x9286, 7), // UNDEFINED
-            ("SubSecTime", 0x9290, 2), // ASCII
-            ("SubSecTimeOriginal", 0x9291, 2), // ASCII
-            ("SubSecTimeDigitized", 0x9292, 2), // ASCII
-            ("FlashpixVersion", 0xA000, 7), // UNDEFINED
-            ("ColorSpace", 0xA001, 3), // SHORT
-            ("PixelXDimension", 0xA002, 4), // LONG
-            ("PixelYDimension", 0xA003, 4), // LONG
-            ("RelatedSoundFile", 0xA004, 2), // ASCII
-            ("InteropIndex", 0xA005, 2), // ASCII
-            ("InteropVersion", 0xA006, 7), // UNDEFINED
-            ("RelatedImageFileFormat", 0xA100, 2), // ASCII
-            ("RelatedImageWidth", 0xA101, 3), // SHORT
-            ("RelatedImageLength", 0xA102, 3), // SHORT
-            ("ExposureIndex", 0xA215, 5), // RATIONAL
-            ("SensingMethod", 0xA217, 3), // SHORT
-            ("FileSource", 0xA300, 7), // UNDEFINED
-            ("SceneType", 0xA301, 7), // UNDEFINED
-            ("CFAPattern", 0xA302, 7), // UNDEFINED
-            ("CustomRendered", 0xA401, 3), // SHORT
-            ("ExposureMode", 0xA402, 3), // SHORT
-            ("WhiteBalance", 0xA403, 3), // SHORT
-            ("DigitalZoomRatio", 0xA404, 5), // RATIONAL
-            ("FocalLengthIn35mmFilm", 0xA405, 3), // SHORT
-            ("SceneCaptureType", 0xA406, 3), // SHORT
-            ("GainControl", 0xA407, 3), // SHORT
-            ("Contrast", 0xA408, 3), // SHORT
-            ("Saturation", 0xA409, 3), // SHORT
-            ("Sharpness", 0xA40A, 3), // SHORT
-            ("DeviceSettingDescription", 0xA40B, 7), // UNDEFINED
-            ("SubjectDistanceRange", 0xA40C, 3), // SHORT
-            ("ImageUniqueID", 0xA420, 2), // ASCII
-            ("CameraOwnerName", 0xA430, 2), // ASCII
-            ("BodySerialNumber", 0xA431, 2), // ASCII
-            ("LensSpecification", 0xA432, 5), // RATIONAL
-            ("LensMake", 0xA433, 2), // ASCII
-            ("LensModel", 0xA434, 2), // ASCII
-            ("LensSerialNumber", 0xA435, 2), // ASCII
-            
-            // GPS fields (GPS IFD)
-            ("GPSVersionID", 0x0000, 1), // BYTE
-            ("GPSLatitudeRef", 0x0001, 2), // ASCII
-            ("GPSLatitude", 0x0002, 5), // RATIONAL
-            ("GPSLongitudeRef", 0x0003, 2), // ASCII
-            ("GPSLongitude", 0x0004, 5), // RATIONAL
-            ("GPSAltitudeRef", 0x0005, 1), // BYTE
-            ("GPSAltitude", 0x0006, 5), // RATIONAL
-            ("GPSTimeStamp", 0x0007, 5), // RATIONAL
-            ("GPSSatellites", 0x0008, 2), // ASCII
-            ("GPSStatus", 0x0009, 2), // ASCII
-            ("GPSMeasureMode", 0x000A, 2), // ASCII
-            ("GPSDOP", 0x000B, 5), // RATIONAL
-            ("GPSSpeedRef", 0x000C, 2), // ASCII
-            ("GPSSpeed", 0x000D, 5), // RATIONAL
-            ("GPSTrackRef", 0x000E, 2), // ASCII
-            ("GPSTrack", 0x000F, 5), // RATIONAL
-            ("GPSImgDirectionRef", 0x0010, 2), // ASCII
-            ("GPSImgDirection", 0x0011, 5), // RATIONAL
-            ("GPSMapDatum", 0x0012, 2), // ASCII
-            ("GPSDestLatitudeRef", 0x0013, 2), // ASCII
-            ("GPSDestLatitude", 0x0014, 5), // RATIONAL
-            ("GPSDestLongitudeRef", 0x0015, 2), // ASCII
-            ("GPSDestLongitude", 0x0016, 5), // RATIONAL
-            ("GPSDestBearingRef", 0x0017, 2), // ASCII
-            ("GPSDestBearing", 0x0018, 5), // RATIONAL
-            ("GPSDestDistanceRef", 0x0019, 2), // ASCII
-            ("GPSDestDistance", 0x001A, 5), // RATIONAL
-            ("GPSProcessingMethod", 0x001B, 7), // UNDEFINED
-            ("GPSAreaInformation", 0x001C, 7), // UNDEFINED
-            ("GPSDateStamp", 0x001D, 2), // ASCII
-            ("GPSDifferential", 0x001E, 3), // SHORT
-            
-            // Additional common fields
-            ("OffsetTime", 0x9010, 2), // ASCII
-            ("OffsetTimeOriginal", 0x9011, 2), // ASCII
-            ("OffsetTimeDigitized", 0x9012, 2), // ASCII
-            ("ShutterSpeedValue", 0x9201, 10), // SRATIONAL
-            ("ApertureValue", 0x9202, 5), // RATIONAL
-        ];
-        
-        for (field_name, tag_id, data_type) in exif_fields.iter() {
-            if let Some(value) = metadata.get(*field_name) {
-                if let Some(entry) = self.create_ifd_entry(
-                    *tag_id,
-                    *data_type,
-                    value,
-                    &mut value_data,
-                )? {
-                    entries.push(entry);
-                }
-            }
-        }
-        
-        // Write entry count
-        let entry_count = entries.len();
-        if self.little_endian {
-            ifd_data.write_u16::<LittleEndian>(entry_count as u16)?;
-        } else {
-            ifd_data.write_u16::<BigEndian>(entry_count as u16)?;
-        }
-        
-        // Write entries
-        for entry in entries {
-            ifd_data.extend_from_slice(&entry);
-        }
-        
-        // Next IFD offset (0 for last IFD)
-        if self.little_endian {
-            ifd_data.write_u32::<LittleEndian>(0)?;
-        } else {
-            ifd_data.write_u32::<BigEndian>(0)?;
-        }
-        
-        Ok((ifd_data, value_data))
-    }
-
-    /// Create a single IFD entry
-    fn create_ifd_entry(
-        &self,
-        tag_id: u16,
-        data_type: u16,
-        value: &str,
-        value_data: &mut Vec<u8>,
-    ) -> Result<Option<Vec<u8>>, ExifError> {
-        let mut entry = Vec::new();
-        
-        // Tag ID
-        if self.little_endian {
-            entry.write_u16::<LittleEndian>(tag_id)?;
-        } else {
-            entry.write_u16::<BigEndian>(tag_id)?;
-        }
-        
-        // Data type
-        if self.little_endian {
-            entry.write_u16::<LittleEndian>(data_type)?;
-        } else {
-            entry.write_u16::<BigEndian>(data_type)?;
-        }
-        
-        // Count and value/offset
-        match data_type {
-            1 => {
-                // BYTE
-                if let Ok(byte_value) = value.parse::<u8>() {
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(1)?; // Count
-                        entry.write_u32::<LittleEndian>(byte_value as u32)?; // Value
-                    } else {
-                        entry.write_u32::<BigEndian>(1)?; // Count
-                        entry.write_u32::<BigEndian>(byte_value as u32)?; // Value
-                    }
-                } else {
-                    return Ok(None); // Skip invalid values
-                }
-            }
-            2 => {
-                // ASCII
-                let value_bytes = value.as_bytes();
-                let count = value_bytes.len() + 1; // +1 for null terminator
-                
-                if self.little_endian {
-                    entry.write_u32::<LittleEndian>(count as u32)?;
-                } else {
-                    entry.write_u32::<BigEndian>(count as u32)?;
-                }
-                
-                if count <= 4 {
-                    // Value fits in 4 bytes
-                    let mut value_bytes_padded = [0u8; 4];
-                    value_bytes_padded[..value_bytes.len()].copy_from_slice(value_bytes);
-                    entry.extend_from_slice(&value_bytes_padded);
-                } else {
-                    // Value stored at offset
-                    let offset = value_data.len() as u32;
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(offset)?;
-                    } else {
-                        entry.write_u32::<BigEndian>(offset)?;
-                    }
-                    
-                    // Add value to value data
-                    value_data.extend_from_slice(value_bytes);
-                    value_data.push(0); // Null terminator
-                }
-            }
-            3 => {
-                // SHORT
-                if let Ok(short_value) = value.parse::<u16>() {
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(1)?; // Count
-                        entry.write_u32::<LittleEndian>(short_value as u32)?; // Value
-                    } else {
-                        entry.write_u32::<BigEndian>(1)?; // Count
-                        entry.write_u32::<BigEndian>(short_value as u32)?; // Value
-                    }
-                } else {
-                    return Ok(None); // Skip invalid values
-                }
-            }
-            4 => {
-                // LONG
-                if let Ok(long_value) = value.parse::<u32>() {
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(1)?; // Count
-                        entry.write_u32::<LittleEndian>(long_value)?; // Value
-                    } else {
-                        entry.write_u32::<BigEndian>(1)?; // Count
-                        entry.write_u32::<BigEndian>(long_value)?; // Value
-                    }
-                } else {
-                    return Ok(None); // Skip invalid values
-                }
-            }
-            5 => {
-                // RATIONAL
-                if let Ok(rational_value) = self.parse_rational(value) {
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(1)?; // Count
-                        entry.write_u32::<LittleEndian>(value_data.len() as u32)?; // Offset
-                    } else {
-                        entry.write_u32::<BigEndian>(1)?; // Count
-                        entry.write_u32::<BigEndian>(value_data.len() as u32)?; // Offset
-                    }
-                    
-                    // Add rational value to value data
-                    if self.little_endian {
-                        value_data.write_u32::<LittleEndian>(rational_value.0)?;
-                        value_data.write_u32::<LittleEndian>(rational_value.1)?;
-                    } else {
-                        value_data.write_u32::<BigEndian>(rational_value.0)?;
-                        value_data.write_u32::<BigEndian>(rational_value.1)?;
-                    }
-                } else {
-                    return Ok(None); // Skip invalid values
-                }
-            }
-            7 => {
-                // UNDEFINED
-                let value_bytes = value.as_bytes();
-                let count = value_bytes.len();
-                
-                if self.little_endian {
-                    entry.write_u32::<LittleEndian>(count as u32)?;
-                } else {
-                    entry.write_u32::<BigEndian>(count as u32)?;
-                }
-                
-                if count <= 4 {
-                    // Value fits in 4 bytes
-                    let mut value_bytes_padded = [0u8; 4];
-                    value_bytes_padded[..value_bytes.len()].copy_from_slice(value_bytes);
-                    entry.extend_from_slice(&value_bytes_padded);
-                } else {
-                    // Value stored at offset
-                    let offset = value_data.len() as u32;
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(offset)?;
-                    } else {
-                        entry.write_u32::<BigEndian>(offset)?;
-                    }
-                    
-                    // Add value to value data
-                    value_data.extend_from_slice(value_bytes);
-                }
-            }
-            10 => {
-                // SRATIONAL (signed rational)
-                if let Ok(rational_value) = self.parse_srational(value) {
-                    if self.little_endian {
-                        entry.write_u32::<LittleEndian>(1)?; // Count
-                        entry.write_u32::<LittleEndian>(value_data.len() as u32)?; // Offset
-                    } else {
-                        entry.write_u32::<BigEndian>(1)?; // Count
-                        entry.write_u32::<BigEndian>(value_data.len() as u32)?; // Offset
-                    }
-                    
-                    // Add signed rational value to value data
-                    if self.little_endian {
-                        value_data.write_u32::<LittleEndian>(rational_value.0)?;
-                        value_data.write_u32::<LittleEndian>(rational_value.1)?;
-                    } else {
-                        value_data.write_u32::<BigEndian>(rational_value.0)?;
-                        value_data.write_u32::<BigEndian>(rational_value.1)?;
-                    }
-                } else {
-                    return Ok(None); // Skip invalid values
-                }
-            }
-            _ => {
-                return Ok(None); // Unsupported data type
-            }
-        }
-        
-        Ok(Some(entry))
+        crate::exif_encode::encode_jpeg_app1(self.little_endian, metadata)
     }
 
     /// Parse rational value from string (e.g., "1/60", "4.0", "50")
@@ -1243,13 +837,54 @@ mod tests {
         let mut metadata = HashMap::new();
         metadata.insert("Make".to_string(), "Canon".to_string());
         metadata.insert("Model".to_string(), "EOS 70D".to_string());
-        metadata.insert("DateTime".to_string(), "2023:12:25 12:00:00".to_string());
+        metadata.insert("FocalLength".to_string(), "77.0 mm".to_string());
         
         let exif_data = writer.create_exif_segment(&metadata).unwrap();
         
         // Check basic structure
-        assert!(exif_data.len() > 100);
+        assert!(exif_data.len() > 64);
         assert_eq!(&exif_data[0..2], [0xFF, 0xE1]); // APP1 marker
         assert_eq!(&exif_data[4..10], b"Exif\0\0"); // EXIF signature
+    }
+
+    #[test]
+    fn write_then_read_roundtrip_jpeg() {
+        let jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
+        let mut metadata = HashMap::new();
+        metadata.insert("Make".to_string(), "NIKON CORPORATION".to_string());
+        metadata.insert("Model".to_string(), "NIKON Z50_2".to_string());
+        metadata.insert("ModifyDate".to_string(), "2026:05:10 15:03:55".to_string());
+        metadata.insert("DateTimeOriginal".to_string(), "2026:05:10 15:03:55".to_string());
+        metadata.insert("CreateDate".to_string(), "2026:05:10 15:03:55".to_string());
+        metadata.insert("ISO".to_string(), "500".to_string());
+        metadata.insert("ExposureTime".to_string(), "1/1250".to_string());
+        metadata.insert("FNumber".to_string(), "9.0".to_string());
+        metadata.insert("FocalLength".to_string(), "77.0 mm".to_string());
+        metadata.insert("Artist".to_string(), "Jedediah Frey".to_string());
+        metadata.insert("Copyright".to_string(), "Jedediah Frey".to_string());
+        metadata.insert("OffsetTimeOriginal".to_string(), "-05:00".to_string());
+        metadata.insert("SubSecTimeOriginal".to_string(), "95".to_string());
+        metadata.insert("LensModel".to_string(), "NIKKOR Z DX 50-250mm f/4.5-6.3 VR".to_string());
+        metadata.insert("SerialNumber".to_string(), "3016339".to_string());
+        metadata.insert("Orientation".to_string(), "Horizontal (normal)".to_string());
+        metadata.insert("Flash".to_string(), "Off, Did not fire".to_string());
+
+        let writer = ExifWriter::new();
+        let written = writer.write_jpeg_exif_to_bytes(&jpeg, &metadata).unwrap();
+        let mut reader = crate::FastExifReader::new();
+        let back = reader.read_bytes(&written).unwrap();
+
+        assert_eq!(back.get("Make").unwrap(), "NIKON CORPORATION");
+        assert_eq!(back.get("Model").unwrap(), "NIKON Z50_2");
+        assert_eq!(back.get("DateTimeOriginal").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(back.get("CreateDate").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(back.get("ISO").unwrap(), "500");
+        assert_eq!(back.get("Artist").unwrap(), "Jedediah Frey");
+        assert_eq!(back.get("LensModel").unwrap(), "NIKKOR Z DX 50-250mm f/4.5-6.3 VR");
+        assert_eq!(back.get("SerialNumber").unwrap(), "3016339");
+        assert_eq!(
+            back.get("SubSecDateTimeOriginal").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
     }
 }

@@ -14,7 +14,7 @@ Rust 1.70+.
 
 ```toml
 [dependencies]
-fast-exif-reader = "0.10.5"
+fast-exif-reader = "0.11.0"
 ```
 
 From git:

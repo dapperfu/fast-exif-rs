@@ -11,6 +11,7 @@ pub mod parsers;
 mod types;
 mod utils;
 mod writer;
+mod exif_encode;
 mod exif_copier;
 
 // Enhanced format support modules
