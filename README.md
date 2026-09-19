@@ -1,12 +1,22 @@
 # fast-exif-rs
 
-I needed camera metadata off a large photo library. ExifTool has the tags I actually use — maker notes, GPS, the computed fields — but it boots Perl for every file. Fine for a few shots. Miserable at tens of thousands.
+I needed camera metadata off a large photo library. Not just Make/Model —
+maker notes, GPS, and the computed dates ExifTool prints (`CreateDate` and
+friends). I already had scripts keyed on those names.
 
-The usual Rust and Python EXIF crates go the other way: they skip maker notes, GPS, or they name things differently than ExifTool, so anything already keyed on ExifTool tags breaks.
+ExifTool is the right answer for coverage. It also starts a Perl process per
+file. That is fine for a dozen shots and miserable at tens of thousands.
 
-This crate sits in the middle. It memory-maps the file, finds the metadata (JPEG APP1, TIFF IFDs, HEIF boxes, video atoms), parses those bytes only, then names and formats fields the way ExifTool does. Directories go through rayon.
+The usual Rust and Python EXIF crates are faster, but they skip maker notes
+or GPS, or they invent their own tag names. Then none of the old scripts
+work.
 
-It is not a full ExifTool port. Reads are the point. There's a writer and a copier; don't trust them yet.
+This crate is the middle path I wanted: mmap the file, find the metadata
+(JPEG APP1, TIFF IFDs, HEIF boxes, video atoms), parse those bytes only, and
+emit ExifTool names and formatting. Directories go through rayon.
+
+Not a full ExifTool port. Reads are the point. There is a writer and a
+copier; do not trust them yet.
 
 ## Install
 
@@ -30,7 +40,7 @@ make install
 exiftool-rs extract photo.jpg
 ```
 
-That puts the binary in `~/.local/bin/`. Make sure that directory is on your `PATH`.
+That puts the binary in `~/.local/bin/`. Put that directory on your `PATH`.
 
 ## Usage
 
@@ -53,10 +63,13 @@ Or bytes: `reader.read_bytes(&buf)?`.
 
 ## Formats
 
-JPEG, TIFF, PNG, BMP, HEIF/HIF, Canon CR2, Nikon NEF, Olympus ORF, DNG, MOV/MP4/3GP, MKV.
+JPEG, TIFF, PNG, BMP, HEIF/HIF, Canon CR2, Nikon NEF, Olympus ORF, DNG,
+MOV/MP4/3GP, MKV.
 
-Maker notes are best on Canon and Nikon. Other cameras usually still get the standard EXIF/GPS tags.
+Maker notes are best on Canon and Nikon. Other cameras usually still get
+the standard EXIF/GPS tags.
 
 ## License
 
-MIT. ExifTool is Phil Harvey's; this is just faster at the subset I actually use.
+MIT. ExifTool is Phil Harvey's. This is just faster at the subset I actually
+use.
