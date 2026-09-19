@@ -1,19 +1,36 @@
 # fast-exif-rs
 
-I wanted ExifTool's tag coverage without starting Perl for every file. Most Rust/Python EXIF crates are either slow on a big library or they drop maker notes, GPS, and half the computed fields.
+I needed camera metadata off a large photo library. ExifTool has the tags I actually use — maker notes, GPS, the computed fields — but it boots Perl for every file. Fine for a few shots. Miserable at tens of thousands.
 
-This crate memory-maps the file, finds the metadata (JPEG APP1, TIFF IFDs, HEIF boxes, video atoms), parses those bits only, then names and formats fields the way ExifTool does. Batch reads use rayon.
+The usual Rust and Python EXIF crates go the other way: they skip maker notes, GPS, or they name things differently than ExifTool, so anything already keyed on ExifTool tags breaks.
 
-It is not a full ExifTool port. Reads are the point. There's a writer and a copier; treat them as experimental.
+This crate sits in the middle. It memory-maps the file, finds the metadata (JPEG APP1, TIFF IFDs, HEIF boxes, video atoms), parses those bytes only, then names and formats fields the way ExifTool does. Directories go through rayon.
+
+It is not a full ExifTool port. Reads are the point. There's a writer and a copier; don't trust them yet.
 
 ## Install
 
+Rust 1.70+.
+
 ```toml
 [dependencies]
-fast-exif-reader = "0.9"
+fast-exif-reader = "0.9.5"
 ```
 
-Needs Rust 1.70+.
+From git:
+
+```toml
+fast-exif-reader = { git = "https://github.com/dapperfu/fast-exif-rs" }
+```
+
+CLI, if you just want to dump tags:
+
+```bash
+make install
+exiftool-rs extract photo.jpg
+```
+
+That puts the binary in `~/.local/bin/`. Make sure that directory is on your `PATH`.
 
 ## Usage
 
@@ -26,7 +43,7 @@ let tags = reader.read_file("photo.jpg")?;
 println!("{} {}", tags["Make"], tags["Model"]);
 ```
 
-A directory of files:
+A pile of files:
 
 ```rust
 let tags = reader.read_files_parallel(paths)?;
@@ -34,14 +51,12 @@ let tags = reader.read_files_parallel(paths)?;
 
 Or bytes: `reader.read_bytes(&buf)?`.
 
-There's a CLI in `exiftool-rs/` if you just want to dump tags.
-
 ## Formats
 
 JPEG, TIFF, PNG, BMP, HEIF/HIF, Canon CR2, Nikon NEF, Olympus ORF, DNG, MOV/MP4/3GP, MKV.
 
-Maker notes are best on Canon/Nikon. Other cameras usually still get the standard EXIF/GPS tags.
+Maker notes are best on Canon and Nikon. Other cameras usually still get the standard EXIF/GPS tags.
 
 ## License
 
-MIT. ExifTool is Phil Harvey's; this just tries to be faster at the subset I actually use.
+MIT. ExifTool is Phil Harvey's; this is just faster at the subset I actually use.

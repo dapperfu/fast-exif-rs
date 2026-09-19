@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use memmap2::{Mmap, MmapOptions};
-use crate::types::ExifError;
+use crate::types::{ExifError, ParseScope, ReadOptions};
 use crate::parsers::tiff::TiffParser;
 
 /// Optimal EXIF parser that automatically chooses the best strategy
@@ -25,6 +25,10 @@ pub struct OptimalExifParser {
     metadata_cache: HashMap<String, String>,
     /// Fields to extract (empty means all)
     target_fields: Vec<String>,
+    include_maker_notes: bool,
+    include_gps: bool,
+    include_interop: bool,
+    force_exif_segment: bool,
     /// Memory mapping threshold (bytes)
     mmap_threshold: usize,
     /// SIMD acceleration support
@@ -93,6 +97,10 @@ impl OptimalExifParser {
             max_exif_size: 2 * 1024 * 1024, // 2MB max EXIF size
             metadata_cache: HashMap::with_capacity(200),
             target_fields: Vec::new(),
+            include_maker_notes: true,
+            include_gps: true,
+            include_interop: true,
+            force_exif_segment: false,
             mmap_threshold: 8 * 1024 * 1024, // 8MB threshold
             #[cfg(target_arch = "x86_64")]
             avx2_supported: Self::check_avx2_support(),
@@ -106,7 +114,11 @@ impl OptimalExifParser {
             read_buffer: Vec::with_capacity(64 * 1024),
             max_exif_size: 2 * 1024 * 1024,
             metadata_cache: HashMap::with_capacity(fields.len()),
-            target_fields: fields,
+            target_fields: fields.clone(),
+            include_maker_notes: fields.iter().any(|f| crate::types::looks_like_maker_note_tag(f)),
+            include_gps: fields.iter().any(|f| f.len() >= 3 && f[..3].eq_ignore_ascii_case("gps")),
+            include_interop: false,
+            force_exif_segment: true,
             mmap_threshold: 8 * 1024 * 1024,
             #[cfg(target_arch = "x86_64")]
             avx2_supported: Self::check_avx2_support(),
@@ -121,6 +133,10 @@ impl OptimalExifParser {
             max_exif_size,
             metadata_cache: HashMap::with_capacity(200),
             target_fields: Vec::new(),
+            include_maker_notes: true,
+            include_gps: true,
+            include_interop: true,
+            force_exif_segment: false,
             mmap_threshold,
             #[cfg(target_arch = "x86_64")]
             avx2_supported: Self::check_avx2_support(),
@@ -130,17 +146,79 @@ impl OptimalExifParser {
     
     /// Parse EXIF data with optimal strategy selection
     pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, ExifError> {
+        self.parse_file_inner(path)
+    }
+
+    /// Parse a file using [`ReadOptions`] to skip unused tag groups.
+    pub fn parse_file_with_options<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        options: &ReadOptions,
+    ) -> Result<HashMap<String, String>, ExifError> {
+        let saved = self.snapshot_options();
+        self.apply_options(options);
+        let result = self.parse_file_inner(path);
+        self.restore_options(saved);
+        result
+    }
+
+    fn snapshot_options(&self) -> (Vec<String>, bool, bool, bool, bool) {
+        (
+            self.target_fields.clone(),
+            self.include_maker_notes,
+            self.include_gps,
+            self.include_interop,
+            self.force_exif_segment,
+        )
+    }
+
+    fn restore_options(&mut self, saved: (Vec<String>, bool, bool, bool, bool)) {
+        self.target_fields = saved.0;
+        self.include_maker_notes = saved.1;
+        self.include_gps = saved.2;
+        self.include_interop = saved.3;
+        self.force_exif_segment = saved.4;
+    }
+
+    fn apply_options(&mut self, options: &ReadOptions) {
+        self.target_fields = options.wanted_tags.clone().unwrap_or_default();
+        self.include_maker_notes = options.include_maker_notes;
+        self.include_gps = options.include_gps;
+        self.include_interop = options.include_interop;
+        self.force_exif_segment = options.exif_segment_only;
+    }
+
+    fn parse_scope(&self) -> ParseScope {
+        ParseScope {
+            maker_notes: self.include_maker_notes,
+            gps: self.include_gps,
+            interop: self.include_interop,
+        }
+    }
+
+    fn is_full_parse(&self) -> bool {
+        self.include_maker_notes
+            && self.include_gps
+            && self.include_interop
+            && self.target_fields.is_empty()
+            && !self.force_exif_segment
+    }
+
+    fn parse_file_inner<P: AsRef<Path>>(&mut self, path: P) -> Result<HashMap<String, String>, ExifError> {
         let start_time = std::time::Instant::now();
         
-        let file = File::open(path)?;
+        let mut file = File::open(path)?;
         let file_size = file.metadata()?.len() as usize;
         
         // Clear cache for new file
         self.metadata_cache.clear();
         
-        // Read first 32 bytes to detect format
+        // Read first 32 bytes to detect format, then rewind. File::try_clone
+        // shares the kernel offset, so a clone-read would leave the original
+        // cursor at 32 and break seek-based EXIF location.
         let mut header = [0u8; 32];
-        file.try_clone()?.read_exact(&mut header)?;
+        file.read_exact(&mut header)?;
+        file.seek(SeekFrom::Start(0))?;
         
         // Detect format from header
         let format = self.detect_format(&header)?;
@@ -151,7 +229,11 @@ impl OptimalExifParser {
         }
         
         // Determine optimal parsing strategy for other formats
-        let strategy = self.determine_strategy(file_size);
+        let strategy = if self.force_exif_segment || !self.is_full_parse() {
+            ParseStrategy::SeekOptimized
+        } else {
+            self.determine_strategy(file_size)
+        };
         
         // Parse using optimal strategy
         let result = match strategy {
@@ -368,34 +450,33 @@ impl OptimalExifParser {
     
     /// Parse EXIF data with optimizations
     fn parse_exif_data_optimized(&mut self, exif_data: &[u8]) -> Result<(), ExifError> {
-        if !self.target_fields.is_empty() {
-            // Parse only target fields for maximum efficiency
-            self.parse_selective_fields(exif_data)?;
-        } else {
-            // Parse all fields with SIMD acceleration if available
-            #[cfg(target_arch = "x86_64")]
-            if self.avx2_supported {
-                self.parse_exif_data_simd(exif_data)?;
-            } else {
-                TiffParser::parse_tiff_exif(exif_data, &mut self.metadata_cache)?;
-            }
-            
-            #[cfg(not(target_arch = "x86_64"))]
-            {
-                TiffParser::parse_tiff_exif(exif_data, &mut self.metadata_cache)?;
-            }
-        }
-        
+        // Always use the real TIFF/EXIF walker. The old AVX2 path only
+        // touched IFD0 and filled Make/Model/DateTime with a placeholder.
+        let scope = self.parse_scope();
+        TiffParser::parse_tiff_exif_scoped(exif_data, &mut self.metadata_cache, &scope)?;
+        self.apply_target_field_filter();
         Ok(())
     }
-    
-    /// Parse only specific fields for maximum efficiency
-    fn parse_selective_fields(&mut self, exif_data: &[u8]) -> Result<(), ExifError> {
-        for field_name in &self.target_fields {
-            if let Some(value) = self.parse_specific_field(exif_data, field_name)? {
-                self.metadata_cache.insert(field_name.clone(), value);
-            }
+
+    fn apply_target_field_filter(&mut self) {
+        if self.target_fields.is_empty() {
+            return;
         }
+        let wanted = crate::types::wanted_normalized_set(&self.target_fields);
+        self.metadata_cache
+            .retain(|key, _| crate::types::tag_is_wanted_normalized(key, &wanted));
+    }
+
+    /// Parse only specific fields for maximum efficiency
+    #[allow(dead_code)]
+    fn parse_selective_fields(&mut self, exif_data: &[u8]) -> Result<(), ExifError> {
+        let scope = self.parse_scope();
+        TiffParser::parse_tiff_exif_scoped(
+            exif_data,
+            &mut self.metadata_cache,
+            &scope,
+        )?;
+        self.apply_target_field_filter();
         Ok(())
     }
     
@@ -462,14 +543,22 @@ impl OptimalExifParser {
     
     /// Parse JPEG EXIF data
     fn parse_jpeg_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
-        // Use existing JPEG parser logic
-        TiffParser::parse_tiff_exif(data, &mut self.metadata_cache)?;
+        let payload = if let Ok(exif) = self.extract_exif_from_mapped(data) {
+            exif
+        } else {
+            data.to_vec()
+        };
+        let scope = self.parse_scope();
+        TiffParser::parse_tiff_exif_scoped(&payload, &mut self.metadata_cache, &scope)?;
+        self.apply_target_field_filter();
         Ok(())
     }
     
     /// Parse TIFF EXIF data
     fn parse_tiff_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
-        TiffParser::parse_tiff_exif(data, &mut self.metadata_cache)?;
+        let scope = self.parse_scope();
+        TiffParser::parse_tiff_exif_scoped(data, &mut self.metadata_cache, &scope)?;
+        self.apply_target_field_filter();
         Ok(())
     }
     
@@ -524,129 +613,11 @@ impl OptimalExifParser {
     /// Check if AVX2 is supported on x86_64
     #[cfg(target_arch = "x86_64")]
     fn check_avx2_support() -> bool {
-        unsafe {
-            // Check if CPU supports AVX2
-            let cpuid = std::arch::x86_64::__cpuid(7);
-            (cpuid.ebx & (1 << 5)) != 0 // AVX2 bit
-        }
+        // Check if CPU supports AVX2
+        let cpuid = std::arch::x86_64::__cpuid(7);
+        (cpuid.ebx & (1 << 5)) != 0 // AVX2 bit
     }
     
-    /// SIMD-accelerated EXIF parsing using AVX2
-    #[cfg(target_arch = "x86_64")]
-    fn parse_exif_data_simd(&mut self, exif_data: &[u8]) -> Result<(), ExifError> {
-        // Track SIMD usage
-        self.stats.simd_count += 1;
-        
-        // Find TIFF header and parse with SIMD acceleration
-        if exif_data.len() < 8 {
-            return Err(ExifError::InvalidExif("EXIF data too short".to_string()));
-        }
-        
-        // Check for TIFF header (0x4949 for little-endian, 0x4D4D for big-endian)
-        let is_little_endian = exif_data[0] == 0x49 && exif_data[1] == 0x49;
-        let is_big_endian = exif_data[0] == 0x4D && exif_data[1] == 0x4D;
-        
-        if !is_little_endian && !is_big_endian {
-            return Err(ExifError::InvalidExif("Invalid TIFF header".to_string()));
-        }
-        
-        // Parse IFD entries with SIMD acceleration
-        self.parse_ifd_simd(exif_data, 8, is_little_endian)?;
-        
-        Ok(())
-    }
-    
-    /// SIMD-accelerated IFD parsing
-    #[cfg(target_arch = "x86_64")]
-    fn parse_ifd_simd(&mut self, data: &[u8], offset: usize, is_little_endian: bool) -> Result<(), ExifError> {
-        if offset + 2 > data.len() {
-            return Ok(());
-        }
-        
-        // Read number of directory entries
-        let num_entries = if is_little_endian {
-            u16::from_le_bytes([data[offset], data[offset + 1]]) as usize
-        } else {
-            u16::from_be_bytes([data[offset], data[offset + 1]]) as usize
-        };
-        
-        if num_entries == 0 || offset + 2 + (num_entries * 12) > data.len() {
-            return Ok(());
-        }
-        
-        // Process directory entries in parallel using SIMD
-        let entry_start = offset + 2;
-        
-        // Use SIMD to process multiple entries at once
-        for i in 0..num_entries {
-            let entry_offset = entry_start + (i * 12);
-            if entry_offset + 12 <= data.len() {
-                self.parse_ifd_entry_simd(&data[entry_offset..entry_offset + 12], is_little_endian)?;
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// SIMD-accelerated IFD entry parsing
-    #[cfg(target_arch = "x86_64")]
-    fn parse_ifd_entry_simd(&mut self, entry_data: &[u8], is_little_endian: bool) -> Result<(), ExifError> {
-        if entry_data.len() < 12 {
-            return Ok(());
-        }
-        
-        // Parse tag ID
-        let tag_id = if is_little_endian {
-            u16::from_le_bytes([entry_data[0], entry_data[1]])
-        } else {
-            u16::from_be_bytes([entry_data[0], entry_data[1]])
-        };
-        
-        // Parse data type
-        let _data_type = if is_little_endian {
-            u16::from_le_bytes([entry_data[2], entry_data[3]])
-        } else {
-            u16::from_be_bytes([entry_data[2], entry_data[3]])
-        };
-        
-        // Parse count
-        let count = if is_little_endian {
-            u32::from_le_bytes([entry_data[4], entry_data[5], entry_data[6], entry_data[7]])
-        } else {
-            u32::from_be_bytes([entry_data[4], entry_data[5], entry_data[6], entry_data[7]])
-        };
-        
-        // Parse value/offset
-        let value_offset = if is_little_endian {
-            u32::from_le_bytes([entry_data[8], entry_data[9], entry_data[10], entry_data[11]])
-        } else {
-            u32::from_be_bytes([entry_data[8], entry_data[9], entry_data[10], entry_data[11]])
-        };
-        
-        // Process common EXIF tags
-        match tag_id {
-            0x010F => { // Make
-                self.metadata_cache.insert("Make".to_string(), self.read_string_value(entry_data, value_offset, count, is_little_endian)?);
-            },
-            0x0110 => { // Model
-                self.metadata_cache.insert("Model".to_string(), self.read_string_value(entry_data, value_offset, count, is_little_endian)?);
-            },
-            0x0132 => { // DateTime
-                self.metadata_cache.insert("DateTime".to_string(), self.read_string_value(entry_data, value_offset, count, is_little_endian)?);
-            },
-            _ => {
-                // Process other tags as needed
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// Read string value from EXIF data
-    fn read_string_value(&self, _entry_data: &[u8], _value_offset: u32, _count: u32, _is_little_endian: bool) -> Result<String, ExifError> {
-        // Simplified string reading - in practice this would read from the actual data
-        Ok("SIMD_ACCELERATED".to_string())
-    }
 }
 
 impl Default for OptimalExifParser {

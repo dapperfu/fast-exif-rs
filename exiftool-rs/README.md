@@ -17,6 +17,14 @@ A fast EXIF metadata extraction tool written in Rust, built on top of the `fast-
 
 ## Installation
 
+From the repo root:
+
+```bash
+make install
+```
+
+That installs `exiftool-rs` to `~/.local/bin/`. Make sure that directory is on your `PATH`.
+
 ```bash
 cd exiftool-rs
 cargo build --release

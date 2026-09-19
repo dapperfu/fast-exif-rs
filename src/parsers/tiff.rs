@@ -1,5 +1,5 @@
 use crate::parsers::maker_notes::MakerNoteParser;
-use crate::types::ExifError;
+use crate::types::{ExifError, ParseScope};
 use std::collections::HashMap;
 
 /// TIFF-based EXIF parser
@@ -10,6 +10,15 @@ impl TiffParser {
     pub fn parse_tiff_exif(
         data: &[u8],
         metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
+        Self::parse_tiff_exif_scoped(data, metadata, &ParseScope::all())
+    }
+
+    /// Parse TIFF-based EXIF data, optionally skipping GPS / Interop / maker notes.
+    pub fn parse_tiff_exif_scoped(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+        scope: &ParseScope,
     ) -> Result<(), ExifError> {
         if data.len() < 8 {
             return Err(ExifError::InvalidExif("TIFF header too small".to_string()));
@@ -85,6 +94,7 @@ impl TiffParser {
             is_little_endian,
             tiff_start,
             metadata,
+            scope,
         )?;
 
         // Parse EXIF IFD if present (contains DateTimeOriginal, ExposureTime, etc.)
@@ -101,45 +111,53 @@ impl TiffParser {
                 is_little_endian,
                 tiff_start,
                 metadata,
+                scope,
             )?;
         }
 
         // Parse GPS IFD if present (contains GPS metadata)
-        if let Some(gps_ifd_offset) = Self::find_sub_ifd_offset(
-            data,
-            tiff_start + ifd_offset as usize,
-            0x8825,
-            is_little_endian,
-            tiff_start,
-        ) {
-            Self::parse_ifd(
+        if scope.gps {
+            if let Some(gps_ifd_offset) = Self::find_sub_ifd_offset(
                 data,
-                tiff_start + gps_ifd_offset as usize,
+                tiff_start + ifd_offset as usize,
+                0x8825,
                 is_little_endian,
                 tiff_start,
-                metadata,
-            )?;
+            ) {
+                Self::parse_ifd(
+                    data,
+                    tiff_start + gps_ifd_offset as usize,
+                    is_little_endian,
+                    tiff_start,
+                    metadata,
+                    scope,
+                )?;
+            }
         }
 
         // Parse Interoperability IFD if present (contains InteropIndex, InteropVersion, etc.)
-        if let Some(interop_ifd_offset) = Self::find_sub_ifd_offset(
-            data,
-            tiff_start + ifd_offset as usize,
-            0xA005,
-            is_little_endian,
-            tiff_start,
-        ) {
-            Self::parse_ifd(
+        if scope.interop {
+            if let Some(interop_ifd_offset) = Self::find_sub_ifd_offset(
                 data,
-                tiff_start + interop_ifd_offset as usize,
+                tiff_start + ifd_offset as usize,
+                0xA005,
                 is_little_endian,
                 tiff_start,
-                metadata,
-            )?;
+            ) {
+                Self::parse_ifd(
+                    data,
+                    tiff_start + interop_ifd_offset as usize,
+                    is_little_endian,
+                    tiff_start,
+                    metadata,
+                    scope,
+                )?;
+            }
         }
 
-        // Add GPS computed fields
-        Self::add_gps_computed_fields(metadata);
+        if scope.gps {
+            Self::add_gps_computed_fields(metadata);
+        }
 
         Ok(())
     }
@@ -151,6 +169,7 @@ impl TiffParser {
         is_little_endian: bool,
         tiff_start: usize,
         metadata: &mut HashMap<String, String>,
+        scope: &ParseScope,
     ) -> Result<(), ExifError> {
         if offset + 2 > data.len() {
             return Err(ExifError::InvalidExif("IFD header incomplete".to_string()));
@@ -180,28 +199,32 @@ impl TiffParser {
         }
 
         // Parse maker notes if present
-        if let Some(maker_note_offset) =
-            Self::find_sub_ifd_offset(data, offset, 0x927C, is_little_endian, tiff_start)
-        {
-            MakerNoteParser::parse_maker_note(
-                data,
-                tiff_start + maker_note_offset as usize,
-                0,
-                metadata,
-            );
+        if scope.maker_notes {
+            if let Some(maker_note_offset) =
+                Self::find_sub_ifd_offset(data, offset, 0x927C, is_little_endian, tiff_start)
+            {
+                MakerNoteParser::parse_maker_note(
+                    data,
+                    tiff_start + maker_note_offset as usize,
+                    0,
+                    metadata,
+                );
+            }
         }
 
         // Parse GPS IFD if present
-        if let Some(gps_offset) =
-            Self::find_sub_ifd_offset(data, offset, 0x8825, is_little_endian, tiff_start)
-        {
-            Self::parse_gps_ifd(
-                data,
-                tiff_start + gps_offset as usize,
-                is_little_endian,
-                tiff_start,
-                metadata,
-            )?;
+        if scope.gps {
+            if let Some(gps_offset) =
+                Self::find_sub_ifd_offset(data, offset, 0x8825, is_little_endian, tiff_start)
+            {
+                Self::parse_gps_ifd(
+                    data,
+                    tiff_start + gps_offset as usize,
+                    is_little_endian,
+                    tiff_start,
+                    metadata,
+                )?;
+            }
         }
 
         Ok(())
@@ -291,6 +314,9 @@ impl TiffParser {
         metadata: &mut HashMap<String, String>,
     ) -> Result<(), ExifError> {
         let tag_name = Self::get_tag_name(tag_id);
+        if tag_name.is_empty() {
+            return Ok(());
+        }
 
         match data_type {
             1 => {
@@ -996,17 +1022,34 @@ impl TiffParser {
     /// Get human-readable tag name
     fn get_tag_name(tag_id: u16) -> String {
         match tag_id {
+            0x0100 => "ImageWidth".to_string(),
+            0x0101 => "ImageHeight".to_string(),
+            0x0103 => "Compression".to_string(),
+            0x0106 => "PhotometricInterpretation".to_string(),
             0x010E => "ImageDescription".to_string(),
             0x010F => "Make".to_string(),
             0x0110 => "Model".to_string(),
             0x0112 => "Orientation".to_string(),
+            0x0115 => "SamplesPerPixel".to_string(),
             0x011A => "XResolution".to_string(),
             0x011B => "YResolution".to_string(),
+            0x011C => "PlanarConfiguration".to_string(),
             0x0128 => "ResolutionUnit".to_string(),
             0x0131 => "Software".to_string(),
             0x0132 => "DateTime".to_string(),
+            0x013B => "Artist".to_string(),
+            0x0201 => "ThumbnailOffset".to_string(),
+            0x0202 => "ThumbnailLength".to_string(),
+            0x4746 => "Rating".to_string(),
+            0x8824 => "SpectralSensitivity".to_string(),
+            0x8830 => "SensitivityType".to_string(),
+            0x8831 => "StandardOutputSensitivity".to_string(),
+            0x8832 => "RecommendedExposureIndex".to_string(),
             0x9003 => "DateTimeOriginal".to_string(),
             0x9004 => "DateTimeDigitized".to_string(),
+            0x9101 => "ComponentsConfiguration".to_string(),
+            0x9102 => "CompressedBitsPerPixel".to_string(),
+            0x9286 => "UserComment".to_string(),
             0x829A => "ExposureTime".to_string(),
             0x829D => "FNumber".to_string(),
             0x8822 => "ExposureProgram".to_string(),
@@ -1054,7 +1097,7 @@ impl TiffParser {
             0xA402 => "ExposureMode".to_string(),
             0xA403 => "WhiteBalance".to_string(),
             0xA404 => "DigitalZoomRatio".to_string(),
-            0xA405 => "FocalLengthIn35mmFilm".to_string(),
+            0xA405 => "FocalLengthIn35mmFormat".to_string(),
             0xA406 => "SceneCaptureType".to_string(),
             0xA407 => "GainControl".to_string(),
             0xA408 => "Contrast".to_string(),
@@ -1064,8 +1107,9 @@ impl TiffParser {
             0xA40C => "SubjectDistanceRange".to_string(),
             0xA420 => "ImageUniqueID".to_string(),
             0xA430 => "CameraOwnerName".to_string(),
-            0xA431 => "BodySerialNumber".to_string(),
-            0xA432 => "LensSpecification".to_string(),
+            0xA431 => "SerialNumber".to_string(),
+            0xA432 => "LensInfo".to_string(),
+            0xA460 => "CompositeImage".to_string(),
             0xA433 => "LensMake".to_string(),
             0xA434 => "LensModel".to_string(),
             0xA435 => "LensSerialNumber".to_string(),
@@ -1851,5 +1895,76 @@ impl TiffParser {
                 metadata.insert("GPSProcessingMethod".to_string(), "ASCII".to_string());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn put_u16(buf: &mut [u8], at: usize, v: u16) {
+        buf[at..at + 2].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_u32(buf: &mut [u8], at: usize, v: u32) {
+        buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_entry(buf: &mut [u8], at: usize, tag: u16, dtype: u16, count: u32, value: u32) {
+        put_u16(buf, at, tag);
+        put_u16(buf, at + 2, dtype);
+        put_u32(buf, at + 4, count);
+        put_u32(buf, at + 8, value);
+    }
+
+    #[test]
+    fn parses_exif_ifd_datetime_tags() {
+        let mut data = vec![0u8; 256];
+        data[0] = b'I';
+        data[1] = b'I';
+        put_u16(&mut data, 2, 42);
+        put_u32(&mut data, 4, 8);
+
+        let ifd0 = 8usize;
+        put_u16(&mut data, ifd0, 3);
+        put_entry(&mut data, ifd0 + 2, 0x010F, 2, 6, 50);
+        put_entry(&mut data, ifd0 + 14, 0x0132, 2, 20, 56);
+        put_entry(&mut data, ifd0 + 26, 0x8769, 4, 1, 86);
+        put_u32(&mut data, ifd0 + 38, 0);
+
+        data[50..56].copy_from_slice(b"NIKON\0");
+        data[56..76].copy_from_slice(b"2026:05:10 15:03:55\0");
+        data[76..83].copy_from_slice(b"-05:00\0");
+
+        let subsec_inline = u32::from_le_bytes(*b"95\0\0");
+        let exif_ifd = 86usize;
+        put_u16(&mut data, exif_ifd, 8);
+        put_entry(&mut data, exif_ifd + 2, 0x9003, 2, 20, 56);
+        put_entry(&mut data, exif_ifd + 14, 0x9004, 2, 20, 56);
+        put_entry(&mut data, exif_ifd + 26, 0x9290, 2, 3, subsec_inline);
+        put_entry(&mut data, exif_ifd + 38, 0x9291, 2, 3, subsec_inline);
+        put_entry(&mut data, exif_ifd + 50, 0x9292, 2, 3, subsec_inline);
+        put_entry(&mut data, exif_ifd + 62, 0x9010, 2, 7, 76);
+        put_entry(&mut data, exif_ifd + 74, 0x9011, 2, 7, 76);
+        put_entry(&mut data, exif_ifd + 86, 0x9012, 2, 7, 76);
+        put_u32(&mut data, exif_ifd + 98, 0);
+
+        let mut metadata = HashMap::new();
+        TiffParser::parse_tiff_exif(&data, &mut metadata).unwrap();
+        crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
+        crate::field_mapping::FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
+
+        assert_eq!(metadata.get("Make").unwrap(), "NIKON");
+        assert_eq!(metadata.get("DateTimeOriginal").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(metadata.get("CreateDate").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(
+            metadata.get("SubSecCreateDate").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
+        assert_eq!(
+            metadata.get("SubSecDateTimeOriginal").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
+        assert!(!metadata.values().any(|v| v == "SIMD_ACCELERATED"));
     }
 }

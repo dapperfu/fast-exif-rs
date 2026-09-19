@@ -335,132 +335,117 @@ impl ComputedFields {
             metadata.insert("Composite:LensSpec".to_string(), lens_spec);
         }
         
-        // Update main datetime fields to include sub-second precision and timezone (like exiftool)
-        if let Some(create_date) = metadata.get("CreateDate") {
-            if let Some(subsec) = metadata.get("SubSecTime") {
-                let timezone = metadata
-                    .get("OffsetTime")
-                    .or_else(|| metadata.get("TimeZone"))
-                    .map(|tz| tz.to_string())
-                    .unwrap_or_else(|| {
-                        // Fallback: try to extract timezone from camera make or use default
-                        if metadata
-                            .get("Make")
-                            .map(|m| m.contains("NIKON"))
-                            .unwrap_or(false)
-                        {
-                            "-04:00".to_string() // Default for Nikon cameras
-                        } else if metadata
-                            .get("Make")
-                            .map(|m| m.contains("Canon"))
-                            .unwrap_or(false)
-                        {
-                            "-05:00".to_string() // Default for Canon cameras
-                        } else {
-                            "".to_string()
-                        }
-                    });
-                let subsec_create = format!("{}.{}{}", create_date, subsec, timezone);
-                metadata.insert("CreateDate".to_string(), subsec_create);
+        Self::add_exiftool_datetime_fields(metadata);
+    }
+
+    /// ExifTool-style date aliases and SubSec composites for Sortify.
+    ///
+    /// Leaves CreateDate / DateTimeOriginal / ModifyDate at whole-second
+    /// precision. Sub-seconds and timezone go on SubSecCreateDate,
+    /// SubSecDateTimeOriginal, and SubSecModifyDate.
+    fn add_exiftool_datetime_fields(metadata: &mut HashMap<String, String>) {
+        if !metadata.contains_key("CreateDate") {
+            if let Some(v) = metadata
+                .get("DateTimeDigitized")
+                .cloned()
+                .or_else(|| metadata.get("DateTimeOriginal").cloned())
+            {
+                metadata.insert("CreateDate".to_string(), v);
             }
         }
-        
-        if let Some(dto) = metadata.get("DateTimeOriginal") {
-            if let Some(subsec) = metadata.get("SubSecTimeOriginal") {
-                let timezone = metadata
-                    .get("OffsetTimeOriginal")
-                    .or_else(|| metadata.get("OffsetTime"))
-                    .or_else(|| metadata.get("TimeZone"))
-                    .map(|tz| tz.to_string())
-                    .unwrap_or_else(|| {
-                        // Fallback: try to extract timezone from camera make or use default
-                        if metadata
-                            .get("Make")
-                            .map(|m| m.contains("NIKON"))
-                            .unwrap_or(false)
-                        {
-                            "-04:00".to_string() // Default for Nikon cameras
-                        } else if metadata
-                            .get("Make")
-                            .map(|m| m.contains("Canon"))
-                            .unwrap_or(false)
-                        {
-                            "-05:00".to_string() // Default for Canon cameras
-                        } else {
-                            "".to_string()
-                        }
-                    });
-                let subsec_dto = format!("{}.{}{}", dto, subsec, timezone);
-                metadata.insert("DateTimeOriginal".to_string(), subsec_dto);
+        if !metadata.contains_key("ModifyDate") {
+            if let Some(v) = metadata.get("DateTime").cloned() {
+                metadata.insert("ModifyDate".to_string(), v);
             }
         }
-        
-        if let Some(modify_date) = metadata.get("ModifyDate") {
-            if let Some(subsec) = metadata.get("SubSecTime") {
-                let timezone = metadata
-                    .get("OffsetTime")
-                    .or_else(|| metadata.get("TimeZone"))
-                    .map(|tz| tz.to_string())
-                    .unwrap_or_else(|| {
-                        // Fallback: try to extract timezone from camera make or use default
-                        if metadata
-                            .get("Make")
-                            .map(|m| m.contains("NIKON"))
-                            .unwrap_or(false)
-                        {
-                            "-04:00".to_string() // Default for Nikon cameras
-                        } else if metadata
-                            .get("Make")
-                            .map(|m| m.contains("Canon"))
-                            .unwrap_or(false)
-                        {
-                            "-05:00".to_string() // Default for Canon cameras
-                        } else {
-                            "".to_string()
-                        }
-                    });
-                let subsec_modify = format!("{}.{}{}", modify_date, subsec, timezone);
-                metadata.insert("ModifyDate".to_string(), subsec_modify);
+
+        Self::insert_subsec_datetime(
+            metadata,
+            "SubSecCreateDate",
+            &["CreateDate", "DateTimeDigitized"],
+            &["SubSecTimeDigitized", "SubSecTime"],
+            &["OffsetTimeDigitized", "OffsetTime", "TimeZone"],
+        );
+        Self::insert_subsec_datetime(
+            metadata,
+            "SubSecDateTimeOriginal",
+            &["DateTimeOriginal"],
+            &["SubSecTimeOriginal", "SubSecTime"],
+            &["OffsetTimeOriginal", "OffsetTime", "TimeZone"],
+        );
+        Self::insert_subsec_datetime(
+            metadata,
+            "SubSecModifyDate",
+            &["ModifyDate", "DateTime"],
+            &["SubSecTime"],
+            &["OffsetTime", "TimeZone"],
+        );
+    }
+
+    fn insert_subsec_datetime(
+        metadata: &mut HashMap<String, String>,
+        dest: &str,
+        date_keys: &[&str],
+        subsec_keys: &[&str],
+        offset_keys: &[&str],
+    ) {
+        if metadata.contains_key(dest) {
+            return;
+        }
+        let Some(datetime) = Self::first_nonempty(metadata, date_keys) else {
+            return;
+        };
+        let subsec = Self::first_nonempty(metadata, subsec_keys);
+        let offset = Self::first_nonempty(metadata, offset_keys)
+            .filter(|tz| Self::looks_like_offset(tz));
+        metadata.insert(
+            dest.to_string(),
+            Self::compose_subsec_datetime(&datetime, subsec.as_deref(), offset.as_deref()),
+        );
+    }
+
+    fn first_nonempty(metadata: &HashMap<String, String>, keys: &[&str]) -> Option<String> {
+        keys.iter().find_map(|k| {
+            metadata.get(*k).and_then(|v| {
+                let t = v.trim();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t.to_string())
+                }
+            })
+        })
+    }
+
+    fn looks_like_offset(value: &str) -> bool {
+        let b = value.as_bytes();
+        (b.first() == Some(&b'+') || b.first() == Some(&b'-'))
+            && value.len() >= 5
+            && value.contains(':')
+    }
+
+    fn compose_subsec_datetime(datetime: &str, subsec: Option<&str>, offset: Option<&str>) -> String {
+        let mut out = datetime.trim().to_string();
+        if let Some(ss) = subsec {
+            let ss = ss.trim().trim_start_matches('.');
+            if !ss.is_empty() && !out.contains('.') {
+                out.push('.');
+                out.push_str(ss);
             }
         }
-        
-        // Update CreateDate to match the updated DateTimeOriginal
-        if let Some(dto) = metadata.get("DateTimeOriginal") {
-            if let Some(_create_date) = metadata.get("CreateDate") {
-                // Update CreateDate to match DateTimeOriginal format
-                metadata.insert("CreateDate".to_string(), dto.clone());
+        if let Some(tz) = offset {
+            let tz = tz.trim();
+            if !tz.is_empty() && !out.ends_with(tz) {
+                let already = out
+                    .rsplit_once(|c: char| c == '+' || c == '-')
+                    .map(|(_, rest)| rest.contains(':'))
+                    .unwrap_or(false);
+                if !already {
+                    out.push_str(tz);
+                }
             }
         }
-        
-        if let Some(digitized_date) = metadata.get("DateTimeDigitized") {
-            if let Some(subsec) = metadata.get("SubSecTimeDigitized") {
-                let timezone = metadata
-                    .get("OffsetTimeDigitized")
-                    .or_else(|| metadata.get("OffsetTime"))
-                    .or_else(|| metadata.get("TimeZone"))
-                    .map(|tz| tz.to_string())
-                    .unwrap_or_else(|| {
-                        // Fallback: try to extract timezone from camera make or use default
-                        if metadata
-                            .get("Make")
-                            .map(|m| m.contains("NIKON"))
-                            .unwrap_or(false)
-                        {
-                            "-04:00".to_string() // Default for Nikon cameras
-                        } else if metadata
-                            .get("Make")
-                            .map(|m| m.contains("Canon"))
-                            .unwrap_or(false)
-                        {
-                            "-05:00".to_string() // Default for Canon cameras
-                        } else {
-                            "".to_string()
-                        }
-                    });
-                let subsec_digitized = format!("{}.{}{}", digitized_date, subsec, timezone);
-                metadata.insert("DateTimeDigitized".to_string(), subsec_digitized);
-            }
-        }
+        out
     }
     
     /// Add file system metadata
@@ -629,5 +614,44 @@ impl ComputedFields {
             metadata.insert("TrackModifyDate".to_string(), modify_date.clone());
             metadata.insert("MediaModifyDate".to_string(), modify_date);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subsec_composites_keep_base_dates() {
+        let mut metadata = HashMap::new();
+        metadata.insert("DateTimeOriginal".to_string(), "2026:05:10 15:03:55".into());
+        metadata.insert("DateTimeDigitized".to_string(), "2026:05:10 15:03:55".into());
+        metadata.insert("DateTime".to_string(), "2026:05:10 15:03:55".into());
+        metadata.insert("SubSecTime".to_string(), "95".into());
+        metadata.insert("SubSecTimeOriginal".to_string(), "95".into());
+        metadata.insert("SubSecTimeDigitized".to_string(), "95".into());
+        metadata.insert("OffsetTime".to_string(), "-05:00".into());
+        metadata.insert("OffsetTimeOriginal".to_string(), "-05:00".into());
+        metadata.insert("OffsetTimeDigitized".to_string(), "-05:00".into());
+
+        ComputedFields::add_exiftool_datetime_fields(&mut metadata);
+
+        assert_eq!(metadata.get("CreateDate").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(
+            metadata.get("DateTimeOriginal").unwrap(),
+            "2026:05:10 15:03:55"
+        );
+        assert_eq!(
+            metadata.get("SubSecCreateDate").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
+        assert_eq!(
+            metadata.get("SubSecDateTimeOriginal").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
+        assert_eq!(
+            metadata.get("SubSecModifyDate").unwrap(),
+            "2026:05:10 15:03:55.95-05:00"
+        );
     }
 }

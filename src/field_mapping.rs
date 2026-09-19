@@ -341,9 +341,7 @@ impl FieldMapper {
             ("CompressedBitsPerPixel", "EXIF:CompressedBitsPerPixel"),
             ("Contrast", "EXIF:Contrast"),
             ("Copyright", "EXIF:Copyright"),
-            ("CreateDate", "Create Date"),
             ("CustomRendered", "EXIF:CustomRendered"),
-            ("DateTimeOriginal", "Date/Time Original"),
             ("ExifImageHeight", "EXIF:ExifImageHeight"),
             ("ExifImageWidth", "EXIF:ExifImageWidth"),
             ("ExifVersion", "EXIF:ExifVersion"),
@@ -368,7 +366,7 @@ impl FieldMapper {
             ("Make", "EXIF:Make"),
             ("MeteringMode", "EXIF:MeteringMode"),
             ("Model", "EXIF:Model"),
-            ("ModifyDate", "Modify Date"),
+            ("ModifyDate", "EXIF:ModifyDate"),
             ("OffsetTime", "EXIF:OffsetTime"),
             ("OffsetTimeDigitized", "EXIF:OffsetTimeDigitized"),
             ("OffsetTimeOriginal", "EXIF:OffsetTimeOriginal"),
@@ -425,16 +423,49 @@ impl FieldMapper {
         mapper.normalize_to_exiftool(metadata);
     }
     
-    /// Normalize field names to exiftool standard
+    /// Normalize field names to ExifTool `-s` short names.
+    ///
+    /// Keep the original keys. Only apply well-known remaps (DateTime →
+    /// ModifyDate, DateTimeDigitized → CreateDate). Do not rename
+    /// DateTimeOriginal to a display name — Sortify and `exiftool -s` both
+    /// look for the short tag.
     pub fn normalize_to_exiftool(&self, metadata: &mut HashMap<String, String>) {
-        let mut normalized = HashMap::new();
-        
-        for (key, value) in metadata.drain() {
-            let normalized_key = self.fast_to_exiftool(&key);
-            normalized.insert(normalized_key, value);
+        const REMAPS: &[(&str, &str)] = &[
+            ("DateTime", "ModifyDate"),
+            ("DateTimeDigitized", "CreateDate"),
+            ("DateTimeCreated", "CreateDate"),
+            ("ISOSpeedRatings", "ISO"),
+            ("ISOSpeed", "ISO"),
+            ("PixelXDimension", "ExifImageWidth"),
+            ("PixelYDimension", "ExifImageHeight"),
+            ("BodySerialNumber", "SerialNumber"),
+            ("FocalLengthIn35mmFilm", "FocalLengthIn35mmFormat"),
+        ];
+
+        for (from, to) in REMAPS {
+            if let Some(value) = metadata.get(*from).cloned() {
+                metadata.entry((*to).to_string()).or_insert(value);
+            }
         }
-        
-        *metadata = normalized;
+
+        // Namespaced aliases without dropping the short name.
+        let extras: Vec<(String, String)> = metadata
+            .iter()
+            .filter_map(|(key, value)| {
+                let mapped = self.fast_to_exiftool(key);
+                if (mapped.starts_with("EXIF:") || mapped.starts_with("File:"))
+                    && mapped != *key
+                    && !metadata.contains_key(&mapped)
+                {
+                    Some((mapped, value.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (key, value) in extras {
+            metadata.insert(key, value);
+        }
     }
     
     /// Normalize field names to fast-exif-rs standard
@@ -460,5 +491,40 @@ impl FieldMapper {
 impl Default for FieldMapper {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keeps_exiftool_short_date_names() {
+        let mut metadata = HashMap::new();
+        metadata.insert("DateTime".to_string(), "2026:05:10 15:03:55".into());
+        metadata.insert("DateTimeOriginal".to_string(), "2026:05:10 15:03:55".into());
+        metadata.insert(
+            "DateTimeDigitized".to_string(),
+            "2026:05:10 15:03:55".into(),
+        );
+        metadata.insert("Make".to_string(), "NIKON CORPORATION".into());
+
+        FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
+
+        assert_eq!(
+            metadata.get("DateTimeOriginal").map(String::as_str),
+            Some("2026:05:10 15:03:55")
+        );
+        assert_eq!(
+            metadata.get("CreateDate").map(String::as_str),
+            Some("2026:05:10 15:03:55")
+        );
+        assert_eq!(
+            metadata.get("ModifyDate").map(String::as_str),
+            Some("2026:05:10 15:03:55")
+        );
+        assert!(metadata.contains_key("Make"));
+        assert!(!metadata.contains_key("Date/Time Original"));
+        assert!(!metadata.contains_key("Create Date"));
     }
 }

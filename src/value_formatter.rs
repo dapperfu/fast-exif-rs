@@ -30,10 +30,11 @@ impl ValueFormatter {
             // FocusMode values: Convert "Auto" → "AF-C"
             "FocusMode" => Self::format_focus_mode_value(value),
             
-            // DateTime values: Add subsecond precision
-            "ModifyDate" | "CreateDate" | "DateTimeCreated" => {
-                Self::format_datetime_value(value)
-            },
+            "ModifyDate" | "CreateDate" | "DateTimeCreated" | "DateTimeOriginal"
+            | "SubSecCreateDate" | "SubSecDateTimeOriginal" | "SubSecModifyDate"
+            | "FileModifyDate" | "FileAccessDate" | "FileInodeChangeDate" => {
+                value.to_string()
+            }
             
             // Numeric enum values
             "CustomRendered" => Self::format_custom_rendered_value(value),
@@ -68,12 +69,8 @@ impl ValueFormatter {
             "JFIFVersion" => Self::format_jfif_version_value(value),
             "ShutterSpeed" => Self::format_shutter_speed_value(value),
             "FocalLength35efl" => Self::format_focal_length_35efl_value(value),
-            "FileModifyDate" => Self::format_file_modify_date_value(value),
-            "FileInodeChangeDate" => Self::format_file_inode_change_date_value(value),
-            "FileAccessDate" => Self::format_file_access_date_value(value),
             "ExposureTime" => Self::format_exposure_time_value(value),
             "YCbCrSubSampling" => Self::format_ycbcr_subsampling_value(value),
-            "DateTimeOriginal" => Self::format_datetime_original_value(value),
             "MultiExposureShots" => Self::format_multi_exposure_shots_value(value),
             "ExposureMode" => Self::format_exposure_mode_value(value),
             "CircleOfConfusion" => Self::format_circle_of_confusion_value(value),
@@ -115,9 +112,8 @@ impl ValueFormatter {
     fn format_focal_length_value(value: &str) -> String {
         // Remove "mm" suffix and parse as float
         let cleaned = value.replace(" mm", "").replace("mm", "");
-        if let Ok(_focal_length) = cleaned.parse::<f64>() {
-            // Return exact exiftool value: 1612.69894386544
-            "1612.69894386544".to_string()
+        if let Ok(focal_length) = cleaned.parse::<f64>() {
+            format!("{:.1} mm", focal_length)
         } else {
             value.to_string()
         }
@@ -140,16 +136,6 @@ impl ValueFormatter {
             "single" | "single-shot" => "AF-S".to_string(),
             "continuous" | "continuous-af" => "AF-C".to_string(),
             _ => value.to_string(),
-        }
-    }
-    
-    /// Format DateTime value to match exiftool format
-    fn format_datetime_value(value: &str) -> String {
-        // Remove subseconds to match exiftool format
-        if let Some(dot_pos) = value.find('.') {
-            value[..dot_pos].to_string()
-        } else {
-            value.to_string()
         }
     }
     
@@ -202,9 +188,12 @@ impl ValueFormatter {
     }
     
     /// Format ColorSpace value to match exiftool
-    fn format_color_space_value(_value: &str) -> String {
-        // Return the exact exiftool value for ColorSpace
-        "4".to_string()
+    fn format_color_space_value(value: &str) -> String {
+        match value.to_lowercase().as_str() {
+            "srgb" => "1".to_string(),
+            "uncalibrated" | "adobe rgb" | "adobergb" => "65535".to_string(),
+            _ => value.to_string(),
+        }
     }
     
     /// Format ResolutionUnit value to numeric
@@ -364,9 +353,8 @@ impl ValueFormatter {
     }
     
     /// Format PictureControlVersion value to match exiftool
-    fn format_picture_control_version_value(_value: &str) -> String {
-        // Return the exact exiftool value for PictureControlVersion
-        "0310".to_string()
+    fn format_picture_control_version_value(value: &str) -> String {
+        value.to_string()
     }
     
     /// Format FileTypeExtension value
@@ -431,9 +419,8 @@ impl ValueFormatter {
     fn format_hyperfocal_distance_value(value: &str) -> String {
         // Remove "m" suffix and return exact exiftool value
         let cleaned = value.replace(" m", "").replace("m", "");
-        if let Ok(_hd) = cleaned.parse::<f64>() {
-            // Return exact exiftool value: 181.538246037348
-            "181.538246037348".to_string()
+        if let Ok(hd) = cleaned.parse::<f64>() {
+            format!("{:.2}", hd)
         } else {
             value.to_string()
         }
@@ -568,23 +555,6 @@ impl ValueFormatter {
     }
     
     /// Format FileModifyDate value to match exiftool
-    fn format_file_modify_date_value(_value: &str) -> String {
-        // Return the exact exiftool value for FileModifyDate
-        "2025:09:22 20:31:25".to_string()
-    }
-    
-    /// Format FileInodeChangeDate value to match exiftool
-    fn format_file_inode_change_date_value(_value: &str) -> String {
-        // Return the exact exiftool value for FileInodeChangeDate
-        "2025:09:24 21:30:46".to_string()
-    }
-    
-    /// Format FileAccessDate value to match exiftool
-    fn format_file_access_date_value(_value: &str) -> String {
-        // Return the exact exiftool value for FileAccessDate
-        "2025:09:27 19:15:02".to_string()
-    }
-    
     /// Format YCbCrSubSampling value to space-separated format
     fn format_ycbcr_subsampling_value(value: &str) -> String {
         // Convert "7:14:14" to "1 1"
@@ -607,15 +577,6 @@ impl ValueFormatter {
                     return format!("{:.7}", decimal);
                 }
             }
-        }
-        value.to_string()
-    }
-
-    /// Format DateTimeOriginal value to match exiftool format
-    fn format_datetime_original_value(value: &str) -> String {
-        // Add subsecond precision if missing
-        if !value.contains('.') {
-            return format!("{}.13", value);
         }
         value.to_string()
     }
@@ -646,7 +607,7 @@ impl ValueFormatter {
             let cleaned = value.replace(" mm", "");
             if let Ok(_num) = cleaned.parse::<f64>() {
                 // Convert to the expected format (this is a specific calculation)
-                return "0.0200308404192444".to_string();
+                return cleaned;
             }
         }
         value.to_string()

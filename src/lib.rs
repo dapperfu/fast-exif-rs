@@ -3,10 +3,7 @@
 //! A high-performance EXIF metadata extraction library written in Rust.
 //! Provides comprehensive support for image and video formats with exceptional performance.
 
-use memmap2::Mmap;
 use std::collections::HashMap;
-use std::fs::File;
-use rayon::prelude::*;
 
 // Module declarations
 mod format_detection;
@@ -31,7 +28,7 @@ mod value_formatter;
 // Re-export commonly used types
 pub use format_detection::FormatDetector;
 pub use parsers::{OptimalExifParser, OptimalBatchProcessor, BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
-pub use types::{ExifError, ExifResult, ProcessingStats};
+pub use types::{ExifError, ExifResult, ParseScope, ProcessingStats, ReadOptions};
 pub use utils::ExifUtils;
 pub use writer::ExifWriter;
 pub use exif_copier::ExifCopier;
@@ -60,11 +57,32 @@ impl FastExifReader {
 
     /// Read EXIF data from file path
     pub fn read_file(&mut self, file_path: &str) -> Result<HashMap<String, String>, ExifError> {
-        let mut metadata = self.parser.parse_file(file_path)?;
-        Self::add_file_system_metadata(file_path, &mut metadata);
-        crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
+        self.read_file_with_options(file_path, &ReadOptions::full())
+    }
+
+    /// Read EXIF data with control over which tag groups are parsed.
+    ///
+    /// [`ReadOptions::datetime`] and [`ReadOptions::tags`] skip maker notes and
+    /// (unless requested) GPS, which is the usual way to trade tag coverage for
+    /// speed.
+    pub fn read_file_with_options(
+        &mut self,
+        file_path: &str,
+        options: &ReadOptions,
+    ) -> Result<HashMap<String, String>, ExifError> {
+        let mut metadata = self.parser.parse_file_with_options(file_path, options)?;
+        if options.include_file_system {
+            Self::add_file_system_metadata(file_path, &mut metadata);
+        }
+        if options.include_computed_fields {
+            crate::computed_fields::ComputedFields::add_computed_fields(&mut metadata);
+        }
         FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
         crate::value_formatter::ValueFormatter::normalize_values_to_exiftool(&mut metadata);
+        if let Some(wanted) = &options.wanted_tags {
+            let wanted_n = crate::types::wanted_normalized_set(wanted);
+            metadata.retain(|key, _| crate::types::tag_is_wanted_normalized(key, &wanted_n));
+        }
         Ok(metadata)
     }
 
@@ -139,44 +157,33 @@ impl FastExifReader {
                 }
             }
             
-            // File creation time (if available)
-            #[cfg(target_os = "macos")]
+            #[cfg(unix)]
             {
-                use std::os::macos::fs::MetadataExt;
-                let created = metadata_fs.created();
-                if let Ok(created) = created {
-                    if let Ok(duration) = created.duration_since(UNIX_EPOCH) {
-                        let timestamp = duration.as_secs();
-                        let datetime = Self::timestamp_to_datetime(timestamp);
-                        metadata.insert("FileInodeChangeDate".to_string(), datetime);
-                    }
-                }
+                use std::os::unix::fs::MetadataExt;
+                let datetime = Self::timestamp_to_datetime(metadata_fs.ctime() as u64);
+                metadata.insert("FileInodeChangeDate".to_string(), datetime);
             }
-            
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(unix))]
             {
-                // For other systems, use modification time as fallback
                 if let Ok(modified) = metadata_fs.modified() {
                     if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
-                        let timestamp = duration.as_secs();
-                        let datetime = Self::timestamp_to_datetime(timestamp);
-                        metadata.insert("FileInodeChangeDate".to_string(), datetime);
+                        metadata.insert(
+                            "FileInodeChangeDate".to_string(),
+                            Self::timestamp_to_datetime(duration.as_secs()),
+                        );
                     }
                 }
             }
         }
     }
     
-    /// Convert Unix timestamp to EXIF datetime format
+    /// Convert Unix timestamp to ExifTool file-date format (local + offset).
     fn timestamp_to_datetime(timestamp: u64) -> String {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        
-        let datetime = UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
-        let system_time = SystemTime::from(datetime);
-        
-        // Format as "YYYY:MM:DD HH:MM:SS"
-        let datetime_chrono = chrono::DateTime::<chrono::Utc>::from(system_time);
-        datetime_chrono.format("%Y:%m:%d %H:%M:%S").to_string()
+        use chrono::{Local, TimeZone};
+        match Local.timestamp_opt(timestamp as i64, 0).single() {
+            Some(dt) => dt.format("%Y:%m:%d %H:%M:%S%:z").to_string(),
+            None => String::new(),
+        }
     }
 
 }
