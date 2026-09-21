@@ -28,98 +28,558 @@ struct EncodedTag {
 }
 
 const TAGS: &[TagSpec] = &[
-    TagSpec { names: &["ImageDescription"], tag: 0x010E, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Make"], tag: 0x010F, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Model", "CameraModelName"], tag: 0x0110, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Orientation"], tag: 0x0112, dtype: 3, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["XResolution"], tag: 0x011A, dtype: 5, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["YResolution"], tag: 0x011B, dtype: 5, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["ResolutionUnit"], tag: 0x0128, dtype: 3, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Software"], tag: 0x0131, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["DateTime", "ModifyDate"], tag: 0x0132, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Artist"], tag: 0x013B, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["YCbCrPositioning"], tag: 0x0213, dtype: 3, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Copyright"], tag: 0x8298, dtype: 2, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["Rating"], tag: 0x4746, dtype: 3, kind: IfdKind::Ifd0 },
-    TagSpec { names: &["ExposureTime", "ShutterSpeed"], tag: 0x829A, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["FNumber", "Aperture"], tag: 0x829D, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["ExposureProgram"], tag: 0x8822, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["SpectralSensitivity"], tag: 0x8824, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["ISO", "ISOSpeedRatings", "ISOSpeed"], tag: 0x8827, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["SensitivityType"], tag: 0x8830, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["RecommendedExposureIndex"], tag: 0x8832, dtype: 4, kind: IfdKind::Exif },
-    TagSpec { names: &["ExifVersion"], tag: 0x9000, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["DateTimeOriginal"], tag: 0x9003, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["DateTimeDigitized", "CreateDate", "DateTimeCreated"], tag: 0x9004, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["OffsetTime"], tag: 0x9010, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["OffsetTimeOriginal"], tag: 0x9011, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["OffsetTimeDigitized"], tag: 0x9012, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["ComponentsConfiguration"], tag: 0x9101, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["CompressedBitsPerPixel"], tag: 0x9102, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["ShutterSpeedValue"], tag: 0x9201, dtype: 10, kind: IfdKind::Exif },
-    TagSpec { names: &["ApertureValue"], tag: 0x9202, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["BrightnessValue"], tag: 0x9203, dtype: 10, kind: IfdKind::Exif },
-    TagSpec { names: &["ExposureCompensation", "ExposureBiasValue"], tag: 0x9204, dtype: 10, kind: IfdKind::Exif },
-    TagSpec { names: &["MaxApertureValue"], tag: 0x9205, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["SubjectDistance"], tag: 0x9206, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["MeteringMode"], tag: 0x9207, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["LightSource"], tag: 0x9208, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["Flash"], tag: 0x9209, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["FocalLength"], tag: 0x920A, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["UserComment"], tag: 0x9286, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["SubSecTime"], tag: 0x9290, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["SubSecTimeOriginal"], tag: 0x9291, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["SubSecTimeDigitized"], tag: 0x9292, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["FlashpixVersion"], tag: 0xA000, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["ColorSpace"], tag: 0xA001, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["ExifImageWidth", "PixelXDimension"], tag: 0xA002, dtype: 4, kind: IfdKind::Exif },
-    TagSpec { names: &["ExifImageHeight", "PixelYDimension"], tag: 0xA003, dtype: 4, kind: IfdKind::Exif },
-    TagSpec { names: &["RelatedSoundFile"], tag: 0xA004, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["SensingMethod"], tag: 0xA217, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["FileSource"], tag: 0xA300, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["SceneType"], tag: 0xA301, dtype: 7, kind: IfdKind::Exif },
-    TagSpec { names: &["CustomRendered"], tag: 0xA401, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["ExposureMode"], tag: 0xA402, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["WhiteBalance"], tag: 0xA403, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["DigitalZoomRatio"], tag: 0xA404, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["FocalLengthIn35mmFormat", "FocalLengthIn35mmFilm"], tag: 0xA405, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["SceneCaptureType"], tag: 0xA406, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["GainControl"], tag: 0xA407, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["Contrast"], tag: 0xA408, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["Saturation"], tag: 0xA409, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["Sharpness"], tag: 0xA40A, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["SubjectDistanceRange"], tag: 0xA40C, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["ImageUniqueID"], tag: 0xA420, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["CameraOwnerName"], tag: 0xA430, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["SerialNumber", "BodySerialNumber"], tag: 0xA431, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["LensInfo", "Lens", "LensSpecification"], tag: 0xA432, dtype: 5, kind: IfdKind::Exif },
-    TagSpec { names: &["LensMake"], tag: 0xA433, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["LensModel"], tag: 0xA434, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["LensSerialNumber"], tag: 0xA435, dtype: 2, kind: IfdKind::Exif },
-    TagSpec { names: &["CompositeImage"], tag: 0xA460, dtype: 3, kind: IfdKind::Exif },
-    TagSpec { names: &["GPSVersionID"], tag: 0x0000, dtype: 1, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSLatitudeRef"], tag: 0x0001, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSLatitude"], tag: 0x0002, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSLongitudeRef"], tag: 0x0003, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSLongitude"], tag: 0x0004, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSAltitudeRef"], tag: 0x0005, dtype: 1, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSAltitude"], tag: 0x0006, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSTimeStamp"], tag: 0x0007, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSSatellites"], tag: 0x0008, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSStatus"], tag: 0x0009, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSMeasureMode"], tag: 0x000A, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSDOP"], tag: 0x000B, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSSpeedRef"], tag: 0x000C, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSSpeed"], tag: 0x000D, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSTrackRef"], tag: 0x000E, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSTrack"], tag: 0x000F, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSImgDirectionRef"], tag: 0x0010, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSImgDirection"], tag: 0x0011, dtype: 5, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSMapDatum"], tag: 0x0012, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSDateStamp"], tag: 0x001D, dtype: 2, kind: IfdKind::Gps },
-    TagSpec { names: &["GPSDifferential"], tag: 0x001E, dtype: 3, kind: IfdKind::Gps },
-    TagSpec { names: &["InteropIndex"], tag: 0x0001, dtype: 2, kind: IfdKind::Interop },
-    TagSpec { names: &["InteropVersion"], tag: 0x0002, dtype: 7, kind: IfdKind::Interop },
+    TagSpec {
+        names: &["ImageDescription"],
+        tag: 0x010E,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Make"],
+        tag: 0x010F,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Model", "CameraModelName"],
+        tag: 0x0110,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Orientation"],
+        tag: 0x0112,
+        dtype: 3,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["XResolution"],
+        tag: 0x011A,
+        dtype: 5,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["YResolution"],
+        tag: 0x011B,
+        dtype: 5,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["ResolutionUnit"],
+        tag: 0x0128,
+        dtype: 3,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Software"],
+        tag: 0x0131,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["DateTime", "ModifyDate"],
+        tag: 0x0132,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Artist"],
+        tag: 0x013B,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["YCbCrPositioning"],
+        tag: 0x0213,
+        dtype: 3,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Copyright"],
+        tag: 0x8298,
+        dtype: 2,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["Rating"],
+        tag: 0x4746,
+        dtype: 3,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["ExposureTime", "ShutterSpeed"],
+        tag: 0x829A,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["FNumber", "Aperture"],
+        tag: 0x829D,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExposureProgram"],
+        tag: 0x8822,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SpectralSensitivity"],
+        tag: 0x8824,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ISO", "ISOSpeedRatings", "ISOSpeed"],
+        tag: 0x8827,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SensitivityType"],
+        tag: 0x8830,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["RecommendedExposureIndex"],
+        tag: 0x8832,
+        dtype: 4,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExifVersion"],
+        tag: 0x9000,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["DateTimeOriginal"],
+        tag: 0x9003,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["DateTimeDigitized", "CreateDate", "DateTimeCreated"],
+        tag: 0x9004,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["OffsetTime"],
+        tag: 0x9010,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["OffsetTimeOriginal"],
+        tag: 0x9011,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["OffsetTimeDigitized"],
+        tag: 0x9012,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ComponentsConfiguration"],
+        tag: 0x9101,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["CompressedBitsPerPixel"],
+        tag: 0x9102,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ShutterSpeedValue"],
+        tag: 0x9201,
+        dtype: 10,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ApertureValue"],
+        tag: 0x9202,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["BrightnessValue"],
+        tag: 0x9203,
+        dtype: 10,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExposureCompensation", "ExposureBiasValue"],
+        tag: 0x9204,
+        dtype: 10,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["MaxApertureValue"],
+        tag: 0x9205,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SubjectDistance"],
+        tag: 0x9206,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["MeteringMode"],
+        tag: 0x9207,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["LightSource"],
+        tag: 0x9208,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["Flash"],
+        tag: 0x9209,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["FocalLength"],
+        tag: 0x920A,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["UserComment"],
+        tag: 0x9286,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SubSecTime"],
+        tag: 0x9290,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SubSecTimeOriginal"],
+        tag: 0x9291,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SubSecTimeDigitized"],
+        tag: 0x9292,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["FlashpixVersion"],
+        tag: 0xA000,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ColorSpace"],
+        tag: 0xA001,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExifImageWidth", "PixelXDimension"],
+        tag: 0xA002,
+        dtype: 4,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExifImageHeight", "PixelYDimension"],
+        tag: 0xA003,
+        dtype: 4,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["RelatedSoundFile"],
+        tag: 0xA004,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SensingMethod"],
+        tag: 0xA217,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["FileSource"],
+        tag: 0xA300,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SceneType"],
+        tag: 0xA301,
+        dtype: 7,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["CustomRendered"],
+        tag: 0xA401,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ExposureMode"],
+        tag: 0xA402,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["WhiteBalance"],
+        tag: 0xA403,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["DigitalZoomRatio"],
+        tag: 0xA404,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["FocalLengthIn35mmFormat", "FocalLengthIn35mmFilm"],
+        tag: 0xA405,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SceneCaptureType"],
+        tag: 0xA406,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["GainControl"],
+        tag: 0xA407,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["Contrast"],
+        tag: 0xA408,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["Saturation"],
+        tag: 0xA409,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["Sharpness"],
+        tag: 0xA40A,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SubjectDistanceRange"],
+        tag: 0xA40C,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["ImageUniqueID"],
+        tag: 0xA420,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["CameraOwnerName"],
+        tag: 0xA430,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["SerialNumber", "BodySerialNumber"],
+        tag: 0xA431,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["LensInfo", "Lens", "LensSpecification"],
+        tag: 0xA432,
+        dtype: 5,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["LensMake"],
+        tag: 0xA433,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["LensModel"],
+        tag: 0xA434,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["LensSerialNumber"],
+        tag: 0xA435,
+        dtype: 2,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["CompositeImage"],
+        tag: 0xA460,
+        dtype: 3,
+        kind: IfdKind::Exif,
+    },
+    TagSpec {
+        names: &["GPSVersionID"],
+        tag: 0x0000,
+        dtype: 1,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSLatitudeRef"],
+        tag: 0x0001,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSLatitude"],
+        tag: 0x0002,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSLongitudeRef"],
+        tag: 0x0003,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSLongitude"],
+        tag: 0x0004,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSAltitudeRef"],
+        tag: 0x0005,
+        dtype: 1,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSAltitude"],
+        tag: 0x0006,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSTimeStamp"],
+        tag: 0x0007,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSSatellites"],
+        tag: 0x0008,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSStatus"],
+        tag: 0x0009,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSMeasureMode"],
+        tag: 0x000A,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSDOP"],
+        tag: 0x000B,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSSpeedRef"],
+        tag: 0x000C,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSSpeed"],
+        tag: 0x000D,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSTrackRef"],
+        tag: 0x000E,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSTrack"],
+        tag: 0x000F,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSImgDirectionRef"],
+        tag: 0x0010,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSImgDirection"],
+        tag: 0x0011,
+        dtype: 5,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSMapDatum"],
+        tag: 0x0012,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSDateStamp"],
+        tag: 0x001D,
+        dtype: 2,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["GPSDifferential"],
+        tag: 0x001E,
+        dtype: 3,
+        kind: IfdKind::Gps,
+    },
+    TagSpec {
+        names: &["InteropIndex"],
+        tag: 0x0001,
+        dtype: 2,
+        kind: IfdKind::Interop,
+    },
+    TagSpec {
+        names: &["InteropVersion"],
+        tag: 0x0002,
+        dtype: 7,
+        kind: IfdKind::Interop,
+    },
 ];
 
 fn strip_units(value: &str) -> String {
@@ -412,7 +872,13 @@ fn encode_gps_bytes(value: &str) -> Option<Vec<u8>> {
     }
     let parts: Vec<u8> = value
         .split(|c: char| !c.is_ascii_digit())
-        .filter_map(|p| if p.is_empty() { None } else { p.parse::<u8>().ok() })
+        .filter_map(|p| {
+            if p.is_empty() {
+                None
+            } else {
+                p.parse::<u8>().ok()
+            }
+        })
         .collect();
     if parts.is_empty() {
         None
@@ -473,12 +939,22 @@ fn encode_tag(little_endian: bool, spec: &TagSpec, value: &str) -> Option<Encode
     match spec.dtype {
         1 => {
             let data = encode_gps_bytes(value)?;
-            Some(EncodedTag { tag: spec.tag, dtype: 1, count: data.len() as u32, data })
+            Some(EncodedTag {
+                tag: spec.tag,
+                dtype: 1,
+                count: data.len() as u32,
+                data,
+            })
         }
         2 => {
             let mut data = value.as_bytes().to_vec();
             data.push(0);
-            Some(EncodedTag { tag: spec.tag, dtype: 2, count: data.len() as u32, data })
+            Some(EncodedTag {
+                tag: spec.tag,
+                dtype: 2,
+                count: data.len() as u32,
+                data,
+            })
         }
         3 => {
             let n = parse_u16_enum(spec.tag, value)?;
@@ -505,25 +981,47 @@ fn encode_tag(little_endian: bool, spec: &TagSpec, value: &str) -> Option<Encode
         5 => {
             if spec.tag == 0xA432 {
                 let data = encode_lens_info(little_endian, value)?;
-                return Some(EncodedTag { tag: spec.tag, dtype: 5, count: 4, data });
+                return Some(EncodedTag {
+                    tag: spec.tag,
+                    dtype: 5,
+                    count: 4,
+                    data,
+                });
             }
             let (count, data) = encode_rationals(little_endian, value, false)?;
-            Some(EncodedTag { tag: spec.tag, dtype: 5, count, data })
+            Some(EncodedTag {
+                tag: spec.tag,
+                dtype: 5,
+                count,
+                data,
+            })
         }
         7 => {
             let data = encode_undefined(spec.tag, value)?;
-            Some(EncodedTag { tag: spec.tag, dtype: 7, count: data.len() as u32, data })
+            Some(EncodedTag {
+                tag: spec.tag,
+                dtype: 7,
+                count: data.len() as u32,
+                data,
+            })
         }
         10 => {
             let (count, data) = encode_rationals(little_endian, value, true)?;
-            Some(EncodedTag { tag: spec.tag, dtype: 10, count, data })
+            Some(EncodedTag {
+                tag: spec.tag,
+                dtype: 10,
+                count,
+                data,
+            })
         }
         _ => None,
     }
 }
 
 fn overflow_size(tags: &[EncodedTag]) -> usize {
-    tags.iter().map(|t| if t.data.len() > 4 { t.data.len() } else { 0 }).sum()
+    tags.iter()
+        .map(|t| if t.data.len() > 4 { t.data.len() } else { 0 })
+        .sum()
 }
 
 fn ifd_dir_size(count: usize) -> usize {
@@ -618,7 +1116,9 @@ pub fn encode_tiff_exif(
     }
 
     if ifd0.is_empty() && exif.is_empty() {
-        return Err(ExifError::InvalidExif("No writable EXIF fields in metadata".to_string()));
+        return Err(ExifError::InvalidExif(
+            "No writable EXIF fields in metadata".to_string(),
+        ));
     }
 
     let has_exif = !exif.is_empty() || !interop.is_empty();
@@ -636,13 +1136,23 @@ pub fn encode_tiff_exif(
     } else {
         exif_off
     };
-    let gps_off = overflow_exif_off + if has_exif { overflow_size(&exif) as u32 } else { 0 };
+    let gps_off = overflow_exif_off
+        + if has_exif {
+            overflow_size(&exif) as u32
+        } else {
+            0
+        };
     let overflow_gps_off = if has_gps {
         gps_off + ifd_dir_size(gps.len()) as u32
     } else {
         gps_off
     };
-    let interop_off = overflow_gps_off + if has_gps { overflow_size(&gps) as u32 } else { 0 };
+    let interop_off = overflow_gps_off
+        + if has_gps {
+            overflow_size(&gps) as u32
+        } else {
+            0
+        };
     let overflow_interop_off = if has_interop {
         interop_off + ifd_dir_size(interop.len()) as u32
     } else {

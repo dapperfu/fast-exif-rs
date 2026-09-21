@@ -52,9 +52,7 @@ const SKIP_COMPARE: &[&str] = &[
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() < 3 {
-        eprintln!(
-            "usage: write_roundtrip <source-with-exif> <no-exif-base> <output.jpg>"
-        );
+        eprintln!("usage: write_roundtrip <source-with-exif> <no-exif-base> <output.jpg>");
         std::process::exit(2);
     }
     if let Err(err) = run(&args[0], &args[1], &args[2]) {

@@ -28,7 +28,10 @@ impl MakerNoteParser {
             Self::parse_samsung_maker_note(data, metadata);
         } else if data[offset..offset + 5].windows(5).any(|w| w == b"RICOH") {
             Self::parse_ricoh_maker_note(data, metadata);
-        } else if data[offset..offset + 8].windows(8).any(|w| w == b"FUJIFILM") {
+        } else if data[offset..offset + 8]
+            .windows(8)
+            .any(|w| w == b"FUJIFILM")
+        {
             Self::parse_fujifilm_maker_note(data, metadata);
         } else {
             // Try to detect manufacturer from existing metadata
@@ -114,10 +117,20 @@ impl MakerNoteParser {
         while pos + 12 <= data.len() && entry_count < max_entries {
             let tag_id = u16::from_le_bytes([data[pos], data[pos + 1]]);
             let data_type = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
-            let count_val = u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]);
-            let value_offset = u32::from_le_bytes([data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11]]);
+            let count_val =
+                u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]);
+            let value_offset =
+                u32::from_le_bytes([data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11]]);
 
-            Self::parse_samsung_tag(data, tag_id, data_type, count_val, value_offset, 0, metadata);
+            Self::parse_samsung_tag(
+                data,
+                tag_id,
+                data_type,
+                count_val,
+                value_offset,
+                0,
+                metadata,
+            );
 
             pos += 12;
             entry_count += 1;
@@ -135,7 +148,7 @@ impl MakerNoteParser {
         metadata: &mut HashMap<String, String>,
     ) {
         let tag_name = Self::get_samsung_tag_name(tag_id);
-        
+
         match data_type {
             1 => {
                 if count <= 4 {
@@ -164,8 +177,18 @@ impl MakerNoteParser {
             5 => {
                 let offset = maker_note_offset + value_offset as usize;
                 if offset + 8 <= data.len() {
-                    let numerator = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
-                    let denominator = u32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]);
+                    let numerator = u32::from_le_bytes([
+                        data[offset],
+                        data[offset + 1],
+                        data[offset + 2],
+                        data[offset + 3],
+                    ]);
+                    let denominator = u32::from_le_bytes([
+                        data[offset + 4],
+                        data[offset + 5],
+                        data[offset + 6],
+                        data[offset + 7],
+                    ]);
                     if denominator != 0 {
                         let value = numerator as f64 / denominator as f64;
                         metadata.insert(tag_name, format!("{:.2}", value));
@@ -459,10 +482,20 @@ impl MakerNoteParser {
         while pos + 12 <= data.len() && entry_count < max_entries {
             let tag_id = u16::from_le_bytes([data[pos], data[pos + 1]]);
             let data_type = u16::from_le_bytes([data[pos + 2], data[pos + 3]]);
-            let count_val = u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]);
-            let value_offset = u32::from_le_bytes([data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11]]);
+            let count_val =
+                u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]);
+            let value_offset =
+                u32::from_le_bytes([data[pos + 8], data[pos + 9], data[pos + 10], data[pos + 11]]);
 
-            Self::parse_ricoh_tag(data, tag_id, data_type, count_val, value_offset, 0, metadata);
+            Self::parse_ricoh_tag(
+                data,
+                tag_id,
+                data_type,
+                count_val,
+                value_offset,
+                0,
+                metadata,
+            );
 
             pos += 12;
             entry_count += 1;
@@ -480,7 +513,7 @@ impl MakerNoteParser {
         metadata: &mut HashMap<String, String>,
     ) {
         let tag_name = Self::get_ricoh_tag_name(tag_id);
-        
+
         match data_type {
             1 => {
                 if count <= 4 {
@@ -509,8 +542,18 @@ impl MakerNoteParser {
             5 => {
                 let offset = maker_note_offset + value_offset as usize;
                 if offset + 8 <= data.len() {
-                    let numerator = u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
-                    let denominator = u32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]);
+                    let numerator = u32::from_le_bytes([
+                        data[offset],
+                        data[offset + 1],
+                        data[offset + 2],
+                        data[offset + 3],
+                    ]);
+                    let denominator = u32::from_le_bytes([
+                        data[offset + 4],
+                        data[offset + 5],
+                        data[offset + 6],
+                        data[offset + 7],
+                    ]);
                     if denominator != 0 {
                         let value = numerator as f64 / denominator as f64;
                         metadata.insert(tag_name, format!("{:.2}", value));

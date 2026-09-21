@@ -94,13 +94,9 @@ impl TiffParser {
         // Parse EXIF IFD if present (contains DateTimeOriginal, ExposureTime, etc.).
         // Adobe DNG often stores this directory at EOF while IFD0/values stay near
         // the start — skip it here if the current buffer is only a prefix.
-        if let Some(exif_ifd_offset) = Self::find_sub_ifd_offset(
-            data,
-            ifd0,
-            0x8769,
-            is_little_endian,
-            tiff_start,
-        ) {
+        if let Some(exif_ifd_offset) =
+            Self::find_sub_ifd_offset(data, ifd0, 0x8769, is_little_endian, tiff_start)
+        {
             Self::parse_ifd_if_present(
                 data,
                 tiff_start + exif_ifd_offset as usize,
@@ -113,13 +109,9 @@ impl TiffParser {
 
         // Parse GPS IFD if present (contains GPS metadata)
         if scope.gps {
-            if let Some(gps_ifd_offset) = Self::find_sub_ifd_offset(
-                data,
-                ifd0,
-                0x8825,
-                is_little_endian,
-                tiff_start,
-            ) {
+            if let Some(gps_ifd_offset) =
+                Self::find_sub_ifd_offset(data, ifd0, 0x8825, is_little_endian, tiff_start)
+            {
                 Self::parse_ifd_if_present(
                     data,
                     tiff_start + gps_ifd_offset as usize,
@@ -133,29 +125,19 @@ impl TiffParser {
 
         // Parse Interoperability IFD if present (pointer lives in ExifIFD, sometimes IFD0)
         if scope.interop {
-            let interop_from_ifd0 = Self::find_sub_ifd_offset(
-                data,
-                ifd0,
-                0xA005,
-                is_little_endian,
-                tiff_start,
-            );
-            let interop_from_exif = Self::find_sub_ifd_offset(
-                data,
-                ifd0,
-                0x8769,
-                is_little_endian,
-                tiff_start,
-            )
-            .and_then(|exif_off| {
-                Self::find_sub_ifd_offset(
-                    data,
-                    tiff_start + exif_off as usize,
-                    0xA005,
-                    is_little_endian,
-                    tiff_start,
-                )
-            });
+            let interop_from_ifd0 =
+                Self::find_sub_ifd_offset(data, ifd0, 0xA005, is_little_endian, tiff_start);
+            let interop_from_exif =
+                Self::find_sub_ifd_offset(data, ifd0, 0x8769, is_little_endian, tiff_start)
+                    .and_then(|exif_off| {
+                        Self::find_sub_ifd_offset(
+                            data,
+                            tiff_start + exif_off as usize,
+                            0xA005,
+                            is_little_endian,
+                            tiff_start,
+                        )
+                    });
             if let Some(interop_ifd_offset) = interop_from_exif.or(interop_from_ifd0) {
                 Self::parse_ifd_if_present(
                     data,
@@ -213,7 +195,8 @@ impl TiffParser {
 
         let mut pointers = Vec::new();
         Self::collect_ifd_pointers_from(data, ifd0, is_little_endian, tiff_start, &mut pointers);
-        if let Some(exif_off) = Self::find_sub_ifd_offset(data, ifd0, 0x8769, is_little_endian, tiff_start)
+        if let Some(exif_off) =
+            Self::find_sub_ifd_offset(data, ifd0, 0x8769, is_little_endian, tiff_start)
         {
             let exif_abs = tiff_start.saturating_add(exif_off as usize);
             if exif_abs + 2 <= data.len() {
@@ -1483,7 +1466,8 @@ impl TiffParser {
                     if tag_id == 0x0000 && count == 4 {
                         // GPSVersionID is stored as 4 bytes in the value_offset
                         // Read bytes in correct order (little-endian: last byte is major version)
-                        let version = format!("{}.{}.{}.{}", 
+                        let version = format!(
+                            "{}.{}.{}.{}",
                             (value_offset & 0xFF) as u8,
                             ((value_offset >> 8) & 0xFF) as u8,
                             ((value_offset >> 16) & 0xFF) as u8,
@@ -1503,16 +1487,17 @@ impl TiffParser {
                     let offset = tiff_start + value_offset as usize;
                     if offset + count as usize <= data.len() {
                         let bytes = &data[offset..offset + count as usize];
-                        
+
                         // Special handling for GPSVersionID (4 bytes)
                         if tag_id == 0x0000 && count == 4 {
                             // GPSVersionID is stored as 4 bytes in little-endian order
                             // Read bytes in correct order (little-endian: last byte is major version)
-                            let version = format!("{}.{}.{}.{}", bytes[3], bytes[2], bytes[1], bytes[0]);
+                            let version =
+                                format!("{}.{}.{}.{}", bytes[3], bytes[2], bytes[1], bytes[0]);
                             metadata.insert(tag_name, version);
                         } else if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                             let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                            
+
                             // Special formatting for GPS reference fields
                             let formatted_string = match tag_id {
                                 0x0001 => {
@@ -1533,7 +1518,7 @@ impl TiffParser {
                                 }
                                 _ => cleaned_string,
                             };
-                            
+
                             metadata.insert(tag_name, formatted_string);
                         }
                     }
@@ -1549,7 +1534,7 @@ impl TiffParser {
                     };
                     if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                         let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                        
+
                         // Special formatting for GPS reference fields
                         let formatted_string = match tag_id {
                             0x0001 => {
@@ -1570,7 +1555,7 @@ impl TiffParser {
                             }
                             _ => cleaned_string,
                         };
-                        
+
                         metadata.insert(tag_name, formatted_string);
                     }
                 } else {
@@ -1579,12 +1564,15 @@ impl TiffParser {
                         let bytes = &data[offset..offset + count as usize];
                         if let Ok(string) = String::from_utf8(bytes.to_vec()) {
                             let cleaned_string = string.trim_end_matches('\0').trim().to_string();
-                            
+
                             // Special formatting for GPS coordinates
                             let formatted_string = match tag_id {
                                 0x0002 => {
                                     // GPSLatitude - add N suffix
-                                    if cleaned_string.contains("deg") && !cleaned_string.ends_with("N") && !cleaned_string.ends_with("S") {
+                                    if cleaned_string.contains("deg")
+                                        && !cleaned_string.ends_with("N")
+                                        && !cleaned_string.ends_with("S")
+                                    {
                                         format!("{} N", cleaned_string)
                                     } else {
                                         cleaned_string
@@ -1592,7 +1580,10 @@ impl TiffParser {
                                 }
                                 0x0004 => {
                                     // GPSLongitude - add W suffix
-                                    if cleaned_string.contains("deg") && !cleaned_string.ends_with("E") && !cleaned_string.ends_with("W") {
+                                    if cleaned_string.contains("deg")
+                                        && !cleaned_string.ends_with("E")
+                                        && !cleaned_string.ends_with("W")
+                                    {
                                         format!("{} W", cleaned_string)
                                     } else {
                                         cleaned_string
@@ -1600,7 +1591,7 @@ impl TiffParser {
                                 }
                                 _ => cleaned_string,
                             };
-                            
+
                             metadata.insert(tag_name, formatted_string);
                         }
                     }
@@ -1662,7 +1653,8 @@ impl TiffParser {
                             ])
                         };
 
-                        let formatted_value = Self::format_gps_rational(tag_id, numerator, denominator);
+                        let formatted_value =
+                            Self::format_gps_rational(tag_id, numerator, denominator);
                         metadata.insert(tag_name, formatted_value);
                     }
                 } else if count == 3 {
@@ -1695,7 +1687,8 @@ impl TiffParser {
             0x0000 => {
                 // GPSVersionID - format as version string (like exiftool)
                 // GPSVersionID is stored as 4 bytes in little-endian order: build.revision.minor.major
-                format!("{}.{}.{}.{}", 
+                format!(
+                    "{}.{}.{}.{}",
                     value & 0xFF,
                     (value >> 8) & 0xFF,
                     (value >> 16) & 0xFF,
@@ -1947,7 +1940,10 @@ impl TiffParser {
             0x0004 => "W", // GPSLongitude
             _ => "",
         };
-        format!("{} deg {}' {:.2}\" {}", degrees as i32, minutes as i32, seconds, direction)
+        format!(
+            "{} deg {}' {:.2}\" {}",
+            degrees as i32, minutes as i32, seconds, direction
+        )
     }
 
     /// Convert raw shutter speed value to proper fraction format
@@ -2002,8 +1998,8 @@ impl TiffParser {
         // Known raw brightness values and their corresponding EV values
         // Based on validation results from comprehensive testing
         match raw_value {
-            644 => "0.62".to_string(),  // Samsung Galaxy S10
-            740 => "0.58".to_string(),  // Ricoh THETA V
+            644 => "0.62".to_string(), // Samsung Galaxy S10
+            740 => "0.58".to_string(), // Ricoh THETA V
             _ => {
                 // For unknown values, try to convert using APEX formula
                 // BrightnessValue is typically stored as APEX value
@@ -2035,20 +2031,27 @@ impl TiffParser {
                 "West" => "W",
                 _ => lon_ref,
             };
-            
+
             // Remove the direction suffix from coordinates if present
-            let lat_clean = lat.replace(" N", "").replace(" S", "").replace(" North", "").replace(" South", "");
-            let lon_clean = lon.replace(" E", "").replace(" W", "").replace(" East", "").replace(" West", "");
-            
+            let lat_clean = lat
+                .replace(" N", "")
+                .replace(" S", "")
+                .replace(" North", "")
+                .replace(" South", "");
+            let lon_clean = lon
+                .replace(" E", "")
+                .replace(" W", "")
+                .replace(" East", "")
+                .replace(" West", "");
+
             let gps_position = format!("{}, {} {}", lat_clean, lon_clean, lon_abbrev);
             metadata.insert("GPSPosition".to_string(), gps_position);
         }
 
         // Add GPSDateTime if we have both date and time
-        if let (Some(date), Some(time)) = (
-            metadata.get("GPSDateStamp"),
-            metadata.get("GPSTimeStamp"),
-        ) {
+        if let (Some(date), Some(time)) =
+            (metadata.get("GPSDateStamp"), metadata.get("GPSTimeStamp"))
+        {
             // Format GPSDateTime like exiftool: "YYYY:MM:DD HH:MM:SSZ"
             let gps_datetime = format!("{} {}Z", date, time);
             metadata.insert("GPSDateTime".to_string(), gps_datetime);
@@ -2121,7 +2124,10 @@ mod tests {
         crate::field_mapping::FieldMapper::normalize_metadata_to_exiftool(&mut metadata);
 
         assert_eq!(metadata.get("Make").unwrap(), "NIKON");
-        assert_eq!(metadata.get("DateTimeOriginal").unwrap(), "2026:05:10 15:03:55");
+        assert_eq!(
+            metadata.get("DateTimeOriginal").unwrap(),
+            "2026:05:10 15:03:55"
+        );
         assert_eq!(metadata.get("CreateDate").unwrap(), "2026:05:10 15:03:55");
         assert_eq!(
             metadata.get("SubSecCreateDate").unwrap(),

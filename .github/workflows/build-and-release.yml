@@ -3,218 +3,120 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v0.3.5)'
+        description: "Tag to release (e.g., v0.11.2)"
         required: true
-        default: 'v0.3.5'
+        default: "v0.11.2"
+
+permissions:
+  contents: write
 
 jobs:
-  build-wheels:
-    name: Build wheels on ${{ matrix.os }}
+  build-cli:
+    name: Build CLI on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact: exiftool-rs-linux-x86_64
+            binary: exiftool-rs
+          - os: windows-latest
+            artifact: exiftool-rs-windows-x86_64
+            binary: exiftool-rs.exe
+          - os: macos-latest
+            artifact: exiftool-rs-macos-aarch64
+            binary: exiftool-rs
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Rust dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
+      - name: Build CLI
+        run: cargo build --release --manifest-path exiftool-rs/Cargo.toml
 
-    - name: Install maturin (Linux/macOS)
-      if: runner.os != 'Windows'
-      run: pip install maturin[patchelf]
+      - name: Stage binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          dest="dist/${{ matrix.artifact }}"
+          if [[ "${{ matrix.binary }}" == *.exe ]]; then
+            dest="${dest}.exe"
+          fi
+          cp "exiftool-rs/target/release/${{ matrix.binary }}" "$dest"
+          ls -la dist
 
-    - name: Install maturin (Windows)
-      if: runner.os == 'Windows'
-      run: pip install maturin
-
-    - name: Build wheels
-      run: maturin build --release --out dist
-
-    - name: Upload wheels
-      uses: actions/upload-artifact@v4
-      with:
-        name: wheels-${{ matrix.os }}
-        path: dist/*.whl
-
-  build-sdist:
-    name: Build source distribution
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-
-    - name: Install build dependencies
-      run: pip install build
-
-    - name: Build source distribution
-      run: python -m build --sdist
-
-    - name: Upload source distribution
-      uses: actions/upload-artifact@v4
-      with:
-        name: sdist
-        path: dist/*.tar.gz
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
 
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-wheels, build-sdist]
+    needs: [build-cli]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
 
-    - name: Display structure of downloaded files
-      run: ls -la
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find . -type f \( -name 'exiftool-rs*' -o -name '*.exe' \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
 
-    - name: Prepare release assets
-      run: |
-        mkdir release-assets
-        # Copy wheels from all platforms
-        find . -name "*.whl" -exec cp {} release-assets/ \;
-        # Copy source distribution
-        find . -name "*.tar.gz" -exec cp {} release-assets/ \;
-        
-        # List all assets
-        echo "Release assets:"
-        ls -la release-assets/
+      - name: Get tag name
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
 
-    - name: Get tag name
-      id: get_tag
-      run: |
-        if [ "${{ github.event_name }}" = "push" ]; then
-          echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-        else
-          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-        fi
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: Release ${{ steps.get_tag.outputs.tag }}
+          body: |
+            ## fast-exif-rs ${{ steps.get_tag.outputs.tag }}
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.get_tag.outputs.tag }}
-        name: Release ${{ steps.get_tag.outputs.tag }}
-        body: |
-          ## Fast EXIF Reader ${{ steps.get_tag.outputs.tag }}
-          
-          ### Installation
-          
-          **From wheel (recommended):**
-          ```bash
-          pip install fast_exif_reader-*.whl
-          ```
-          
-          **From source:**
-          ```bash
-          git clone https://github.com/dapperfu/fast-exif-rs.git
-          cd fast-exif-rs
-          pip install maturin
-          maturin develop
-          ```
-          
-          ### What's New in ${{ steps.get_tag.outputs.tag }}
-          
-          - 🔒 **Security**: Upgraded pyo3 to 0.24.2 to fix security vulnerabilities
-          - 🛠️ **Compatibility**: Improved Python 3.10+ support and Windows compatibility
-          - 🚀 **CI/CD**: Enhanced GitHub Actions with better error handling and logging
-          - 📦 **Packaging**: Improved wheel building for all platforms
-          - 🐛 **Bug Fixes**: Resolved all linting and formatting issues
-          
-          ### Features
-          
-          - High-performance EXIF metadata reader built in Rust
-          - Optimized for Canon 70D and Nikon Z50 II cameras
-          - Supports RAW, HEIF, and JPEG formats
-          - Command-line interface included
-          - Multiprocessing support for batch processing
-          
-          ### Files
-          
-          - **Wheels**: Pre-compiled packages for Linux, Windows, and macOS
-          - **Source**: Source distribution for custom builds
-          
-          ### Usage
-          
-          ```python
-          from fast_exif_reader import FastExifReader
-          
-          reader = FastExifReader()
-          metadata = reader.read_file("image.jpg")
-          print(metadata["Make"])
-          ```
-          
-          ```bash
-          fast-exif-cli --help
-          ```
-        files: release-assets/*
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            Pure Rust EXIF reader (ExifTool-compatible tag names) plus the `exiftool-rs` CLI.
 
-  test-installation:
-    name: Test Installation
-    runs-on: ubuntu-latest
-    needs: [build-wheels]
+            ### Install the library
 
-    steps:
-    - uses: actions/checkout@v4
+            ```toml
+            [dependencies]
+            fast-exif-reader = "${{ steps.get_tag.outputs.tag }}"
+            ```
 
-    - name: Install Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
+            Strip a leading `v` from the tag if the crate version does not include it.
 
-    - name: Download wheels
-      uses: actions/download-artifact@v4
-      with:
-        name: wheels-ubuntu-latest
+            ### CLI
 
-    - name: Debug downloaded files
-      run: |
-        echo "Current directory structure:"
-        find . -type f -name "*.whl" -exec ls -la {} \;
+            Download a binary from this release, or:
 
-    - name: Install wheel
-      run: |
-        # Find and install the wheel file
-        find . -name "*.whl" -exec pip install {} \;
-
-    - name: Test CLI
-      run: |
-        fast-exif-cli --version
-        fast-exif-cli --help
-
-    - name: Test Python import
-      run: |
-        python -c "from fast_exif_reader import FastExifReader; print('Import successful')"
-        python -c "import fast_exif_reader; print('Version:', fast_exif_reader.__version__)"
+            ```bash
+            git clone https://github.com/dapperfu/fast-exif-rs.git
+            cd fast-exif-rs
+            make install
+            exiftool-rs extract photo.jpg
+            ```
+          files: release-assets/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

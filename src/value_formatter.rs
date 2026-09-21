@@ -9,33 +9,38 @@ impl ValueFormatter {
         // Remove ExifToolVersion since fast-exif-rs shouldn't add this field
         // It should only be present if ExifTool itself processed the file
         metadata.remove("ExifToolVersion");
-        
+
         for (key, value) in metadata.iter_mut() {
             *value = Self::format_value_for_exiftool(key, value);
         }
     }
-    
+
     /// Format a specific field value to match PyExifTool raw format
     fn format_value_for_exiftool(field_name: &str, value: &str) -> String {
         match field_name {
             // Flash values: Convert "Off, Did not fire" → "16"
             "Flash" => Self::format_flash_value(value),
-            
+
             // FocalLength values: Convert "200.0 mm" → "1612.69894386544"
             "FocalLength" => Self::format_focal_length_value(value),
-            
+
             // ImageSize values: Convert "5568x3712" → "5568 3712"
             "ImageSize" => Self::format_image_size_value(value),
-            
+
             // FocusMode values: Convert "Auto" → "AF-C"
             "FocusMode" => Self::format_focus_mode_value(value),
-            
-            "ModifyDate" | "CreateDate" | "DateTimeCreated" | "DateTimeOriginal"
-            | "SubSecCreateDate" | "SubSecDateTimeOriginal" | "SubSecModifyDate"
-            | "FileModifyDate" | "FileAccessDate" | "FileInodeChangeDate" => {
-                value.to_string()
-            }
-            
+
+            "ModifyDate"
+            | "CreateDate"
+            | "DateTimeCreated"
+            | "DateTimeOriginal"
+            | "SubSecCreateDate"
+            | "SubSecDateTimeOriginal"
+            | "SubSecModifyDate"
+            | "FileModifyDate"
+            | "FileAccessDate"
+            | "FileInodeChangeDate" => value.to_string(),
+
             // Numeric enum values
             "CustomRendered" => Self::format_custom_rendered_value(value),
             "Sharpness" => Self::format_sharpness_value(value),
@@ -43,11 +48,11 @@ impl ValueFormatter {
             "ColorSpace" => Self::format_color_space_value(value),
             "ResolutionUnit" => Self::format_resolution_unit_value(value),
             "ComponentsConfiguration" => Self::format_components_configuration_value(value),
-            
+
             // Computed fields with higher precision
             "Megapixels" => Self::format_megapixels_value(value),
             "LightValue" => Self::format_light_value_value(value),
-            
+
             // Additional enum values
             "Contrast" => Self::format_contrast_value(value),
             "LightSource" => Self::format_light_source_value(value),
@@ -75,12 +80,12 @@ impl ValueFormatter {
             "ExposureMode" => Self::format_exposure_mode_value(value),
             "CircleOfConfusion" => Self::format_circle_of_confusion_value(value),
             "GainControl" => Self::format_gain_control_value(value),
-            
+
             // Default: return as-is
             _ => value.to_string(),
         }
     }
-    
+
     /// Format Flash value to raw numeric format
     fn format_flash_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -95,8 +100,12 @@ impl ValueFormatter {
             "fired, red-eye reduction mode, return not detected" => "64".to_string(),
             "fired, red-eye reduction mode, return detected" => "69".to_string(),
             "fired, compulsory flash mode, red-eye reduction mode" => "73".to_string(),
-            "fired, compulsory flash mode, red-eye reduction mode, return not detected" => "72".to_string(),
-            "fired, compulsory flash mode, red-eye reduction mode, return detected" => "77".to_string(),
+            "fired, compulsory flash mode, red-eye reduction mode, return not detected" => {
+                "72".to_string()
+            }
+            "fired, compulsory flash mode, red-eye reduction mode, return detected" => {
+                "77".to_string()
+            }
             _ => {
                 // Try to parse as number
                 if let Ok(num) = value.parse::<u32>() {
@@ -107,7 +116,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format FocalLength value to exiftool format
     fn format_focal_length_value(value: &str) -> String {
         // Remove "mm" suffix and parse as float
@@ -118,7 +127,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format ImageSize value to space-separated format
     fn format_image_size_value(value: &str) -> String {
         if value.contains('x') {
@@ -127,7 +136,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format FocusMode value to raw format
     fn format_focus_mode_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -138,7 +147,7 @@ impl ValueFormatter {
             _ => value.to_string(),
         }
     }
-    
+
     /// Format CustomRendered value to numeric
     fn format_custom_rendered_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -153,7 +162,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format Sharpness value to numeric
     fn format_sharpness_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -169,7 +178,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format SceneCaptureType value to numeric
     fn format_scene_capture_type_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -186,7 +195,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format ColorSpace value to match exiftool
     fn format_color_space_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -195,7 +204,7 @@ impl ValueFormatter {
             _ => value.to_string(),
         }
     }
-    
+
     /// Format ResolutionUnit value to numeric
     fn format_resolution_unit_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -211,7 +220,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format ComponentsConfiguration value to numeric
     fn format_components_configuration_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -222,7 +231,7 @@ impl ValueFormatter {
             _ => value.to_string(),
         }
     }
-    
+
     /// Format Megapixels value with exact calculation
     fn format_megapixels_value(value: &str) -> String {
         if let Ok(_mp) = value.parse::<f64>() {
@@ -233,7 +242,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format LightValue value with exact calculation
     fn format_light_value_value(value: &str) -> String {
         if let Ok(_lv) = value.parse::<f64>() {
@@ -244,7 +253,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format Contrast value to numeric
     fn format_contrast_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -260,7 +269,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format LightSource value to numeric
     fn format_light_source_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -285,7 +294,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format ExposureProgram value to numeric
     fn format_exposure_program_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -306,7 +315,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format Orientation value to numeric
     fn format_orientation_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -327,7 +336,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format EncodingProcess value to numeric
     fn format_encoding_process_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -351,18 +360,18 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format PictureControlVersion value to match exiftool
     fn format_picture_control_version_value(value: &str) -> String {
         value.to_string()
     }
-    
+
     /// Format FileTypeExtension value
     fn format_file_type_extension_value(value: &str) -> String {
         // FileTypeExtension should be uppercase
         value.to_uppercase()
     }
-    
+
     /// Format YCbCrPositioning value to numeric
     fn format_ycbcr_positioning_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -377,7 +386,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format MeteringMode value to numeric
     fn format_metering_mode_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -398,7 +407,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format Saturation value to numeric
     fn format_saturation_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -414,7 +423,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format HyperfocalDistance value
     fn format_hyperfocal_distance_value(value: &str) -> String {
         // Remove "m" suffix and return exact exiftool value
@@ -425,7 +434,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format ExifByteOrder value to short format
     fn format_exif_byte_order_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -434,7 +443,7 @@ impl ValueFormatter {
             _ => value.to_string(),
         }
     }
-    
+
     /// Format WhiteBalance value to exiftool format
     fn format_white_balance_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -449,7 +458,7 @@ impl ValueFormatter {
             _ => value.to_uppercase(),
         }
     }
-    
+
     /// Format ExposureCompensation value
     fn format_exposure_compensation_value(value: &str) -> String {
         // ExposureCompensation is often stored as a fraction (e.g., 918 = 0 EV)
@@ -467,7 +476,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format BlueBalance value with higher precision
     fn format_blue_balance_value(value: &str) -> String {
         if let Ok(bb) = value.parse::<f64>() {
@@ -482,7 +491,7 @@ impl ValueFormatter {
             value.to_string()
         }
     }
-    
+
     /// Format AutoFocus value to numeric
     fn format_auto_focus_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -499,7 +508,7 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format SubjectDistanceRange value to numeric
     fn format_subject_distance_range_value(value: &str) -> String {
         match value.to_lowercase().as_str() {
@@ -516,19 +525,21 @@ impl ValueFormatter {
             }
         }
     }
-    
+
     /// Format JFIFVersion value to space-separated format
     fn format_jfif_version_value(value: &str) -> String {
         // Convert "1.1" to "1 1"
         value.replace('.', " ")
     }
-    
+
     /// Format ShutterSpeed value to decimal format
     fn format_shutter_speed_value(value: &str) -> String {
         if value.contains('/') {
             let parts: Vec<&str> = value.split('/').collect();
             if parts.len() == 2 {
-                if let (Ok(numerator), Ok(denominator)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
+                if let (Ok(numerator), Ok(denominator)) =
+                    (parts[0].parse::<f64>(), parts[1].parse::<f64>())
+                {
                     let decimal = numerator / denominator;
                     return format!("{:.7}", decimal);
                 }
@@ -536,7 +547,7 @@ impl ValueFormatter {
         }
         value.to_string()
     }
-    
+
     /// Format FocalLength35efl value to extract just the 35mm equivalent
     fn format_focal_length_35efl_value(value: &str) -> String {
         // Extract the 35mm equivalent value from strings like "200.0 mm (35 mm equivalent: 300.0 mm)"
@@ -553,7 +564,7 @@ impl ValueFormatter {
         }
         value.to_string()
     }
-    
+
     /// Format FileModifyDate value to match exiftool
     /// Format YCbCrSubSampling value to space-separated format
     fn format_ycbcr_subsampling_value(value: &str) -> String {
@@ -572,7 +583,9 @@ impl ValueFormatter {
         if value.contains('/') {
             let parts: Vec<&str> = value.split('/').collect();
             if parts.len() == 2 {
-                if let (Ok(numerator), Ok(denominator)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
+                if let (Ok(numerator), Ok(denominator)) =
+                    (parts[0].parse::<f64>(), parts[1].parse::<f64>())
+                {
                     let decimal = numerator / denominator;
                     return format!("{:.7}", decimal);
                 }

@@ -14,39 +14,34 @@ impl FieldMapper {
     pub fn new() -> Self {
         let mut fast_to_exiftool = HashMap::new();
         let mut exiftool_to_fast = HashMap::new();
-        
+
         // Standard field mappings to ensure 1:1 compatibility with exiftool
         let mappings = vec![
             // Date/Time fields
             ("DateTime", "ModifyDate"),
             ("DateTimeDigitized", "DateTimeCreated"),
-        ("TrackCreateDate", "TrackCreateDate"),
-        ("TrackModifyDate", "TrackModifyDate"),
-        ("MediaCreateDate", "MediaCreateDate"),
-        ("MediaModifyDate", "MediaModifyDate"),
-            
+            ("TrackCreateDate", "TrackCreateDate"),
+            ("TrackModifyDate", "TrackModifyDate"),
+            ("MediaCreateDate", "MediaCreateDate"),
+            ("MediaModifyDate", "MediaModifyDate"),
             // ISO fields
             ("ISOSpeedRatings", "ISO"),
             ("ISOSpeed", "ISO"),
-            
             // Image dimension fields
             ("ImageWidth", "ImageWidth"),
             ("ImageHeight", "ImageHeight"),
             ("ImageSize", "ImageSize"),
-            
             // Camera fields
             ("Make", "Make"),
             ("Model", "Model"),
             ("CameraModelName", "Model"),
             ("CameraMake", "Make"),
-            
             // Lens fields
             ("LensModel", "LensModel"),
             ("LensMake", "LensMake"),
             ("LensID", "LensID"),
             ("FocalLength", "FocalLength"),
             ("FocalLengthIn35mmFilm", "FocalLengthIn35mmFilm"),
-            
             // Exposure fields
             ("ExposureTime", "ExposureTime"),
             ("ShutterSpeed", "ShutterSpeed"),
@@ -56,30 +51,25 @@ impl FieldMapper {
             ("ExposureProgram", "ExposureProgram"),
             ("ExposureCompensation", "ExposureCompensation"),
             ("MeteringMode", "MeteringMode"),
-            
             // Flash fields
             ("Flash", "Flash"),
             ("FlashMode", "FlashMode"),
             ("FlashFired", "FlashFired"),
-            
             // Focus fields
             ("FocusMode", "FocusMode"),
             ("AutoFocus", "AutoFocus"),
             ("AFAreaMode", "AFAreaMode"),
             ("AFPointsUsed", "AFPointsUsed"),
-            
             // White balance fields
             ("WhiteBalance", "WhiteBalance"),
             ("WhiteBalanceMode", "WhiteBalanceMode"),
             ("ColorTemperature", "ColorTemperature"),
-            
             // Image processing fields
             ("Contrast", "Contrast"),
             ("Saturation", "Saturation"),
             ("Sharpness", "Sharpness"),
             ("Brightness", "Brightness"),
             ("Hue", "Hue"),
-            
             // GPS fields
             ("GPSLatitude", "GPSLatitude"),
             ("GPSLongitude", "GPSLongitude"),
@@ -87,7 +77,6 @@ impl FieldMapper {
             ("GPSLatitudeRef", "GPSLatitudeRef"),
             ("GPSLongitudeRef", "GPSLongitudeRef"),
             ("GPSAltitudeRef", "GPSAltitudeRef"),
-            
             // File fields
             ("FileName", "FileName"),
             ("Directory", "Directory"),
@@ -96,49 +85,40 @@ impl FieldMapper {
             ("FileAccessDate", "FileAccessDate"),
             ("FileInodeChangeDate", "FileInodeChangeDate"),
             ("FilePermissions", "FilePermissions"),
-            
             // Format fields
             ("Format", "Format"),
             ("FileType", "FileType"),
             ("FileTypeExtension", "FileTypeExtension"),
             ("MIMEType", "MIMEType"),
-            
             // Computed fields
             ("Megapixels", "Megapixels"),
             ("LightValue", "LightValue"),
             ("ScaleFactor35efl", "ScaleFactor35efl"),
-            
             // Color fields
             ("ColorSpace", "ColorSpace"),
             ("ColorComponents", "ColorComponents"),
             ("BitsPerSample", "BitsPerSample"),
             ("Compression", "Compression"),
             ("PhotometricInterpretation", "PhotometricInterpretation"),
-            
             // Orientation fields
             ("Orientation", "Orientation"),
             ("Rotation", "Rotation"),
-            
             // Resolution fields
             ("XResolution", "XResolution"),
             ("YResolution", "YResolution"),
             ("ResolutionUnit", "ResolutionUnit"),
-            
             // Software fields
             ("Software", "Software"),
             ("ProcessingSoftware", "ProcessingSoftware"),
             ("CameraSerialNumber", "CameraSerialNumber"),
             ("BodySerialNumber", "BodySerialNumber"),
             ("LensSerialNumber", "LensSerialNumber"),
-            
             // Maker note fields
             ("MakerNote", "MakerNote"),
             ("MakerNoteVersion", "MakerNoteVersion"),
-            
             // Interop fields
             ("InteropIndex", "InteropIndex"),
             ("InteropVersion", "InteropVersion"),
-            
             // DNG specific fields
             ("DNGVersion", "DNGVersion"),
             ("DNGBackwardVersion", "DNGBackwardVersion"),
@@ -179,14 +159,15 @@ impl FieldMapper {
             ("RecommendedExposureIndex", "RecommendedExposureIndex"),
             ("SensitivityType", "SensitivityType"),
             ("StandardOutputSensitivity", "StandardOutputSensitivity"),
-            ("RecommendedOutputSensitivity", "RecommendedOutputSensitivity"),
-            
+            (
+                "RecommendedOutputSensitivity",
+                "RecommendedOutputSensitivity",
+            ),
             // HEIF specific fields
             ("HEIFDetected", "HEIFDetected"),
             ("EncodingProcess", "EncodingProcess"),
             ("DigitalZoom", "DigitalZoom"),
             ("DigitalZoomRatio", "DigitalZoomRatio"),
-            
             // Video specific fields
             ("Duration", "Duration"),
             ("VideoFrameRate", "VideoFrameRate"),
@@ -203,7 +184,6 @@ impl FieldMapper {
             ("Description", "Description"),
             ("Comment", "Comment"),
             ("Copyright", "Copyright"),
-            
             // Additional computed fields
             ("ScaleFactor35efl", "ScaleFactor35efl"),
             ("CircleOfConfusion", "CircleOfConfusion"),
@@ -220,7 +200,10 @@ impl FieldMapper {
             ("LensCompensation", "LensCompensation"),
             ("LensDistortionParams", "LensDistortionParams"),
             ("LensVignettingParams", "LensVignettingParams"),
-            ("LensChromaticAberrationParams", "LensChromaticAberrationParams"),
+            (
+                "LensChromaticAberrationParams",
+                "LensChromaticAberrationParams",
+            ),
             ("LensShadingParams", "LensShadingParams"),
             ("LensTintParams", "LensTintParams"),
             ("LensSharpnessParams", "LensSharpnessParams"),
@@ -244,35 +227,71 @@ impl FieldMapper {
             ("LensTiltShiftParams", "LensTiltShiftParams"),
             ("LensPerspectiveParams", "LensPerspectiveParams"),
             ("LensBarrelDistortionParams", "LensBarrelDistortionParams"),
-            ("LensPincushionDistortionParams", "LensPincushionDistortionParams"),
-            ("LensMustacheDistortionParams", "LensMustacheDistortionParams"),
+            (
+                "LensPincushionDistortionParams",
+                "LensPincushionDistortionParams",
+            ),
+            (
+                "LensMustacheDistortionParams",
+                "LensMustacheDistortionParams",
+            ),
             ("LensComplexDistortionParams", "LensComplexDistortionParams"),
             ("LensRadialDistortionParams", "LensRadialDistortionParams"),
-            ("LensTangentialDistortionParams", "LensTangentialDistortionParams"),
-            ("LensThinPrismDistortionParams", "LensThinPrismDistortionParams"),
-            ("LensDecenteringDistortionParams", "LensDecenteringDistortionParams"),
+            (
+                "LensTangentialDistortionParams",
+                "LensTangentialDistortionParams",
+            ),
+            (
+                "LensThinPrismDistortionParams",
+                "LensThinPrismDistortionParams",
+            ),
+            (
+                "LensDecenteringDistortionParams",
+                "LensDecenteringDistortionParams",
+            ),
             ("LensAffineDistortionParams", "LensAffineDistortionParams"),
-            ("LensProjectiveDistortionParams", "LensProjectiveDistortionParams"),
-            ("LensHomographyDistortionParams", "LensHomographyDistortionParams"),
+            (
+                "LensProjectiveDistortionParams",
+                "LensProjectiveDistortionParams",
+            ),
+            (
+                "LensHomographyDistortionParams",
+                "LensHomographyDistortionParams",
+            ),
             ("LensFundamentalMatrixParams", "LensFundamentalMatrixParams"),
             ("LensEssentialMatrixParams", "LensEssentialMatrixParams"),
             ("LensCameraMatrixParams", "LensCameraMatrixParams"),
-            ("LensDistortionCoefficientsParams", "LensDistortionCoefficientsParams"),
+            (
+                "LensDistortionCoefficientsParams",
+                "LensDistortionCoefficientsParams",
+            ),
             ("LensIntrinsicMatrixParams", "LensIntrinsicMatrixParams"),
             ("LensExtrinsicMatrixParams", "LensExtrinsicMatrixParams"),
             ("LensRotationMatrixParams", "LensRotationMatrixParams"),
             ("LensTranslationVectorParams", "LensTranslationVectorParams"),
             ("LensCalibrationMatrixParams", "LensCalibrationMatrixParams"),
-            ("LensRectificationMatrixParams", "LensRectificationMatrixParams"),
+            (
+                "LensRectificationMatrixParams",
+                "LensRectificationMatrixParams",
+            ),
             ("LensStereoMatrixParams", "LensStereoMatrixParams"),
             ("LensEpipolarMatrixParams", "LensEpipolarMatrixParams"),
             ("LensTrifocalTensorParams", "LensTrifocalTensorParams"),
             ("LensQuadrifocalTensorParams", "LensQuadrifocalTensorParams"),
             ("LensMultifocalTensorParams", "LensMultifocalTensorParams"),
-            ("LensPluckerCoordinatesParams", "LensPluckerCoordinatesParams"),
-            ("LensGrassmannCoordinatesParams", "LensGrassmannCoordinatesParams"),
+            (
+                "LensPluckerCoordinatesParams",
+                "LensPluckerCoordinatesParams",
+            ),
+            (
+                "LensGrassmannCoordinatesParams",
+                "LensGrassmannCoordinatesParams",
+            ),
             ("LensCayleyCoordinatesParams", "LensCayleyCoordinatesParams"),
-            ("LensRodriguesCoordinatesParams", "LensRodriguesCoordinatesParams"),
+            (
+                "LensRodriguesCoordinatesParams",
+                "LensRodriguesCoordinatesParams",
+            ),
             ("LensEulerAnglesParams", "LensEulerAnglesParams"),
             ("LensQuaternionParams", "LensQuaternionParams"),
             ("LensAxisAngleParams", "LensAxisAngleParams"),
@@ -326,13 +345,13 @@ impl FieldMapper {
             ("LensThwackParams", "LensThwackParams"),
             ("LensWhopParams", "LensWhopParams"),
         ];
-        
+
         // Build bidirectional mappings
         for (fast_field, exiftool_field) in mappings {
             fast_to_exiftool.insert(fast_field.to_string(), exiftool_field.to_string());
             exiftool_to_fast.insert(exiftool_field.to_string(), fast_field.to_string());
         }
-        
+
         // Add EXIF namespace mappings for PyExifTool compatibility
         let exif_namespace_mappings = vec![
             ("ColorSpace", "EXIF:ColorSpace"),
@@ -390,39 +409,41 @@ impl FieldMapper {
             ("YCbCrPositioning", "EXIF:YCbCrPositioning"),
             ("YResolution", "EXIF:YResolution"),
         ];
-        
+
         // Add EXIF namespace mappings
         for (fast_field, exif_field) in exif_namespace_mappings {
             fast_to_exiftool.insert(fast_field.to_string(), exif_field.to_string());
             exiftool_to_fast.insert(exif_field.to_string(), fast_field.to_string());
         }
-        
+
         Self {
             fast_to_exiftool,
             exiftool_to_fast,
         }
     }
-    
+
     /// Convert fast-exif-rs field name to exiftool field name
     pub fn fast_to_exiftool(&self, field_name: &str) -> String {
-        self.fast_to_exiftool.get(field_name)
+        self.fast_to_exiftool
+            .get(field_name)
             .map(|s| s.clone())
             .unwrap_or_else(|| field_name.to_string())
     }
-    
+
     /// Convert exiftool field name to fast-exif-rs field name
     pub fn exiftool_to_fast(&self, field_name: &str) -> String {
-        self.exiftool_to_fast.get(field_name)
+        self.exiftool_to_fast
+            .get(field_name)
             .map(|s| s.clone())
             .unwrap_or_else(|| field_name.to_string())
     }
-    
+
     /// Normalize field names to exiftool standard (static method)
     pub fn normalize_metadata_to_exiftool(metadata: &mut HashMap<String, String>) {
         let mapper = FieldMapper::new();
         mapper.normalize_to_exiftool(metadata);
     }
-    
+
     /// Normalize field names to ExifTool `-s` short names.
     ///
     /// Keep the original keys. Only apply well-known remaps (DateTime →
@@ -467,22 +488,23 @@ impl FieldMapper {
             metadata.insert(key, value);
         }
     }
-    
+
     /// Normalize field names to fast-exif-rs standard
     pub fn normalize_to_fast(&self, metadata: &mut HashMap<String, String>) {
         let mut normalized = HashMap::new();
-        
+
         for (key, value) in metadata.drain() {
             let normalized_key = self.exiftool_to_fast(&key);
             normalized.insert(normalized_key, value);
         }
-        
+
         *metadata = normalized;
     }
-    
+
     /// Get all known field mappings
     pub fn get_all_mappings(&self) -> Vec<(String, String)> {
-        self.fast_to_exiftool.iter()
+        self.fast_to_exiftool
+            .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect()
     }

@@ -30,7 +30,8 @@ impl EnhancedFormatDetector {
                 || header == b"ftyphevc"
                 || header == b"ftypavci"
                 || header == b"ftypavcs"
-                || header == b"ftyphif1"  // Hasselblad HIF
+                || header == b"ftyphif1"
+            // Hasselblad HIF
             {
                 return Ok("HEIF".to_string());
             }
@@ -38,8 +39,14 @@ impl EnhancedFormatDetector {
 
         // Check for PNG format
         if data.len() >= 8 {
-            if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47
-                && data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A
+            if data[0] == 0x89
+                && data[1] == 0x50
+                && data[2] == 0x4E
+                && data[3] == 0x47
+                && data[4] == 0x0D
+                && data[5] == 0x0A
+                && data[6] == 0x1A
+                && data[7] == 0x0A
             {
                 return Ok("PNG".to_string());
             }
@@ -404,12 +411,10 @@ impl EnhancedFormatDetector {
     pub fn get_supported_formats() -> Vec<&'static str> {
         vec![
             // Image formats
-            "JPEG", "PNG", "BMP", "GIF", "WEBP", "TIFF",
-            // RAW formats
+            "JPEG", "PNG", "BMP", "GIF", "WEBP", "TIFF", // RAW formats
             "CR2", "CR3", "NEF", "ARW", "RAF", "SRW", "ORF", "PEF", "RW2", "DNG",
             // HEIF variants
-            "HEIF", "HEIC", "HIF",
-            // Video formats
+            "HEIF", "HEIC", "HIF", // Video formats
             "MP4", "MOV", "3GP", "AVI", "WMV", "WEBM", "MKV",
         ]
     }

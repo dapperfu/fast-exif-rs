@@ -1,44 +1,47 @@
 //! Fast EXIF Reader - Pure Rust Implementation
-//! 
+//!
 //! A high-performance EXIF metadata extraction library written in Rust.
 //! Provides comprehensive support for image and video formats with exceptional performance.
 
 use std::collections::HashMap;
 
 // Module declarations
+mod exif_copier;
+mod exif_encode;
 mod format_detection;
 pub mod parsers;
 mod types;
 mod utils;
 mod writer;
-mod exif_encode;
-mod exif_copier;
 
 // Enhanced format support modules
+mod computed_fields;
+mod enhanced_cr2_parser;
+mod enhanced_dng_parser;
 mod enhanced_format_detection;
+mod enhanced_heif_parser;
+mod enhanced_image_parser;
 mod enhanced_raw_parser;
 mod enhanced_video_parser;
-mod enhanced_image_parser;
-mod enhanced_cr2_parser;
-mod enhanced_heif_parser;
-mod enhanced_dng_parser;
 mod field_mapping;
-mod computed_fields;
 mod value_formatter;
 
 // Re-export commonly used types
+pub use exif_copier::ExifCopier;
 pub use format_detection::FormatDetector;
-pub use parsers::{OptimalExifParser, OptimalBatchProcessor, BmpParser, HeifParser, JpegParser, MkvParser, PngParser, RawParser, VideoParser};
+pub use parsers::{
+    BmpParser, HeifParser, JpegParser, MkvParser, OptimalBatchProcessor, OptimalExifParser,
+    PngParser, RawParser, VideoParser,
+};
 pub use types::{ExifError, ExifResult, ParseScope, ProcessingStats, ReadOptions};
 pub use utils::ExifUtils;
 pub use writer::ExifWriter;
-pub use exif_copier::ExifCopier;
 
 // Re-export enhanced parsers
 pub use enhanced_format_detection::EnhancedFormatDetector;
+pub use enhanced_image_parser::EnhancedImageParser;
 pub use enhanced_raw_parser::EnhancedRawParser;
 pub use enhanced_video_parser::EnhancedVideoParser;
-pub use enhanced_image_parser::EnhancedImageParser;
 pub use field_mapping::FieldMapper;
 
 /// Fast EXIF reader with comprehensive multimedia support
@@ -97,40 +100,43 @@ impl FastExifReader {
     }
 
     /// Read EXIF data from multiple files in parallel
-    pub fn read_files_parallel(&mut self, file_paths: Vec<String>) -> Result<Vec<HashMap<String, String>>, ExifError> {
+    pub fn read_files_parallel(
+        &mut self,
+        file_paths: Vec<String>,
+    ) -> Result<Vec<HashMap<String, String>>, ExifError> {
         let mut processor = OptimalBatchProcessor::new(50);
         processor.process_files(&file_paths)
     }
 
     /// Add file system metadata
     fn add_file_system_metadata(file_path: &str, metadata: &mut HashMap<String, String>) {
-        use std::path::Path;
         use std::fs;
+        use std::path::Path;
         use std::time::UNIX_EPOCH;
-        
+
         let path = Path::new(file_path);
-        
+
         // Add file name and directory
         if let Some(file_name) = path.file_name() {
             if let Some(name_str) = file_name.to_str() {
                 metadata.insert("FileName".to_string(), name_str.to_string());
             }
         }
-        
+
         if let Some(parent) = path.parent() {
             if let Some(parent_str) = parent.to_str() {
                 metadata.insert("Directory".to_string(), parent_str.to_string());
             }
         }
-        
+
         // Add source file path
         metadata.insert("SourceFile".to_string(), file_path.to_string());
-        
+
         // Add file metadata
         if let Ok(metadata_fs) = fs::metadata(file_path) {
             // File size
             metadata.insert("FileSize".to_string(), metadata_fs.len().to_string());
-            
+
             // File permissions (Unix-style)
             #[cfg(unix)]
             {
@@ -139,7 +145,7 @@ impl FastExifReader {
                 let mode = permissions.mode();
                 metadata.insert("FilePermissions".to_string(), format!("{:o}", mode));
             }
-            
+
             // File modification time
             if let Ok(modified) = metadata_fs.modified() {
                 if let Ok(duration) = modified.duration_since(UNIX_EPOCH) {
@@ -148,7 +154,7 @@ impl FastExifReader {
                     metadata.insert("FileModifyDate".to_string(), datetime);
                 }
             }
-            
+
             // File access time
             if let Ok(accessed) = metadata_fs.accessed() {
                 if let Ok(duration) = accessed.duration_since(UNIX_EPOCH) {
@@ -157,7 +163,7 @@ impl FastExifReader {
                     metadata.insert("FileAccessDate".to_string(), datetime);
                 }
             }
-            
+
             #[cfg(unix)]
             {
                 use std::os::unix::fs::MetadataExt;
@@ -177,7 +183,7 @@ impl FastExifReader {
             }
         }
     }
-    
+
     /// Convert Unix timestamp to ExifTool file-date format (local + offset).
     fn timestamp_to_datetime(timestamp: u64) -> String {
         use chrono::{Local, TimeZone};
@@ -186,7 +192,6 @@ impl FastExifReader {
             None => String::new(),
         }
     }
-
 }
 
 impl Default for FastExifReader {
@@ -235,7 +240,8 @@ impl FastExifWriter {
         target_path: &str,
         output_path: &str,
     ) -> Result<(), ExifError> {
-        self.writer.copy_high_priority_exif(source_path, target_path, output_path)
+        self.writer
+            .copy_high_priority_exif(source_path, target_path, output_path)
     }
 
     /// Copy high-priority EXIF fields from source bytes to target bytes
@@ -244,7 +250,8 @@ impl FastExifWriter {
         source_data: &[u8],
         target_data: &[u8],
     ) -> Result<Vec<u8>, ExifError> {
-        self.writer.copy_high_priority_exif_to_bytes(source_data, target_data)
+        self.writer
+            .copy_high_priority_exif_to_bytes(source_data, target_data)
     }
 }
 
@@ -275,7 +282,8 @@ impl FastExifCopier {
         target_path: &str,
         output_path: &str,
     ) -> Result<(), ExifError> {
-        self.copier.copy_high_priority_exif(source_path, target_path, output_path)
+        self.copier
+            .copy_high_priority_exif(source_path, target_path, output_path)
     }
 
     /// Copy high-priority EXIF fields from source bytes to target bytes
@@ -284,7 +292,8 @@ impl FastExifCopier {
         source_data: &[u8],
         target_data: &[u8],
     ) -> Result<Vec<u8>, ExifError> {
-        self.copier.copy_high_priority_exif_to_bytes(source_data, target_data)
+        self.copier
+            .copy_high_priority_exif_to_bytes(source_data, target_data)
     }
 
     /// Copy all EXIF fields from source to target image
@@ -294,7 +303,8 @@ impl FastExifCopier {
         target_path: &str,
         output_path: &str,
     ) -> Result<(), ExifError> {
-        self.copier.copy_all_exif(source_path, target_path, output_path)
+        self.copier
+            .copy_all_exif(source_path, target_path, output_path)
     }
 
     /// Copy specific EXIF fields from source to target image
@@ -305,7 +315,8 @@ impl FastExifCopier {
         output_path: &str,
         field_names: &[&str],
     ) -> Result<(), ExifError> {
-        self.copier.copy_specific_exif(source_path, target_path, output_path, field_names)
+        self.copier
+            .copy_specific_exif(source_path, target_path, output_path, field_names)
     }
 
     /// Get available EXIF fields from source image
@@ -314,7 +325,10 @@ impl FastExifCopier {
     }
 
     /// Get high-priority EXIF fields from source image
-    pub fn get_high_priority_fields(&mut self, source_path: &str) -> Result<HashMap<String, String>, ExifError> {
+    pub fn get_high_priority_fields(
+        &mut self,
+        source_path: &str,
+    ) -> Result<HashMap<String, String>, ExifError> {
         self.copier.get_high_priority_fields(source_path)
     }
 }

@@ -6,7 +6,10 @@ pub struct BmpParser;
 
 impl BmpParser {
     /// Parse BMP metadata
-    pub fn parse_bmp_exif(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    pub fn parse_bmp_exif(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         if data.len() < 14 {
             return Err(ExifError::InvalidExif("BMP file too small".to_string()));
         }
@@ -58,9 +61,14 @@ impl BmpParser {
     }
 
     /// Parse BITMAPINFOHEADER
-    fn parse_bitmapinfoheader(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    fn parse_bitmapinfoheader(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         if data.len() < 54 {
-            return Err(ExifError::InvalidExif("BITMAPINFOHEADER too small".to_string()));
+            return Err(ExifError::InvalidExif(
+                "BITMAPINFOHEADER too small".to_string(),
+            ));
         }
 
         let width = i32::from_le_bytes([data[18], data[19], data[20], data[21]]);
@@ -76,13 +84,25 @@ impl BmpParser {
 
         metadata.insert("ImageWidth".to_string(), width.abs().to_string());
         metadata.insert("ImageHeight".to_string(), height.abs().to_string());
-        metadata.insert("ImageSize".to_string(), format!("{}x{}", width.abs(), height.abs()));
+        metadata.insert(
+            "ImageSize".to_string(),
+            format!("{}x{}", width.abs(), height.abs()),
+        );
         metadata.insert("Planes".to_string(), planes.to_string());
         metadata.insert("BitDepth".to_string(), bits_per_pixel.to_string());
-        metadata.insert("Compression".to_string(), Self::get_compression_name(compression));
+        metadata.insert(
+            "Compression".to_string(),
+            Self::get_compression_name(compression),
+        );
         metadata.insert("ImageSizeBytes".to_string(), image_size.to_string());
-        metadata.insert("XPixelsPerMeter".to_string(), x_pixels_per_meter.to_string());
-        metadata.insert("YPixelsPerMeter".to_string(), y_pixels_per_meter.to_string());
+        metadata.insert(
+            "XPixelsPerMeter".to_string(),
+            x_pixels_per_meter.to_string(),
+        );
+        metadata.insert(
+            "YPixelsPerMeter".to_string(),
+            y_pixels_per_meter.to_string(),
+        );
         metadata.insert("ColorsUsed".to_string(), colors_used.to_string());
         metadata.insert("ColorsImportant".to_string(), colors_important.to_string());
 
@@ -104,12 +124,17 @@ impl BmpParser {
     }
 
     /// Parse BITMAPV4HEADER
-    fn parse_bitmapv4header(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    fn parse_bitmapv4header(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         // Parse BITMAPINFOHEADER first
         Self::parse_bitmapinfoheader(data, metadata)?;
 
         if data.len() < 108 {
-            return Err(ExifError::InvalidExif("BITMAPV4HEADER too small".to_string()));
+            return Err(ExifError::InvalidExif(
+                "BITMAPV4HEADER too small".to_string(),
+            ));
         }
 
         // Parse additional V4 fields
@@ -123,18 +148,26 @@ impl BmpParser {
         metadata.insert("GreenMask".to_string(), format!("0x{:08X}", green_mask));
         metadata.insert("BlueMask".to_string(), format!("0x{:08X}", blue_mask));
         metadata.insert("AlphaMask".to_string(), format!("0x{:08X}", alpha_mask));
-        metadata.insert("ColorSpaceType".to_string(), Self::get_color_space_name(color_space_type));
+        metadata.insert(
+            "ColorSpaceType".to_string(),
+            Self::get_color_space_name(color_space_type),
+        );
 
         Ok(())
     }
 
     /// Parse BITMAPV5HEADER
-    fn parse_bitmapv5header(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    fn parse_bitmapv5header(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         // Parse BITMAPV4HEADER first
         Self::parse_bitmapv4header(data, metadata)?;
 
         if data.len() < 124 {
-            return Err(ExifError::InvalidExif("BITMAPV5HEADER too small".to_string()));
+            return Err(ExifError::InvalidExif(
+                "BITMAPV5HEADER too small".to_string(),
+            ));
         }
 
         // Parse additional V5 fields
@@ -191,7 +224,10 @@ impl BmpParser {
         // File information
         metadata.insert("FileTypeExtension".to_string(), "bmp".to_string());
         metadata.insert("MIMEType".to_string(), "image/bmp".to_string());
-        metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        metadata.insert(
+            "ExifByteOrder".to_string(),
+            "Little-endian (Intel, II)".to_string(),
+        );
 
         // Add format-specific fields
         if !metadata.contains_key("Format") {

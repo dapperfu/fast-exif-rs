@@ -20,7 +20,7 @@ impl JpegParser {
             // No EXIF segment found - extract basic file information instead
             Self::extract_basic_jpeg_info(data, metadata);
         }
-        
+
         // Always extract JFIF information (regardless of EXIF presence)
         Self::extract_jfif_info(data, metadata);
 
@@ -50,47 +50,53 @@ impl JpegParser {
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
         metadata.insert("Format".to_string(), "image/jpeg".to_string());
-        
+
         // Extract JFIF information
         Self::extract_jfif_info(data, metadata);
-        
+
         // Extract image dimensions from JPEG header
         if let Some((width, height)) = Self::extract_jpeg_dimensions(data) {
             metadata.insert("ImageWidth".to_string(), width.to_string());
             metadata.insert("ImageHeight".to_string(), height.to_string());
             metadata.insert("ImageSize".to_string(), format!("{}x{}", width, height));
-            
+
             // Calculate megapixels
             let megapixels = (width as f32 * height as f32) / 1_000_000.0;
             metadata.insert("Megapixels".to_string(), format!("{:.1}", megapixels));
         }
-        
+
         // Extract JPEG quality and other basic info
         if let Some(quality) = Self::extract_jpeg_quality(data) {
             metadata.insert("JPEGQuality".to_string(), quality.to_string());
         }
-        
+
         // Add default values for common fields
         metadata.insert("Compression".to_string(), "JPEG".to_string());
         metadata.insert("ColorSpace".to_string(), "sRGB".to_string());
         metadata.insert("BitsPerSample".to_string(), "8".to_string());
         metadata.insert("ColorComponents".to_string(), "3".to_string());
-        
+
         // Add file source information
         metadata.insert("FileSource".to_string(), "Digital Camera".to_string());
         metadata.insert("SceneType".to_string(), "Directly photographed".to_string());
-        
+
         // Add default EXIF version
         metadata.insert("ExifVersion".to_string(), "0220".to_string());
         metadata.insert("FlashpixVersion".to_string(), "0100".to_string());
-        
+
         // Add default component configuration
-        metadata.insert("ComponentsConfiguration".to_string(), "Y, Cb, Cr, -".to_string());
-        
+        metadata.insert(
+            "ComponentsConfiguration".to_string(),
+            "Y, Cb, Cr, -".to_string(),
+        );
+
         // Add default interop information
-        metadata.insert("InteropIndex".to_string(), "R98 - DCF basic file (sRGB)".to_string());
+        metadata.insert(
+            "InteropIndex".to_string(),
+            "R98 - DCF basic file (sRGB)".to_string(),
+        );
         metadata.insert("InteropVersion".to_string(), "0100".to_string());
-        
+
         // Add default rendering information
         metadata.insert("CustomRendered".to_string(), "Normal".to_string());
         metadata.insert("ExposureMode".to_string(), "Auto".to_string());
@@ -101,7 +107,10 @@ impl JpegParser {
         metadata.insert("Saturation".to_string(), "Normal".to_string());
         metadata.insert("Sharpness".to_string(), "Normal".to_string());
         metadata.insert("SubjectDistanceRange".to_string(), "Unknown".to_string());
-        metadata.insert("SensingMethod".to_string(), "One-chip color area sensor".to_string());
+        metadata.insert(
+            "SensingMethod".to_string(),
+            "One-chip color area sensor".to_string(),
+        );
     }
 
     /// Extract JFIF (JPEG File Interchange Format) information
@@ -113,19 +122,21 @@ impl JpegParser {
                 let length = ((data[i + 2] as u16) << 8) | (data[i + 3] as u16);
                 if i + (length as usize) < data.len() {
                     let segment_start = i + 4;
-                    
+
                     // Check for JFIF identifier
-                    if segment_start + 5 < data.len() && 
-                       &data[segment_start..segment_start + 5] == b"JFIF\0" {
-                        
+                    if segment_start + 5 < data.len()
+                        && &data[segment_start..segment_start + 5] == b"JFIF\0"
+                    {
                         // Extract JFIF version
                         if segment_start + 7 < data.len() {
                             let major_version = data[segment_start + 5];
                             let minor_version = data[segment_start + 6];
-                            metadata.insert("JFIFVersion".to_string(), 
-                                format!("{}.{}", major_version, minor_version));
+                            metadata.insert(
+                                "JFIFVersion".to_string(),
+                                format!("{}.{}", major_version, minor_version),
+                            );
                         }
-                        
+
                         // Extract density unit
                         if segment_start + 8 < data.len() {
                             let density_unit = data[segment_start + 7];
@@ -133,26 +144,35 @@ impl JpegParser {
                                 0 => "None",
                                 1 => "inches",
                                 2 => "cm",
-                                _ => "Unknown"
+                                _ => "Unknown",
                             };
-                            metadata.insert("ResolutionUnit".to_string(), density_unit_str.to_string());
+                            metadata
+                                .insert("ResolutionUnit".to_string(), density_unit_str.to_string());
                         }
-                        
+
                         // Extract X and Y density
                         if segment_start + 12 < data.len() {
-                            let x_density = ((data[segment_start + 8] as u16) << 8) | (data[segment_start + 9] as u16);
-                            let y_density = ((data[segment_start + 10] as u16) << 8) | (data[segment_start + 11] as u16);
+                            let x_density = ((data[segment_start + 8] as u16) << 8)
+                                | (data[segment_start + 9] as u16);
+                            let y_density = ((data[segment_start + 10] as u16) << 8)
+                                | (data[segment_start + 11] as u16);
                             metadata.insert("XResolution".to_string(), x_density.to_string());
                             metadata.insert("YResolution".to_string(), y_density.to_string());
                         }
-                        
+
                         // Extract thumbnail dimensions
                         if segment_start + 14 < data.len() {
                             let thumb_width = data[segment_start + 12];
                             let thumb_height = data[segment_start + 13];
                             if thumb_width > 0 && thumb_height > 0 {
-                                metadata.insert("JFIFThumbnailWidth".to_string(), thumb_width.to_string());
-                                metadata.insert("JFIFThumbnailHeight".to_string(), thumb_height.to_string());
+                                metadata.insert(
+                                    "JFIFThumbnailWidth".to_string(),
+                                    thumb_width.to_string(),
+                                );
+                                metadata.insert(
+                                    "JFIFThumbnailHeight".to_string(),
+                                    thumb_height.to_string(),
+                                );
                             }
                         }
                     }
@@ -160,7 +180,7 @@ impl JpegParser {
                 break;
             }
         }
-        
+
         // Extract YCbCr SubSampling from SOF marker
         Self::extract_ycbcr_subsampling(data, metadata);
     }
@@ -171,7 +191,8 @@ impl JpegParser {
         for i in 0..data.len().saturating_sub(20) {
             if data[i] == 0xFF {
                 match data[i + 1] {
-                    0xC0..=0xC3 => { // SOF0-SOF3
+                    0xC0..=0xC3 => {
+                        // SOF0-SOF3
                         if i + 20 < data.len() {
                             // Extract component information
                             let num_components = data[i + 9];
@@ -183,18 +204,36 @@ impl JpegParser {
                                 let cb_v = data[i + 14] & 0x0F;
                                 let cr_h = (data[i + 17] >> 4) & 0x0F;
                                 let cr_v = data[i + 17] & 0x0F;
-                                
+
                                 // Determine subsampling pattern
-                                let subsampling = if y_h == 2 && y_v == 2 && cb_h == 1 && cb_v == 1 && cr_h == 1 && cr_v == 1 {
+                                let subsampling = if y_h == 2
+                                    && y_v == 2
+                                    && cb_h == 1
+                                    && cb_v == 1
+                                    && cr_h == 1
+                                    && cr_v == 1
+                                {
                                     "4:2:0".to_string()
-                                } else if y_h == 2 && y_v == 1 && cb_h == 1 && cb_v == 1 && cr_h == 1 && cr_v == 1 {
+                                } else if y_h == 2
+                                    && y_v == 1
+                                    && cb_h == 1
+                                    && cb_v == 1
+                                    && cr_h == 1
+                                    && cr_v == 1
+                                {
                                     "4:2:2".to_string()
-                                } else if y_h == 1 && y_v == 1 && cb_h == 1 && cb_v == 1 && cr_h == 1 && cr_v == 1 {
+                                } else if y_h == 1
+                                    && y_v == 1
+                                    && cb_h == 1
+                                    && cb_v == 1
+                                    && cr_h == 1
+                                    && cr_v == 1
+                                {
                                     "4:4:4".to_string()
                                 } else {
                                     format!("{}:{}:{}", y_h, cb_h, cr_h)
                                 };
-                                
+
                                 metadata.insert("YCbCrSubSampling".to_string(), subsampling);
                             }
                         }
@@ -212,7 +251,8 @@ impl JpegParser {
         for i in 0..data.len().saturating_sub(8) {
             if data[i] == 0xFF {
                 match data[i + 1] {
-                    0xC0..=0xC3 => { // SOF0-SOF3
+                    0xC0..=0xC3 => {
+                        // SOF0-SOF3
                         if i + 8 < data.len() {
                             let height = ((data[i + 5] as u16) << 8) | (data[i + 6] as u16);
                             let width = ((data[i + 7] as u16) << 8) | (data[i + 8] as u16);
@@ -237,31 +277,41 @@ impl JpegParser {
                     // Analyze quantization table to estimate quality
                     let table_start = i + 4;
                     let table_end = table_start + (length - 2) as usize;
-                    
+
                     if table_end <= data.len() {
                         // Simple quality estimation based on quantization values
                         let mut sum = 0u32;
                         let mut count = 0u32;
-                        
+
                         for j in table_start..table_end {
                             if j < data.len() {
                                 sum += data[j] as u32;
                                 count += 1;
                             }
                         }
-                        
+
                         if count > 0 {
                             let avg_quant = sum / count;
                             // Convert average quantization to quality (rough estimation)
-                            let quality = if avg_quant < 10 { 95 } 
-                                         else if avg_quant < 20 { 85 }
-                                         else if avg_quant < 30 { 75 }
-                                         else if avg_quant < 40 { 65 }
-                                         else if avg_quant < 50 { 55 }
-                                         else if avg_quant < 60 { 45 }
-                                         else if avg_quant < 70 { 35 }
-                                         else if avg_quant < 80 { 25 }
-                                         else { 15 };
+                            let quality = if avg_quant < 10 {
+                                95
+                            } else if avg_quant < 20 {
+                                85
+                            } else if avg_quant < 30 {
+                                75
+                            } else if avg_quant < 40 {
+                                65
+                            } else if avg_quant < 50 {
+                                55
+                            } else if avg_quant < 60 {
+                                45
+                            } else if avg_quant < 70 {
+                                35
+                            } else if avg_quant < 80 {
+                                25
+                            } else {
+                                15
+                            };
                             return Some(quality);
                         }
                     }
@@ -407,10 +457,10 @@ impl JpegParser {
         // File information
         metadata.insert("FileTypeExtension".to_string(), "jpg".to_string());
         metadata.insert("MIMEType".to_string(), "image/jpeg".to_string());
-        
+
         // Add file system information that exiftool provides
         Self::add_file_system_info(metadata);
-        
+
         // ExifByteOrder is now set by the TIFF parser based on actual byte order detection
 
         // Override Format field to match exiftool
@@ -473,12 +523,18 @@ impl JpegParser {
     /// Add file system information that exiftool provides
     fn add_file_system_info(metadata: &mut HashMap<String, String>) {
         // Add ExifTool version (we can add our own version)
-        metadata.insert("ExifToolVersion".to_string(), "fast-exif-rs 0.5.2".to_string());
-        
+        metadata.insert(
+            "ExifToolVersion".to_string(),
+            "fast-exif-rs 0.5.2".to_string(),
+        );
+
         // Add encoding process information
-        metadata.insert("EncodingProcess".to_string(), "Baseline DCT, Huffman coding".to_string());
-        
-        // Note: File system fields like Directory, FileName, FileSize, FileModifyDate, 
+        metadata.insert(
+            "EncodingProcess".to_string(),
+            "Baseline DCT, Huffman coding".to_string(),
+        );
+
+        // Note: File system fields like Directory, FileName, FileSize, FileModifyDate,
         // FileAccessDate, FileInodeChangeDate, FilePermissions, SourceFile are typically
         // added by the calling code that has access to the file path and file system metadata.
         // These would be added in the main library when reading from file paths.
@@ -856,13 +912,22 @@ impl JpegParser {
         let equivalent_35mm = focal_mm * crop_factor;
 
         // Format like exiftool: "18.0 mm (35 mm equivalent: 29.1 mm)"
-        format!("{} (35 mm equivalent: {:.1} mm)", focal_length, equivalent_35mm)
+        format!(
+            "{} (35 mm equivalent: {:.1} mm)",
+            focal_length, equivalent_35mm
+        )
     }
 
     /// Get crop factor for camera make/model
     fn get_crop_factor(metadata: &HashMap<String, String>) -> f32 {
-        let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
-        let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
+        let make = metadata
+            .get("Make")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let model = metadata
+            .get("Model")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
 
         // Canon APS-C cameras have specific crop factors
         if make.contains("canon") {
