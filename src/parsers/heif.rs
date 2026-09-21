@@ -269,7 +269,9 @@ impl HeifParser {
             if &data[i..i + 4] == b"Exif" && i + 8 < data.len() {
                 // Check if this is followed by a valid TIFF header
                 let tiff_start = i + 4;
-                if &data[tiff_start..tiff_start + 2] == b"II" || &data[tiff_start..tiff_start + 2] == b"MM" {
+                if &data[tiff_start..tiff_start + 2] == b"II"
+                    || &data[tiff_start..tiff_start + 2] == b"MM"
+                {
                     // Found valid EXIF with TIFF header
                     return Some(&data[tiff_start..]);
                 }
@@ -331,8 +333,9 @@ impl HeifParser {
                 // Found EXIF identifier, check for valid TIFF header
                 let exif_start = pos + 4;
                 if exif_start + 2 < data_box.len() {
-                    if &data_box[exif_start..exif_start + 2] == b"II" || 
-                       &data_box[exif_start..exif_start + 2] == b"MM" {
+                    if &data_box[exif_start..exif_start + 2] == b"II"
+                        || &data_box[exif_start..exif_start + 2] == b"MM"
+                    {
                         return Some(&data_box[exif_start..]);
                     }
                 }
@@ -807,7 +810,6 @@ impl HeifParser {
         }
     }
 
-
     /// Calculate 35mm equivalent focal length
     fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
         // Extract numeric focal length
@@ -826,13 +828,22 @@ impl HeifParser {
         let equivalent_35mm = focal_mm * crop_factor;
 
         // Format like exiftool: "18.0 mm (35 mm equivalent: 29.1 mm)"
-        format!("{} (35 mm equivalent: {:.1} mm)", focal_length, equivalent_35mm)
+        format!(
+            "{} (35 mm equivalent: {:.1} mm)",
+            focal_length, equivalent_35mm
+        )
     }
 
     /// Get crop factor for camera make/model
     fn get_crop_factor(metadata: &HashMap<String, String>) -> f32 {
-        let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
-        let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
+        let make = metadata
+            .get("Make")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let model = metadata
+            .get("Model")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
 
         // Canon APS-C cameras have specific crop factors
         if make.contains("canon") {

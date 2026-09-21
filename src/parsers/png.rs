@@ -6,14 +6,23 @@ pub struct PngParser;
 
 impl PngParser {
     /// Parse PNG EXIF data
-    pub fn parse_png_exif(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    pub fn parse_png_exif(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         if data.len() < 8 {
             return Err(ExifError::InvalidExif("PNG file too small".to_string()));
         }
 
         // Check PNG signature
-        if data[0] != 0x89 || data[1] != 0x50 || data[2] != 0x4E || data[3] != 0x47
-            || data[4] != 0x0D || data[5] != 0x0A || data[6] != 0x1A || data[7] != 0x0A
+        if data[0] != 0x89
+            || data[1] != 0x50
+            || data[2] != 0x4E
+            || data[3] != 0x47
+            || data[4] != 0x0D
+            || data[5] != 0x0A
+            || data[6] != 0x1A
+            || data[7] != 0x0A
         {
             return Err(ExifError::InvalidExif("Invalid PNG signature".to_string()));
         }
@@ -69,19 +78,18 @@ impl PngParser {
     }
 
     /// Parse PNG EXIF chunk
-    fn parse_png_exif_chunk(exif_data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    fn parse_png_exif_chunk(
+        exif_data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         // PNG EXIF data is stored in TIFF format
         // Skip the first 4 bytes which contain the TIFF header offset
         if exif_data.len() < 4 {
             return Ok(());
         }
 
-        let tiff_offset = u32::from_le_bytes([
-            exif_data[0],
-            exif_data[1],
-            exif_data[2],
-            exif_data[3],
-        ]) as usize;
+        let tiff_offset =
+            u32::from_le_bytes([exif_data[0], exif_data[1], exif_data[2], exif_data[3]]) as usize;
 
         if tiff_offset >= exif_data.len() {
             return Ok(());
@@ -89,7 +97,7 @@ impl PngParser {
 
         // Parse TIFF data starting from the offset
         let tiff_data = &exif_data[tiff_offset..];
-        
+
         // Use the existing TIFF parser to parse the EXIF data
         crate::parsers::tiff::TiffParser::parse_tiff_exif(tiff_data, metadata)
     }
@@ -105,7 +113,7 @@ impl PngParser {
             if null_pos > 0 && null_pos < data.len() - 1 {
                 let keyword = String::from_utf8_lossy(&data[..null_pos]);
                 let text = String::from_utf8_lossy(&data[null_pos + 1..]);
-                
+
                 // Map common PNG text keywords to EXIF fields
                 match keyword.as_ref() {
                     "Software" => {
@@ -146,23 +154,24 @@ impl PngParser {
             if null_pos > 0 && null_pos < data.len() - 1 {
                 let keyword = String::from_utf8_lossy(&data[..null_pos]);
                 let remaining = &data[null_pos + 1..];
-                
+
                 // Skip compression flag, compression method, language tag, translated keyword
                 let mut text_start = 0;
                 let mut null_count = 0;
                 for (i, &byte) in remaining.iter().enumerate() {
                     if byte == 0 {
                         null_count += 1;
-                        if null_count == 4 { // After 4 nulls, we have the text
+                        if null_count == 4 {
+                            // After 4 nulls, we have the text
                             text_start = i + 1;
                             break;
                         }
                     }
                 }
-                
+
                 if text_start < remaining.len() {
                     let text = String::from_utf8_lossy(&remaining[text_start..]);
-                    
+
                     // Map common PNG text keywords to EXIF fields
                     match keyword.as_ref() {
                         "Software" => {
@@ -231,7 +240,10 @@ impl PngParser {
         // File information
         metadata.insert("FileTypeExtension".to_string(), "png".to_string());
         metadata.insert("MIMEType".to_string(), "image/png".to_string());
-        metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        metadata.insert(
+            "ExifByteOrder".to_string(),
+            "Little-endian (Intel, II)".to_string(),
+        );
 
         // Add format-specific fields
         if !metadata.contains_key("Format") {

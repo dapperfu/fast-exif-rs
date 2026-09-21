@@ -1,5 +1,5 @@
 //! EXIF Tool RS - A fast EXIF metadata extraction tool
-//! 
+//!
 //! This CLI tool provides fast EXIF metadata extraction with support for:
 //! - Short tags (compact output)
 //! - Known EXIF parameters and values
@@ -8,7 +8,7 @@
 
 use clap::{Parser, Subcommand};
 use colored::*;
-use fast_exif_reader::{FastExifReader, ExifError};
+use fast_exif_reader::{ExifError, FastExifReader};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -21,7 +21,9 @@ use walkdir::WalkDir;
 #[command(name = "exiftool-rs")]
 #[command(version = "0.4.1")]
 #[command(about = "A fast EXIF metadata extraction tool")]
-#[command(long_about = "A high-performance EXIF metadata extraction tool that supports short tags, known parameters, and multiple output formats.")]
+#[command(
+    long_about = "A high-performance EXIF metadata extraction tool that supports short tags, known parameters, and multiple output formats."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -34,27 +36,27 @@ enum Commands {
         /// Input files or directories
         #[arg(required = true)]
         inputs: Vec<String>,
-        
+
         /// Use short tags (compact output)
         #[arg(short, long)]
         short: bool,
-        
+
         /// Output format
         #[arg(short, long, default_value = "text")]
         format: OutputFormat,
-        
+
         /// Recursively process directories
         #[arg(short, long)]
         recursive: bool,
-        
+
         /// Show only specific tags
         #[arg(short, long)]
         tags: Option<Vec<String>>,
-        
+
         /// Show file names
         #[arg(long)]
         filenames: bool,
-        
+
         /// Quiet mode (minimal output)
         #[arg(short, long)]
         quiet: bool,
@@ -64,7 +66,7 @@ enum Commands {
         /// Show only short tag names
         #[arg(short, long)]
         short: bool,
-        
+
         /// Filter by tag category
         #[arg(short, long)]
         category: Option<String>,
@@ -76,27 +78,27 @@ enum Commands {
         /// Input files or directories to benchmark
         #[arg(required = true)]
         inputs: Vec<String>,
-        
+
         /// Recursively process directories
         #[arg(short, long)]
         recursive: bool,
-        
+
         /// Number of iterations to run for more accurate timing
         #[arg(short, long, default_value = "1")]
         iterations: u32,
-        
+
         /// Show detailed per-file timing
         #[arg(long)]
         detailed: bool,
-        
+
         /// Output format for benchmark results
         #[arg(short, long, default_value = "text")]
         format: BenchmarkFormat,
-        
+
         /// Use parallel processing for better performance
         #[arg(long)]
         parallel: bool,
-        
+
         /// Number of threads for parallel processing (0 = auto-detect)
         #[arg(long, default_value = "0")]
         threads: usize,
@@ -119,16 +121,16 @@ enum BenchmarkFormat {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    
+
     match cli.command {
-        Commands::Extract { 
-            inputs, 
-            short, 
-            format, 
-            recursive, 
-            tags, 
-            filenames, 
-            quiet 
+        Commands::Extract {
+            inputs,
+            short,
+            format,
+            recursive,
+            tags,
+            filenames,
+            quiet,
         } => {
             extract_exif_data(inputs, short, format, recursive, tags, filenames, quiet)?;
         }
@@ -138,19 +140,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Info => {
             show_info()?;
         }
-        Commands::Benchmark { 
-            inputs, 
-            recursive, 
-            iterations, 
-            detailed, 
+        Commands::Benchmark {
+            inputs,
+            recursive,
+            iterations,
+            detailed,
             format,
             parallel,
-            threads
+            threads,
         } => {
-            benchmark_exif_extraction(inputs, recursive, iterations, detailed, format, parallel, threads)?;
+            benchmark_exif_extraction(
+                inputs, recursive, iterations, detailed, format, parallel, threads,
+            )?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -165,26 +169,43 @@ fn extract_exif_data(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = FastExifReader::new();
     let mut all_results = Vec::new();
-    
+
     for input in inputs {
         let path = Path::new(&input);
-        
+
         if path.is_file() {
-            process_file(&mut reader, path, &mut all_results, short, &tags, filenames, quiet)?;
+            process_file(
+                &mut reader,
+                path,
+                &mut all_results,
+                short,
+                &tags,
+                filenames,
+                quiet,
+            )?;
         } else if path.is_dir() {
-            process_directory(&mut reader, path, &mut all_results, short, &tags, filenames, quiet, recursive)?;
+            process_directory(
+                &mut reader,
+                path,
+                &mut all_results,
+                short,
+                &tags,
+                filenames,
+                quiet,
+                recursive,
+            )?;
         } else {
             eprintln!("{}: File or directory not found", input.red());
         }
     }
-    
+
     // Output results in requested format
     match format {
         OutputFormat::Text => output_text_format(&all_results, short, quiet),
         OutputFormat::Json => output_json_format(&all_results)?,
         OutputFormat::Csv => output_csv_format(&all_results)?,
     }
-    
+
     Ok(())
 }
 
@@ -204,24 +225,29 @@ fn process_file(
             } else {
                 metadata
             };
-            
+
             if !quiet {
-                println!("{}: {} EXIF fields extracted", 
-                    path.display().to_string().green(), 
+                println!(
+                    "{}: {} EXIF fields extracted",
+                    path.display().to_string().green(),
                     filtered_metadata.len()
                 );
             }
-            
+
             results.push(FileResult {
                 filename: path.to_string_lossy().to_string(),
                 metadata: filtered_metadata,
             });
         }
         Err(e) => {
-            eprintln!("{}: Error reading EXIF data: {}", path.display().to_string().red(), e);
+            eprintln!(
+                "{}: Error reading EXIF data: {}",
+                path.display().to_string().red(),
+                e
+            );
         }
     }
-    
+
     Ok(())
 }
 
@@ -240,16 +266,16 @@ fn process_directory(
     } else {
         WalkDir::new(path).max_depth(1).into_iter()
     };
-    
+
     for entry in walker {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_file() && is_image_file(path) {
             process_file(reader, path, results, short, tags, filenames, quiet)?;
         }
     }
-    
+
     Ok(())
 }
 
@@ -257,11 +283,34 @@ fn is_image_file(path: &Path) -> bool {
     if let Some(ext) = path.extension() {
         if let Some(ext_str) = ext.to_str() {
             let ext_lower = ext_str.to_lowercase();
-            return matches!(ext_lower.as_str(), 
-                "jpg" | "jpeg" | "tiff" | "tif" | "png" | "bmp" | "gif" | "webp" | 
-                "cr2" | "nef" | "arw" | "raf" | "srw" | "pef" | "rw2" | "orf" | 
-                "dng" | "heic" | "heif" | "mov" | "mp4" | "3gp" | "avi" | "wmv" | 
-                "webm" | "mkv"
+            return matches!(
+                ext_lower.as_str(),
+                "jpg"
+                    | "jpeg"
+                    | "tiff"
+                    | "tif"
+                    | "png"
+                    | "bmp"
+                    | "gif"
+                    | "webp"
+                    | "cr2"
+                    | "nef"
+                    | "arw"
+                    | "raf"
+                    | "srw"
+                    | "pef"
+                    | "rw2"
+                    | "orf"
+                    | "dng"
+                    | "heic"
+                    | "heif"
+                    | "mov"
+                    | "mp4"
+                    | "3gp"
+                    | "avi"
+                    | "wmv"
+                    | "webm"
+                    | "mkv"
             );
         }
     }
@@ -270,13 +319,13 @@ fn is_image_file(path: &Path) -> bool {
 
 fn filter_tags(metadata: &HashMap<String, String>, tags: &[String]) -> HashMap<String, String> {
     let mut filtered = HashMap::new();
-    
+
     for tag in tags {
         if let Some(value) = metadata.get(tag) {
             filtered.insert(tag.clone(), value.clone());
         }
     }
-    
+
     filtered
 }
 
@@ -285,14 +334,14 @@ fn output_text_format(results: &[FileResult], short: bool, quiet: bool) {
         if !quiet {
             println!("\n{}", format!("=== {} ===", result.filename).bold().blue());
         }
-        
+
         for (key, value) in &result.metadata {
             let display_key = if short {
                 get_short_tag(key)
             } else {
                 key.clone()
             };
-            
+
             println!("{}: {}", display_key.cyan(), value);
         }
     }
@@ -314,25 +363,28 @@ fn output_csv_format(results: &[FileResult]) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-fn list_known_tags(short: bool, category: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+fn list_known_tags(
+    short: bool,
+    category: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let tags = get_known_exif_tags();
-    
+
     println!("{}", "Known EXIF Tags".bold().green());
     println!("{}", "===============".green());
-    
+
     for (tag, info) in tags {
         if let Some(ref cat) = category {
             if !info.category.to_lowercase().contains(&cat.to_lowercase()) {
                 continue;
             }
         }
-        
+
         let display_tag = if short {
             info.short_name.clone()
         } else {
             tag.clone()
         };
-        
+
         println!("{}: {}", display_tag.cyan(), info.description);
         if !short {
             println!("  Category: {}", info.category.yellow());
@@ -340,7 +392,7 @@ fn list_known_tags(short: bool, category: Option<String>) -> Result<(), Box<dyn 
         }
         println!();
     }
-    
+
     Ok(())
 }
 
@@ -348,8 +400,14 @@ fn show_info() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "EXIF Tool RS".bold().blue());
     println!("{}", "============".blue());
     println!("Version: {}", "0.1.0".green());
-    println!("Description: {}", "A fast EXIF metadata extraction tool written in Rust".yellow());
-    println!("Repository: {}", "https://github.com/dapperfu/fast-exif-rs".cyan());
+    println!(
+        "Description: {}",
+        "A fast EXIF metadata extraction tool written in Rust".yellow()
+    );
+    println!(
+        "Repository: {}",
+        "https://github.com/dapperfu/fast-exif-rs".cyan()
+    );
     println!();
     println!("{}", "Features:".bold().green());
     println!("• High-performance EXIF extraction");
@@ -360,9 +418,11 @@ fn show_info() -> Result<(), Box<dyn std::error::Error>> {
     println!("• Known EXIF parameter definitions");
     println!();
     println!("{}", "Supported Formats:".bold().green());
-    println!("Images: JPEG, CR2, NEF, ARW, RAF, SRW, PEF, RW2, ORF, DNG, HEIF/HEIC, PNG, BMP, GIF, WEBP");
+    println!(
+        "Images: JPEG, CR2, NEF, ARW, RAF, SRW, PEF, RW2, ORF, DNG, HEIF/HEIC, PNG, BMP, GIF, WEBP"
+    );
     println!("Videos: MOV, MP4, 3GP, AVI, WMV, WEBM, MKV");
-    
+
     Ok(())
 }
 
@@ -376,11 +436,11 @@ fn benchmark_exif_extraction(
     threads: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut all_files = Vec::new();
-    
+
     // Collect all files to benchmark
     for input in inputs {
         let path = Path::new(&input);
-        
+
         if path.is_file() {
             if is_image_file(path) {
                 all_files.push(path.to_path_buf());
@@ -391,11 +451,11 @@ fn benchmark_exif_extraction(
             } else {
                 WalkDir::new(path).max_depth(1).into_iter()
             };
-            
+
             for entry in walker {
                 let entry = entry?;
                 let path = entry.path();
-                
+
                 if path.is_file() && is_image_file(path) {
                     all_files.push(path.to_path_buf());
                 }
@@ -404,43 +464,56 @@ fn benchmark_exif_extraction(
             eprintln!("{}: File or directory not found", input.red());
         }
     }
-    
+
     if all_files.is_empty() {
         eprintln!("{}", "No valid image files found to benchmark".red());
         return Ok(());
     }
-    
+
     println!("{}", "EXIF Extraction Benchmark".bold().blue());
     println!("{}", "=========================".blue());
     println!("Files to process: {}", all_files.len().to_string().green());
     println!("Iterations: {}", iterations.to_string().green());
-    println!("Parallel processing: {}", if parallel { "Enabled".green() } else { "Disabled".yellow() });
+    println!(
+        "Parallel processing: {}",
+        if parallel {
+            "Enabled".green()
+        } else {
+            "Disabled".yellow()
+        }
+    );
     if parallel && threads > 0 {
         println!("Threads: {}", threads.to_string().green());
     }
     println!();
-    
+
     let mut total_duration = Duration::new(0, 0);
     let mut successful_files = 0;
     let mut total_exif_fields = 0;
     let mut file_timings = Vec::new();
-    
+
     // Run benchmark iterations
     for iteration in 1..=iterations {
         if iterations > 1 {
-            println!("{}", format!("Iteration {}/{}", iteration, iterations).bold().yellow());
+            println!(
+                "{}",
+                format!("Iteration {}/{}", iteration, iterations)
+                    .bold()
+                    .yellow()
+            );
         }
-        
+
         let iteration_start = Instant::now();
         let mut iteration_successful = 0;
         let mut iteration_exif_fields = 0;
-        
+
         if parallel {
             // Use true parallel processing with rayon
-            let file_paths: Vec<String> = all_files.iter()
+            let file_paths: Vec<String> = all_files
+                .iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
-            
+
             // Create progress bar
             let progress = ProgressBar::new(file_paths.len() as u64);
             progress.set_style(
@@ -450,7 +523,7 @@ fn benchmark_exif_extraction(
                     .progress_chars("#>-")
             );
             progress.set_message("Processing files in parallel...");
-            
+
             // Set thread count if specified
             if threads > 0 {
                 rayon::ThreadPoolBuilder::new()
@@ -458,7 +531,7 @@ fn benchmark_exif_extraction(
                     .build_global()
                     .unwrap_or_default();
             }
-            
+
             // Process files in parallel using rayon
             let results: Vec<(String, Result<HashMap<String, String>, ExifError>)> = file_paths
                 .par_iter()
@@ -468,17 +541,17 @@ fn benchmark_exif_extraction(
                     (file_path.clone(), result)
                 })
                 .collect();
-            
+
             // Process results and update progress
             for (file_path, result) in results {
                 progress.inc(1);
-                
+
                 match result {
                     Ok(metadata) => {
                         if !metadata.is_empty() {
                             iteration_successful += 1;
                             iteration_exif_fields += metadata.len();
-                            
+
                             if detailed {
                                 file_timings.push(FileTiming {
                                     filename: file_path.clone(),
@@ -488,30 +561,40 @@ fn benchmark_exif_extraction(
                                 });
                             }
                         }
-                        
+
                         if detailed && iterations == 1 {
-                            println!("  {}: {} fields", 
-                                Path::new(&file_path).file_name().unwrap().to_string_lossy().cyan(),
+                            println!(
+                                "  {}: {} fields",
+                                Path::new(&file_path)
+                                    .file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .cyan(),
                                 metadata.len().to_string().green()
                             );
                         }
                     }
                     Err(e) => {
                         if detailed {
-                            eprintln!("  {}: Error - {}", 
-                                Path::new(&file_path).file_name().unwrap().to_string_lossy().red(),
+                            eprintln!(
+                                "  {}: Error - {}",
+                                Path::new(&file_path)
+                                    .file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .red(),
                                 e
                             );
                         }
                     }
                 }
             }
-            
+
             progress.finish_with_message("Parallel processing complete!");
         } else {
             // Use sequential processing with progress bar
             let mut reader = FastExifReader::new();
-            
+
             // Create progress bar
             let progress = ProgressBar::new(all_files.len() as u64);
             progress.set_style(
@@ -521,18 +604,18 @@ fn benchmark_exif_extraction(
                     .progress_chars("#>-")
             );
             progress.set_message("Processing files...");
-            
+
             for file_path in &all_files {
                 let file_start = Instant::now();
-                
+
                 match reader.read_file(file_path.to_str().unwrap()) {
                     Ok(metadata) => {
                         let file_duration = file_start.elapsed();
                         let field_count = metadata.len();
-                        
+
                         iteration_successful += 1;
                         iteration_exif_fields += field_count;
-                        
+
                         if detailed {
                             file_timings.push(FileTiming {
                                 filename: file_path.to_string_lossy().to_string(),
@@ -541,9 +624,10 @@ fn benchmark_exif_extraction(
                                 iteration,
                             });
                         }
-                        
+
                         if detailed && iterations == 1 {
-                            println!("  {}: {} fields in {:.3}ms", 
+                            println!(
+                                "  {}: {} fields in {:.3}ms",
                                 file_path.file_name().unwrap().to_string_lossy().cyan(),
                                 field_count.to_string().green(),
                                 file_duration.as_secs_f64() * 1000.0
@@ -552,27 +636,29 @@ fn benchmark_exif_extraction(
                     }
                     Err(e) => {
                         if detailed {
-                            eprintln!("  {}: Error - {}", 
+                            eprintln!(
+                                "  {}: Error - {}",
                                 file_path.file_name().unwrap().to_string_lossy().red(),
                                 e
                             );
                         }
                     }
                 }
-                
+
                 progress.inc(1);
             }
-            
+
             progress.finish_with_message("Processing complete!");
         }
-        
+
         let iteration_duration = iteration_start.elapsed();
         total_duration += iteration_duration;
         successful_files += iteration_successful;
         total_exif_fields += iteration_exif_fields;
-        
+
         if iterations > 1 {
-            println!("  Iteration {}: {} files, {} fields, {:.3}s", 
+            println!(
+                "  Iteration {}: {} files, {} fields, {:.3}s",
                 iteration,
                 iteration_successful,
                 iteration_exif_fields,
@@ -580,7 +666,7 @@ fn benchmark_exif_extraction(
             );
         }
     }
-    
+
     // Calculate statistics
     let avg_duration = total_duration / iterations;
     let files_per_second = if avg_duration.as_secs_f64() > 0.0 {
@@ -588,19 +674,19 @@ fn benchmark_exif_extraction(
     } else {
         0.0
     };
-    
+
     let fields_per_second = if avg_duration.as_secs_f64() > 0.0 {
         total_exif_fields as f64 / avg_duration.as_secs_f64()
     } else {
         0.0
     };
-    
+
     let success_rate = if !all_files.is_empty() {
         ((successful_files / iterations as usize) as f64 / all_files.len() as f64) * 100.0
     } else {
         0.0
     };
-    
+
     // Create benchmark results
     let results = BenchmarkResults {
         total_files: all_files.len(),
@@ -613,14 +699,14 @@ fn benchmark_exif_extraction(
         success_rate,
         file_timings: if detailed { Some(file_timings) } else { None },
     };
-    
+
     // Output results
     match format {
         BenchmarkFormat::Text => output_benchmark_text(&results)?,
         BenchmarkFormat::Json => output_benchmark_json(&results)?,
         BenchmarkFormat::Csv => output_benchmark_csv(&results)?,
     }
-    
+
     Ok(())
 }
 
@@ -628,43 +714,66 @@ fn output_benchmark_text(results: &BenchmarkResults) -> Result<(), Box<dyn std::
     println!();
     println!("{}", "Benchmark Results".bold().green());
     println!("{}", "================".green());
-    println!("Total files processed: {}", results.total_files.to_string().cyan());
+    println!(
+        "Total files processed: {}",
+        results.total_files.to_string().cyan()
+    );
     println!("Iterations: {}", results.iterations.to_string().cyan());
-    println!("Total time: {:.3}s", results.total_duration.as_secs_f64().to_string().cyan());
-    println!("Successful files: {}", results.successful_files.to_string().green());
-    println!("Total EXIF fields: {}", results.total_exif_fields.to_string().green());
-    println!("Success rate: {:.1}%", results.success_rate.to_string().yellow());
+    println!(
+        "Total time: {:.3}s",
+        results.total_duration.as_secs_f64().to_string().cyan()
+    );
+    println!(
+        "Successful files: {}",
+        results.successful_files.to_string().green()
+    );
+    println!(
+        "Total EXIF fields: {}",
+        results.total_exif_fields.to_string().green()
+    );
+    println!(
+        "Success rate: {:.1}%",
+        results.success_rate.to_string().yellow()
+    );
     println!();
     println!("{}", "Performance Metrics".bold().blue());
     println!("{}", "==================".blue());
-    println!("Files per second: {:.1}", results.files_per_second.to_string().green());
-    println!("Fields per second: {:.0}", results.fields_per_second.to_string().green());
-    println!("Average time per file: {:.3}ms", 
+    println!(
+        "Files per second: {:.1}",
+        results.files_per_second.to_string().green()
+    );
+    println!(
+        "Fields per second: {:.0}",
+        results.fields_per_second.to_string().green()
+    );
+    println!(
+        "Average time per file: {:.3}ms",
         (results.total_duration.as_secs_f64() * 1000.0) / results.total_files as f64
     );
-    
+
     if let Some(ref timings) = results.file_timings {
         println!();
         println!("{}", "Detailed File Timings".bold().purple());
         println!("{}", "=====================".purple());
-        
+
         // Sort by duration (slowest first)
         let mut sorted_timings = timings.clone();
         sorted_timings.sort_by(|a, b| b.duration.cmp(&a.duration));
-        
+
         for timing in sorted_timings.iter().take(10) {
-            println!("  {}: {:.3}ms ({} fields)", 
+            println!(
+                "  {}: {:.3}ms ({} fields)",
                 timing.filename.cyan(),
                 timing.duration.as_secs_f64() * 1000.0,
                 timing.exif_fields.to_string().green()
             );
         }
-        
+
         if timings.len() > 10 {
             println!("  ... and {} more files", timings.len() - 10);
         }
     }
-    
+
     Ok(())
 }
 
@@ -677,18 +786,22 @@ fn output_benchmark_csv(results: &BenchmarkResults) -> Result<(), Box<dyn std::e
     println!("metric,value");
     println!("total_files,{}", results.total_files);
     println!("iterations,{}", results.iterations);
-    println!("total_duration_seconds,{:.6}", results.total_duration.as_secs_f64());
+    println!(
+        "total_duration_seconds,{:.6}",
+        results.total_duration.as_secs_f64()
+    );
     println!("successful_files,{}", results.successful_files);
     println!("total_exif_fields,{}", results.total_exif_fields);
     println!("files_per_second,{:.2}", results.files_per_second);
     println!("fields_per_second,{:.0}", results.fields_per_second);
     println!("success_rate_percent,{:.1}", results.success_rate);
-    
+
     if let Some(ref timings) = results.file_timings {
         println!();
         println!("filename,duration_ms,exif_fields,iteration");
         for timing in timings {
-            println!("{},{:.3},{},{}", 
+            println!(
+                "{},{:.3},{},{}",
                 timing.filename,
                 timing.duration.as_secs_f64() * 1000.0,
                 timing.exif_fields,
@@ -696,7 +809,7 @@ fn output_benchmark_csv(results: &BenchmarkResults) -> Result<(), Box<dyn std::e
             );
         }
     }
-    
+
     Ok(())
 }
 
@@ -745,193 +858,283 @@ struct ExifTagInfo {
 
 fn get_known_exif_tags() -> HashMap<String, ExifTagInfo> {
     let mut tags = HashMap::new();
-    
+
     // Camera Information
-    tags.insert("Make".to_string(), ExifTagInfo {
-        short_name: "Make".to_string(),
-        description: "Camera manufacturer".to_string(),
-        category: "Camera".to_string(),
-    });
-    
-    tags.insert("Model".to_string(), ExifTagInfo {
-        short_name: "Model".to_string(),
-        description: "Camera model".to_string(),
-        category: "Camera".to_string(),
-    });
-    
-    tags.insert("SerialNumber".to_string(), ExifTagInfo {
-        short_name: "Serial".to_string(),
-        description: "Camera serial number".to_string(),
-        category: "Camera".to_string(),
-    });
-    
+    tags.insert(
+        "Make".to_string(),
+        ExifTagInfo {
+            short_name: "Make".to_string(),
+            description: "Camera manufacturer".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "Model".to_string(),
+        ExifTagInfo {
+            short_name: "Model".to_string(),
+            description: "Camera model".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "SerialNumber".to_string(),
+        ExifTagInfo {
+            short_name: "Serial".to_string(),
+            description: "Camera serial number".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
     // Image Properties
-    tags.insert("ImageWidth".to_string(), ExifTagInfo {
-        short_name: "Width".to_string(),
-        description: "Image width in pixels".to_string(),
-        category: "Image".to_string(),
-    });
-    
-    tags.insert("ImageHeight".to_string(), ExifTagInfo {
-        short_name: "Height".to_string(),
-        description: "Image height in pixels".to_string(),
-        category: "Image".to_string(),
-    });
-    
-    tags.insert("Orientation".to_string(), ExifTagInfo {
-        short_name: "Orientation".to_string(),
-        description: "Image orientation".to_string(),
-        category: "Image".to_string(),
-    });
-    
+    tags.insert(
+        "ImageWidth".to_string(),
+        ExifTagInfo {
+            short_name: "Width".to_string(),
+            description: "Image width in pixels".to_string(),
+            category: "Image".to_string(),
+        },
+    );
+
+    tags.insert(
+        "ImageHeight".to_string(),
+        ExifTagInfo {
+            short_name: "Height".to_string(),
+            description: "Image height in pixels".to_string(),
+            category: "Image".to_string(),
+        },
+    );
+
+    tags.insert(
+        "Orientation".to_string(),
+        ExifTagInfo {
+            short_name: "Orientation".to_string(),
+            description: "Image orientation".to_string(),
+            category: "Image".to_string(),
+        },
+    );
+
     // Date/Time
-    tags.insert("DateTime".to_string(), ExifTagInfo {
-        short_name: "DateTime".to_string(),
-        description: "Date and time when image was taken".to_string(),
-        category: "DateTime".to_string(),
-    });
-    
-    tags.insert("DateTimeOriginal".to_string(), ExifTagInfo {
-        short_name: "DateTimeOriginal".to_string(),
-        description: "Original date and time".to_string(),
-        category: "DateTime".to_string(),
-    });
-    
-    tags.insert("DateTimeDigitized".to_string(), ExifTagInfo {
-        short_name: "DateTimeDigitized".to_string(),
-        description: "Date and time when image was digitized".to_string(),
-        category: "DateTime".to_string(),
-    });
-    
+    tags.insert(
+        "DateTime".to_string(),
+        ExifTagInfo {
+            short_name: "DateTime".to_string(),
+            description: "Date and time when image was taken".to_string(),
+            category: "DateTime".to_string(),
+        },
+    );
+
+    tags.insert(
+        "DateTimeOriginal".to_string(),
+        ExifTagInfo {
+            short_name: "DateTimeOriginal".to_string(),
+            description: "Original date and time".to_string(),
+            category: "DateTime".to_string(),
+        },
+    );
+
+    tags.insert(
+        "DateTimeDigitized".to_string(),
+        ExifTagInfo {
+            short_name: "DateTimeDigitized".to_string(),
+            description: "Date and time when image was digitized".to_string(),
+            category: "DateTime".to_string(),
+        },
+    );
+
     // Camera Settings
-    tags.insert("ExposureTime".to_string(), ExifTagInfo {
-        short_name: "ExposureTime".to_string(),
-        description: "Exposure time in seconds".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("FNumber".to_string(), ExifTagInfo {
-        short_name: "FNumber".to_string(),
-        description: "Aperture f-number".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("ISO".to_string(), ExifTagInfo {
-        short_name: "ISO".to_string(),
-        description: "ISO sensitivity".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("FocalLength".to_string(), ExifTagInfo {
-        short_name: "FocalLength".to_string(),
-        description: "Focal length of lens".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("Flash".to_string(), ExifTagInfo {
-        short_name: "Flash".to_string(),
-        description: "Flash firing status".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("WhiteBalance".to_string(), ExifTagInfo {
-        short_name: "WhiteBalance".to_string(),
-        description: "White balance mode".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("ExposureMode".to_string(), ExifTagInfo {
-        short_name: "ExposureMode".to_string(),
-        description: "Exposure mode".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("MeteringMode".to_string(), ExifTagInfo {
-        short_name: "MeteringMode".to_string(),
-        description: "Metering mode".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
+    tags.insert(
+        "ExposureTime".to_string(),
+        ExifTagInfo {
+            short_name: "ExposureTime".to_string(),
+            description: "Exposure time in seconds".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "FNumber".to_string(),
+        ExifTagInfo {
+            short_name: "FNumber".to_string(),
+            description: "Aperture f-number".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "ISO".to_string(),
+        ExifTagInfo {
+            short_name: "ISO".to_string(),
+            description: "ISO sensitivity".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "FocalLength".to_string(),
+        ExifTagInfo {
+            short_name: "FocalLength".to_string(),
+            description: "Focal length of lens".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "Flash".to_string(),
+        ExifTagInfo {
+            short_name: "Flash".to_string(),
+            description: "Flash firing status".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "WhiteBalance".to_string(),
+        ExifTagInfo {
+            short_name: "WhiteBalance".to_string(),
+            description: "White balance mode".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "ExposureMode".to_string(),
+        ExifTagInfo {
+            short_name: "ExposureMode".to_string(),
+            description: "Exposure mode".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "MeteringMode".to_string(),
+        ExifTagInfo {
+            short_name: "MeteringMode".to_string(),
+            description: "Metering mode".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
     // GPS Information
-    tags.insert("GPSLatitude".to_string(), ExifTagInfo {
-        short_name: "GPSLatitude".to_string(),
-        description: "GPS latitude".to_string(),
-        category: "GPS".to_string(),
-    });
-    
-    tags.insert("GPSLongitude".to_string(), ExifTagInfo {
-        short_name: "GPSLongitude".to_string(),
-        description: "GPS longitude".to_string(),
-        category: "GPS".to_string(),
-    });
-    
-    tags.insert("GPSAltitude".to_string(), ExifTagInfo {
-        short_name: "GPSAltitude".to_string(),
-        description: "GPS altitude".to_string(),
-        category: "GPS".to_string(),
-    });
-    
+    tags.insert(
+        "GPSLatitude".to_string(),
+        ExifTagInfo {
+            short_name: "GPSLatitude".to_string(),
+            description: "GPS latitude".to_string(),
+            category: "GPS".to_string(),
+        },
+    );
+
+    tags.insert(
+        "GPSLongitude".to_string(),
+        ExifTagInfo {
+            short_name: "GPSLongitude".to_string(),
+            description: "GPS longitude".to_string(),
+            category: "GPS".to_string(),
+        },
+    );
+
+    tags.insert(
+        "GPSAltitude".to_string(),
+        ExifTagInfo {
+            short_name: "GPSAltitude".to_string(),
+            description: "GPS altitude".to_string(),
+            category: "GPS".to_string(),
+        },
+    );
+
     // File Information
-    tags.insert("FileName".to_string(), ExifTagInfo {
-        short_name: "FileName".to_string(),
-        description: "File name".to_string(),
-        category: "File".to_string(),
-    });
-    
-    tags.insert("FileSize".to_string(), ExifTagInfo {
-        short_name: "FileSize".to_string(),
-        description: "File size in bytes".to_string(),
-        category: "File".to_string(),
-    });
-    
-    tags.insert("Directory".to_string(), ExifTagInfo {
-        short_name: "Directory".to_string(),
-        description: "Directory path".to_string(),
-        category: "File".to_string(),
-    });
-    
-    tags.insert("SourceFile".to_string(), ExifTagInfo {
-        short_name: "SourceFile".to_string(),
-        description: "Source file path".to_string(),
-        category: "File".to_string(),
-    });
-    
+    tags.insert(
+        "FileName".to_string(),
+        ExifTagInfo {
+            short_name: "FileName".to_string(),
+            description: "File name".to_string(),
+            category: "File".to_string(),
+        },
+    );
+
+    tags.insert(
+        "FileSize".to_string(),
+        ExifTagInfo {
+            short_name: "FileSize".to_string(),
+            description: "File size in bytes".to_string(),
+            category: "File".to_string(),
+        },
+    );
+
+    tags.insert(
+        "Directory".to_string(),
+        ExifTagInfo {
+            short_name: "Directory".to_string(),
+            description: "Directory path".to_string(),
+            category: "File".to_string(),
+        },
+    );
+
+    tags.insert(
+        "SourceFile".to_string(),
+        ExifTagInfo {
+            short_name: "SourceFile".to_string(),
+            description: "Source file path".to_string(),
+            category: "File".to_string(),
+        },
+    );
+
     // Additional Camera Settings
-    tags.insert("ApertureValue".to_string(), ExifTagInfo {
-        short_name: "ApertureValue".to_string(),
-        description: "Aperture value".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("BrightnessValue".to_string(), ExifTagInfo {
-        short_name: "BrightnessValue".to_string(),
-        description: "Brightness value".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("ExposureBiasValue".to_string(), ExifTagInfo {
-        short_name: "ExposureBiasValue".to_string(),
-        description: "Exposure bias value".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("MaxApertureValue".to_string(), ExifTagInfo {
-        short_name: "MaxApertureValue".to_string(),
-        description: "Maximum aperture value".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("SubjectDistance".to_string(), ExifTagInfo {
-        short_name: "SubjectDistance".to_string(),
-        description: "Subject distance".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
-    tags.insert("FocalLengthIn35mmFilm".to_string(), ExifTagInfo {
-        short_name: "FocalLengthIn35mmFilm".to_string(),
-        description: "35mm equivalent focal length".to_string(),
-        category: "Camera Settings".to_string(),
-    });
-    
+    tags.insert(
+        "ApertureValue".to_string(),
+        ExifTagInfo {
+            short_name: "ApertureValue".to_string(),
+            description: "Aperture value".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "BrightnessValue".to_string(),
+        ExifTagInfo {
+            short_name: "BrightnessValue".to_string(),
+            description: "Brightness value".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "ExposureBiasValue".to_string(),
+        ExifTagInfo {
+            short_name: "ExposureBiasValue".to_string(),
+            description: "Exposure bias value".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "MaxApertureValue".to_string(),
+        ExifTagInfo {
+            short_name: "MaxApertureValue".to_string(),
+            description: "Maximum aperture value".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "SubjectDistance".to_string(),
+        ExifTagInfo {
+            short_name: "SubjectDistance".to_string(),
+            description: "Subject distance".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
+    tags.insert(
+        "FocalLengthIn35mmFilm".to_string(),
+        ExifTagInfo {
+            short_name: "FocalLengthIn35mmFilm".to_string(),
+            description: "35mm equivalent focal length".to_string(),
+            category: "Camera Settings".to_string(),
+        },
+    );
+
     tags
 }

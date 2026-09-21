@@ -129,13 +129,13 @@ impl RawParser {
 
         // File information - Remove ExifToolVersion to avoid confusion with exiftool
         // metadata.insert("ExifToolVersion".to_string(), "fast-exif-cli 0.4.8".to_string());
-        
+
         // Use actual format-specific extensions and MIME types
         let format = metadata.get("Format").cloned().unwrap_or_default();
         let (file_extension, mime_type) = Self::get_format_info(&format);
         metadata.insert("FileTypeExtension".to_string(), file_extension);
         metadata.insert("MIMEType".to_string(), mime_type);
-        
+
         // ExifByteOrder is now set by the TIFF parser based on actual byte order detection
 
         // Don't override Format field - keep the original format
@@ -425,7 +425,6 @@ impl RawParser {
         }
     }
 
-
     /// Get format-specific file extension and MIME type
     fn get_format_info(format: &str) -> (String, String) {
         match format.to_uppercase().as_str() {
@@ -441,7 +440,6 @@ impl RawParser {
             _ => ("raw".to_string(), "image/tiff".to_string()),
         }
     }
-
 
     /// Calculate 35mm equivalent focal length
     fn calculate_35mm_equivalent(focal_length: &str, metadata: &HashMap<String, String>) -> String {
@@ -461,13 +459,22 @@ impl RawParser {
         let equivalent_35mm = focal_mm * crop_factor;
 
         // Format like exiftool: "18.0 mm (35 mm equivalent: 29.1 mm)"
-        format!("{} (35 mm equivalent: {:.1} mm)", focal_length, equivalent_35mm)
+        format!(
+            "{} (35 mm equivalent: {:.1} mm)",
+            focal_length, equivalent_35mm
+        )
     }
 
     /// Get crop factor for camera make/model
     fn get_crop_factor(metadata: &HashMap<String, String>) -> f32 {
-        let make = metadata.get("Make").map(|s| s.to_lowercase()).unwrap_or_default();
-        let model = metadata.get("Model").map(|s| s.to_lowercase()).unwrap_or_default();
+        let make = metadata
+            .get("Make")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
+        let model = metadata
+            .get("Model")
+            .map(|s| s.to_lowercase())
+            .unwrap_or_default();
 
         // Canon APS-C cameras have specific crop factors
         if make.contains("canon") {
@@ -670,11 +677,15 @@ impl RawParser {
                 "{} deg {}' {:.2}\" {}, {} deg {}' {:.2}\" {}",
                 lat_degrees.abs() as i32,
                 ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32,
-                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0 - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0
+                    - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64)
+                    * 60.0,
                 lat_ref,
                 lon_degrees.abs() as i32,
                 ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32,
-                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0 - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0
+                    - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64)
+                    * 60.0,
                 lon_ref
             );
 
@@ -685,11 +696,15 @@ impl RawParser {
                 "{} deg {}' {:.2}\" {}, {} deg {}' {:.2}\" {}",
                 lat_degrees.abs() as i32,
                 ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32,
-                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0 - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0
+                    - ((lat_degrees.abs() - lat_degrees.abs() as i32 as f64) * 60.0) as i32 as f64)
+                    * 60.0,
                 lat_ref,
                 lon_degrees.abs() as i32,
                 ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32,
-                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0 - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64) * 60.0,
+                ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0
+                    - ((lon_degrees.abs() - lon_degrees.abs() as i32 as f64) * 60.0) as i32 as f64)
+                    * 60.0,
                 lon_ref
             );
 

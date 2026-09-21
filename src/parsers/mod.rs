@@ -5,19 +5,19 @@
 //! - Format-specific: Specialized parsers for specific formats
 //! - TIFF: Core TIFF-based EXIF parsing
 
-pub mod optimal;
 pub mod bmp;
 pub mod heif;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;
+pub mod optimal;
 pub mod png;
 pub mod raw;
 pub mod tiff;
 pub mod video;
 
 // Re-export optimal parser as the main parser
-pub use optimal::{OptimalExifParser, OptimalBatchProcessor};
+pub use optimal::{OptimalBatchProcessor, OptimalExifParser};
 
 // Re-export format-specific parsers
 pub use bmp::BmpParser;

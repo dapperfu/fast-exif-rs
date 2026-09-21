@@ -17,8 +17,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const IMAGE_EXTS: &[&str] = &[
-    "jpg", "jpeg", "tif", "tiff", "cr2", "cr3", "nef", "orf", "dng", "arw", "rw2", "raf",
-    "heic", "heif", "hif", "png",
+    "jpg", "jpeg", "tif", "tiff", "cr2", "cr3", "nef", "orf", "dng", "arw", "rw2", "raf", "heic",
+    "heif", "hif", "png",
 ];
 
 const DATETIME_TAGS: &[&str] = &[
@@ -96,7 +96,10 @@ fn parse_args() -> Args {
                 i += 2;
             }
             "--warmup" => {
-                warmup = raw.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(warmup);
+                warmup = raw
+                    .get(i + 1)
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(warmup);
                 i += 2;
             }
             "-h" | "--help" => {
@@ -161,10 +164,7 @@ fn run(args: &Args) -> Result<(), String> {
 
     let files = collect_images(&args.dir, args.n);
     if files.is_empty() {
-        return Err(format!(
-            "No image files found in {}",
-            args.dir.display()
-        ));
+        return Err(format!("No image files found in {}", args.dir.display()));
     }
 
     let probe_n = args.probe.min(files.len());
@@ -370,9 +370,11 @@ fn probe_tag_universe(
 fn camera_from_metadata(meta: &HashMap<String, String>) -> Option<String> {
     let lookup = |names: &[&str]| {
         names.iter().find_map(|n| {
-            meta.iter().find(|(k, v)| {
-                normalize_tag_name(k) == normalize_tag_name(n) && !v.trim().is_empty()
-            }).map(|(_, v)| v.trim().to_string())
+            meta.iter()
+                .find(|(k, v)| {
+                    normalize_tag_name(k) == normalize_tag_name(n) && !v.trim().is_empty()
+                })
+                .map(|(_, v)| v.trim().to_string())
         })
     };
     let make = lookup(&["Make", "CameraMake"]);
@@ -385,10 +387,7 @@ fn camera_from_metadata(meta: &HashMap<String, String>) -> Option<String> {
     }
 }
 
-fn read_full(
-    reader: &mut FastExifReader,
-    path: &Path,
-) -> Result<HashMap<String, String>, String> {
+fn read_full(reader: &mut FastExifReader, path: &Path) -> Result<HashMap<String, String>, String> {
     reader
         .read_file_with_options(path.to_str().unwrap_or_default(), &ReadOptions::full())
         .map_err(|e| format!("{}: {e}", path.display()))
@@ -405,10 +404,8 @@ fn bench_profiles(
     for _ in 0..warmup {
         for profile in profiles {
             for path in files {
-                let _ = reader.read_file_with_options(
-                    path.to_str().unwrap_or_default(),
-                    &profile.options,
-                );
+                let _ = reader
+                    .read_file_with_options(path.to_str().unwrap_or_default(), &profile.options);
             }
         }
     }
@@ -420,10 +417,9 @@ fn bench_profiles(
             let start = Instant::now();
             last_tags[i].clear();
             for path in files {
-                match reader.read_file_with_options(
-                    path.to_str().unwrap_or_default(),
-                    &profile.options,
-                ) {
+                match reader
+                    .read_file_with_options(path.to_str().unwrap_or_default(), &profile.options)
+                {
                     Ok(meta) => last_tags[i].extend(meta.into_keys()),
                     Err(_) => {}
                 }
@@ -435,7 +431,9 @@ fn bench_profiles(
     Ok(profiles
         .iter()
         .enumerate()
-        .map(|(i, profile)| row_from_times(profile, universe, files.len(), &times[i], &last_tags[i]))
+        .map(|(i, profile)| {
+            row_from_times(profile, universe, files.len(), &times[i], &last_tags[i])
+        })
         .collect())
 }
 
@@ -491,23 +489,31 @@ fn print_row(row: &BenchRow, full: &BenchRow) {
 fn photographer_priority(universe: &HashSet<String>) -> Vec<String> {
     let mut ordered: Vec<String> = Vec::new();
     for tag in DATETIME_TAGS.iter().chain(SHOT_TAGS.iter()) {
-        if let Some(actual) = universe.iter().find(|t| normalize_tag_name(t) == normalize_tag_name(tag)) {
-            if !ordered.iter().any(|t| normalize_tag_name(t) == normalize_tag_name(actual)) {
+        if let Some(actual) = universe
+            .iter()
+            .find(|t| normalize_tag_name(t) == normalize_tag_name(tag))
+        {
+            if !ordered
+                .iter()
+                .any(|t| normalize_tag_name(t) == normalize_tag_name(actual))
+            {
                 ordered.push(actual.clone());
             }
         }
     }
     let mut rest: Vec<String> = universe
         .iter()
-        .filter(|t| !ordered.iter().any(|o| normalize_tag_name(o) == normalize_tag_name(t)))
+        .filter(|t| {
+            !ordered
+                .iter()
+                .any(|o| normalize_tag_name(o) == normalize_tag_name(t))
+        })
         .cloned()
         .collect();
     rest.sort();
     // Cheaper groups first so the ladder actually gets faster as coverage drops:
     // remaining non-GPS non-maker-note, then GPS, then maker notes.
-    let (mn, rest): (Vec<_>, Vec<_>) = rest
-        .into_iter()
-        .partition(|t| looks_mn(t));
+    let (mn, rest): (Vec<_>, Vec<_>) = rest.into_iter().partition(|t| looks_mn(t));
     let (gps, core): (Vec<_>, Vec<_>) = rest.into_iter().partition(|t| t.starts_with("GPS"));
     ordered.extend(core);
     ordered.extend(gps);
@@ -531,7 +537,9 @@ fn looks_mn(tag: &str) -> bool {
 fn present_in(universe: &HashSet<String>, tags: &[&str]) -> Vec<String> {
     tags.iter()
         .filter(|want| {
-            universe.iter().any(|have| normalize_tag_name(have) == normalize_tag_name(want))
+            universe
+                .iter()
+                .any(|have| normalize_tag_name(have) == normalize_tag_name(want))
         })
         .map(|t| (*t).to_string())
         .collect()

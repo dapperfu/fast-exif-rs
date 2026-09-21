@@ -6,7 +6,10 @@ pub struct MkvParser;
 
 impl MkvParser {
     /// Parse MKV metadata
-    pub fn parse_mkv_exif(data: &[u8], metadata: &mut HashMap<String, String>) -> Result<(), ExifError> {
+    pub fn parse_mkv_exif(
+        data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) -> Result<(), ExifError> {
         if data.len() < 4 {
             return Err(ExifError::InvalidExif("MKV file too small".to_string()));
         }
@@ -22,7 +25,9 @@ impl MkvParser {
         // Parse EBML structure
         let mut offset = 4; // Skip MKV signature
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 Self::process_mkv_element(element_id, element_data, metadata);
                 offset += element_size;
             } else {
@@ -44,10 +49,10 @@ impl MkvParser {
 
         // Parse element ID (variable length)
         let (element_id, id_size) = Self::parse_vint(data, offset)?;
-        
+
         // Parse element size (variable length)
         let (element_size, size_size) = Self::parse_vint(data, offset + id_size)?;
-        
+
         let total_size = id_size + size_size + element_size as usize;
         if offset + total_size > data.len() {
             return None;
@@ -65,15 +70,19 @@ impl MkvParser {
 
         let first_byte = data[offset];
         let length = first_byte.leading_zeros() as usize + 1;
-        
+
         if offset + length > data.len() || length > 4 {
             return None;
         }
 
         // Safe mask calculation to avoid overflow
-        let mask = if length == 8 { 0xFF } else { (1u8 << (8 - length)) - 1 };
+        let mask = if length == 8 {
+            0xFF
+        } else {
+            (1u8 << (8 - length)) - 1
+        };
         let mut value = (first_byte & mask) as u32;
-        
+
         for i in 1..length {
             value = (value << 8) | data[offset + i] as u32;
         }
@@ -82,7 +91,11 @@ impl MkvParser {
     }
 
     /// Process MKV element
-    fn process_mkv_element(element_id: u32, element_data: &[u8], metadata: &mut HashMap<String, String>) {
+    fn process_mkv_element(
+        element_id: u32,
+        element_data: &[u8],
+        metadata: &mut HashMap<String, String>,
+    ) {
         match element_id {
             0x1A45DFA3 => {
                 // EBML Header
@@ -102,7 +115,9 @@ impl MkvParser {
     fn parse_ebml_header(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0x4286 => {
                         // EBMLVersion
@@ -159,7 +174,9 @@ impl MkvParser {
     fn parse_segment(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0x1549A966 => {
                         // Info
@@ -186,7 +203,9 @@ impl MkvParser {
     fn parse_info(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0x2AD7B1 => {
                         // TimecodeScale
@@ -231,7 +250,9 @@ impl MkvParser {
     fn parse_tracks(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0xAE => {
                         // TrackEntry
@@ -250,7 +271,9 @@ impl MkvParser {
     fn parse_track_entry(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0xD7 => {
                         // TrackNumber
@@ -307,7 +330,9 @@ impl MkvParser {
     fn parse_video_track(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0xB0 => {
                         // PixelWidth
@@ -334,7 +359,9 @@ impl MkvParser {
     fn parse_audio_track(data: &[u8], metadata: &mut HashMap<String, String>) {
         let mut offset = 0;
         while offset < data.len() {
-            if let Some((element_id, element_size, element_data)) = Self::parse_ebml_element(data, offset) {
+            if let Some((element_id, element_size, element_data)) =
+                Self::parse_ebml_element(data, offset)
+            {
                 match element_id {
                     0xB5 => {
                         // SamplingFrequency
@@ -362,7 +389,10 @@ impl MkvParser {
         // File information
         metadata.insert("FileTypeExtension".to_string(), "mkv".to_string());
         metadata.insert("MIMEType".to_string(), "video/x-matroska".to_string());
-        metadata.insert("ExifByteOrder".to_string(), "Little-endian (Intel, II)".to_string());
+        metadata.insert(
+            "ExifByteOrder".to_string(),
+            "Little-endian (Intel, II)".to_string(),
+        );
 
         // Add format-specific fields
         if !metadata.contains_key("Format") {

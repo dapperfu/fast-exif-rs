@@ -119,9 +119,9 @@ impl ReadOptions {
         S: Into<String>,
     {
         let wanted: Vec<String> = tags.into_iter().map(Into::into).collect();
-        let include_gps = wanted.iter().any(|t| {
-            t.len() >= 3 && t[..3].eq_ignore_ascii_case("gps")
-        });
+        let include_gps = wanted
+            .iter()
+            .any(|t| t.len() >= 3 && t[..3].eq_ignore_ascii_case("gps"));
         let include_maker_notes = wanted.iter().any(|t| looks_like_maker_note_tag(t));
         Self {
             include_maker_notes,
@@ -242,7 +242,6 @@ pub enum ExifError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 }
-
 
 /// Result structure for multiprocessing operations
 #[derive(Debug, Clone)]

@@ -149,7 +149,6 @@ impl ExifUtils {
             "OffsetTime",
             "OffsetTimeOriginal",
             "OffsetTimeDigitized",
-            
             // Camera information (essential for identification)
             "Make",
             "Model",
@@ -158,7 +157,6 @@ impl ExifUtils {
             "LensMake",
             "LensModel",
             "LensSerialNumber",
-            
             // Exposure settings (core photography data)
             "ExposureTime",
             "FNumber",
@@ -170,7 +168,6 @@ impl ExifUtils {
             "MeteringMode",
             "Flash",
             "WhiteBalance",
-            
             // Image properties (technical details)
             "Orientation",
             "XResolution",
@@ -179,7 +176,6 @@ impl ExifUtils {
             "PixelXDimension",
             "PixelYDimension",
             "ColorSpace",
-            
             // Advanced camera settings
             "ShutterSpeedValue",
             "ApertureValue",
@@ -194,7 +190,6 @@ impl ExifUtils {
             "Contrast",
             "Saturation",
             "Sharpness",
-            
             // Metadata
             "Artist",
             "Copyright",
@@ -223,7 +218,6 @@ impl ExifUtils {
             "YCbCrPositioning",
             "ReferenceBlackWhite",
             "Copyright",
-            
             // EXIF-specific fields (ExifIFD)
             "ExposureTime",
             "FNumber",
@@ -284,7 +278,6 @@ impl ExifUtils {
             "LensMake",
             "LensModel",
             "LensSerialNumber",
-            
             // GPS fields (GPS IFD)
             "GPSVersionID",
             "GPSLatitudeRef",
@@ -317,7 +310,6 @@ impl ExifUtils {
             "GPSAreaInformation",
             "GPSDateStamp",
             "GPSDifferential",
-            
             // Additional common fields
             "OffsetTime",
             "OffsetTimeOriginal",
@@ -328,16 +320,18 @@ impl ExifUtils {
     }
 
     /// Filter metadata to only include high-priority fields
-    pub fn filter_high_priority_fields(metadata: &HashMap<String, String>) -> HashMap<String, String> {
+    pub fn filter_high_priority_fields(
+        metadata: &HashMap<String, String>,
+    ) -> HashMap<String, String> {
         let high_priority = Self::get_high_priority_fields();
         let mut filtered = HashMap::new();
-        
+
         for field in high_priority {
             if let Some(value) = metadata.get(field) {
                 filtered.insert(field.to_string(), value.clone());
             }
         }
-        
+
         filtered
     }
 
@@ -349,215 +343,259 @@ impl ExifUtils {
     /// Validate EXIF field value format with comprehensive checks
     pub fn validate_field_value(field_name: &str, value: &str) -> Result<(), ExifError> {
         let cleaned_value = value.trim();
-        
+
         if cleaned_value.is_empty() {
-            return Err(ExifError::InvalidExif(
-                format!("Empty value for field: {}", field_name)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Empty value for field: {}",
+                field_name
+            )));
         }
-        
+
         match field_name {
             // DateTime fields - strict format validation
             "DateTime" | "DateTimeOriginal" | "DateTimeDigitized" => {
                 Self::validate_datetime_format(cleaned_value)?;
             }
-            
+
             // Sub-second time fields
             "SubSecTime" | "SubSecTimeOriginal" | "SubSecTimeDigitized" => {
                 Self::validate_subsec_time_format(cleaned_value)?;
             }
-            
+
             // Offset time fields
             "OffsetTime" | "OffsetTimeOriginal" | "OffsetTimeDigitized" => {
                 Self::validate_offset_time_format(cleaned_value)?;
             }
-            
+
             // Exposure time - supports fractions and decimals
             "ExposureTime" => {
                 Self::validate_exposure_time_format(cleaned_value)?;
             }
-            
+
             // F-number - must be positive decimal
             "FNumber" => {
                 Self::validate_fnumber_format(cleaned_value)?;
             }
-            
+
             // ISO - must be positive integer
             "ISOSpeedRatings" => {
                 Self::validate_iso_format(cleaned_value)?;
             }
-            
+
             // Focal length - supports decimals and units
             "FocalLength" => {
                 Self::validate_focal_length_format(cleaned_value)?;
             }
-            
+
             // Orientation - must be 1-8
             "Orientation" => {
                 Self::validate_orientation_format(cleaned_value)?;
             }
-            
+
             // Resolution values - must be positive
             "XResolution" | "YResolution" => {
                 Self::validate_resolution_format(cleaned_value)?;
             }
-            
+
             // Resolution unit - must be 1, 2, or 3
             "ResolutionUnit" => {
                 Self::validate_resolution_unit_format(cleaned_value)?;
             }
-            
+
             // GPS coordinates
             "GPSLatitude" | "GPSLongitude" => {
                 Self::validate_gps_coordinate_format(cleaned_value)?;
             }
-            
+
             // GPS references
             "GPSLatitudeRef" | "GPSLongitudeRef" => {
                 Self::validate_gps_ref_format(cleaned_value)?;
             }
-            
+
             // GPS altitude reference
             "GPSAltitudeRef" => {
                 Self::validate_gps_altitude_ref_format(cleaned_value)?;
             }
-            
+
             // Version fields
             "ExifVersion" | "FlashpixVersion" => {
                 Self::validate_version_format(cleaned_value)?;
             }
-            
+
             // Color space
             "ColorSpace" => {
                 Self::validate_color_space_format(cleaned_value)?;
             }
-            
+
             // Flash
             "Flash" => {
                 Self::validate_flash_format(cleaned_value)?;
             }
-            
+
             // White balance
             "WhiteBalance" => {
                 Self::validate_white_balance_format(cleaned_value)?;
             }
-            
+
             // Scene capture type
             "SceneCaptureType" => {
                 Self::validate_scene_capture_type_format(cleaned_value)?;
             }
-            
+
             // Metering mode
             "MeteringMode" => {
                 Self::validate_metering_mode_format(cleaned_value)?;
             }
-            
+
             // Light source
             "LightSource" => {
                 Self::validate_light_source_format(cleaned_value)?;
             }
-            
+
             // Exposure program
             "ExposureProgram" => {
                 Self::validate_exposure_program_format(cleaned_value)?;
             }
-            
+
             // Exposure mode
             "ExposureMode" => {
                 Self::validate_exposure_mode_format(cleaned_value)?;
             }
-            
+
             // Contrast, Saturation, Sharpness
             "Contrast" | "Saturation" | "Sharpness" => {
                 Self::validate_image_adjustment_format(cleaned_value)?;
             }
-            
+
             // Gain control
             "GainControl" => {
                 Self::validate_gain_control_format(cleaned_value)?;
             }
-            
+
             // Subject distance range
             "SubjectDistanceRange" => {
                 Self::validate_subject_distance_range_format(cleaned_value)?;
             }
-            
+
             // Sensing method
             "SensingMethod" => {
                 Self::validate_sensing_method_format(cleaned_value)?;
             }
-            
+
             // File source
             "FileSource" => {
                 Self::validate_file_source_format(cleaned_value)?;
             }
-            
+
             // Scene type
             "SceneType" => {
                 Self::validate_scene_type_format(cleaned_value)?;
             }
-            
+
             // Custom rendered
             "CustomRendered" => {
                 Self::validate_custom_rendered_format(cleaned_value)?;
             }
-            
+
             // Digital zoom ratio
             "DigitalZoomRatio" => {
                 Self::validate_digital_zoom_ratio_format(cleaned_value)?;
             }
-            
+
             // Focal length in 35mm film
             "FocalLengthIn35mmFilm" => {
                 Self::validate_focal_length_35mm_format(cleaned_value)?;
             }
-            
+
             // Pixel dimensions
             "PixelXDimension" | "PixelYDimension" => {
                 Self::validate_pixel_dimension_format(cleaned_value)?;
             }
-            
+
             // ASCII fields - basic validation
-            "Make" | "Model" | "Software" | "Artist" | "Copyright" | "ImageDescription" |
-            "BodySerialNumber" | "LensMake" | "LensModel" | "LensSerialNumber" |
-            "CameraOwnerName" | "ImageUniqueID" | "RelatedSoundFile" |
-            "GPSMapDatum" | "GPSProcessingMethod" | "GPSAreaInformation" |
-            "GPSDateStamp" | "GPSStatus" | "GPSMeasureMode" | "GPSSatellites" |
-            "GPSDestLatitudeRef" | "GPSDestLongitudeRef" | "GPSDestBearingRef" |
-            "GPSDestDistanceRef" | "GPSImgDirectionRef" | "GPSTrackRef" |
-            "GPSSpeedRef" | "InteropIndex" | "RelatedImageFileFormat" => {
+            "Make"
+            | "Model"
+            | "Software"
+            | "Artist"
+            | "Copyright"
+            | "ImageDescription"
+            | "BodySerialNumber"
+            | "LensMake"
+            | "LensModel"
+            | "LensSerialNumber"
+            | "CameraOwnerName"
+            | "ImageUniqueID"
+            | "RelatedSoundFile"
+            | "GPSMapDatum"
+            | "GPSProcessingMethod"
+            | "GPSAreaInformation"
+            | "GPSDateStamp"
+            | "GPSStatus"
+            | "GPSMeasureMode"
+            | "GPSSatellites"
+            | "GPSDestLatitudeRef"
+            | "GPSDestLongitudeRef"
+            | "GPSDestBearingRef"
+            | "GPSDestDistanceRef"
+            | "GPSImgDirectionRef"
+            | "GPSTrackRef"
+            | "GPSSpeedRef"
+            | "InteropIndex"
+            | "RelatedImageFileFormat" => {
                 Self::validate_ascii_field_format(cleaned_value)?;
             }
-            
+
             // Rational fields - validate as decimal or fraction
-            "MaxApertureValue" | "SubjectDistance" | "BrightnessValue" | "ExposureBiasValue" |
-            "ShutterSpeedValue" | "ApertureValue" | "CompressedBitsPerPixel" |
-            "GPSTimeStamp" | "GPSDOP" | "GPSSpeed" | "GPSTrack" | "GPSImgDirection" |
-            "GPSDestLatitude" | "GPSDestLongitude" | "GPSDestBearing" | "GPSDestDistance" |
-            "GPSAltitude" | "WhitePoint" | "PrimaryChromaticities" | "YCbCrCoefficients" |
-            "ReferenceBlackWhite" | "LensSpecification" | "ExposureIndex" => {
+            "MaxApertureValue"
+            | "SubjectDistance"
+            | "BrightnessValue"
+            | "ExposureBiasValue"
+            | "ShutterSpeedValue"
+            | "ApertureValue"
+            | "CompressedBitsPerPixel"
+            | "GPSTimeStamp"
+            | "GPSDOP"
+            | "GPSSpeed"
+            | "GPSTrack"
+            | "GPSImgDirection"
+            | "GPSDestLatitude"
+            | "GPSDestLongitude"
+            | "GPSDestBearing"
+            | "GPSDestDistance"
+            | "GPSAltitude"
+            | "WhitePoint"
+            | "PrimaryChromaticities"
+            | "YCbCrCoefficients"
+            | "ReferenceBlackWhite"
+            | "LensSpecification"
+            | "ExposureIndex" => {
                 Self::validate_rational_field_format(cleaned_value)?;
             }
-            
+
             // Undefined fields - basic length check
-            "MakerNote" | "UserComment" | "OECF" | "ComponentsConfiguration" |
-            "CFAPattern" | "DeviceSettingDescription" | "InteropVersion" => {
+            "MakerNote"
+            | "UserComment"
+            | "OECF"
+            | "ComponentsConfiguration"
+            | "CFAPattern"
+            | "DeviceSettingDescription"
+            | "InteropVersion" => {
                 Self::validate_undefined_field_format(cleaned_value)?;
             }
-            
+
             // Default validation for unknown fields
             _ => {
                 Self::validate_generic_field_format(cleaned_value)?;
             }
         }
-        
+
         Ok(())
     }
 
     /// Clean and normalize EXIF field values
     pub fn normalize_field_value(field_name: &str, value: &str) -> String {
         let cleaned = value.trim().to_string();
-        
+
         match field_name {
             "DateTime" | "DateTimeOriginal" | "DateTimeDigitized" => {
                 // Ensure datetime format is correct
@@ -597,30 +635,37 @@ impl ExifUtils {
 
     // Validation helper functions
     fn validate_datetime_format(value: &str) -> Result<(), ExifError> {
-        if value.len() != 19 || value.chars().nth(4) != Some(':') || 
-           value.chars().nth(7) != Some(':') || value.chars().nth(10) != Some(' ') ||
-           value.chars().nth(13) != Some(':') || value.chars().nth(16) != Some(':') {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid datetime format: {}", value)
-            ));
+        if value.len() != 19
+            || value.chars().nth(4) != Some(':')
+            || value.chars().nth(7) != Some(':')
+            || value.chars().nth(10) != Some(' ')
+            || value.chars().nth(13) != Some(':')
+            || value.chars().nth(16) != Some(':')
+        {
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid datetime format: {}",
+                value
+            )));
         }
         Ok(())
     }
 
     fn validate_subsec_time_format(value: &str) -> Result<(), ExifError> {
         if value.len() > 6 || !value.chars().all(|c| c.is_ascii_digit()) {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid subsec time format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid subsec time format: {}",
+                value
+            )));
         }
         Ok(())
     }
 
     fn validate_offset_time_format(value: &str) -> Result<(), ExifError> {
         if !value.starts_with('+') && !value.starts_with('-') {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid offset time format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid offset time format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -628,15 +673,20 @@ impl ExifUtils {
     fn validate_exposure_time_format(value: &str) -> Result<(), ExifError> {
         if value.contains('/') {
             let parts: Vec<&str> = value.split('/').collect();
-            if parts.len() != 2 || parts[0].parse::<f64>().is_err() || parts[1].parse::<f64>().is_err() {
-                return Err(ExifError::InvalidExif(
-                    format!("Invalid exposure time fraction format: {}", value)
-                ));
+            if parts.len() != 2
+                || parts[0].parse::<f64>().is_err()
+                || parts[1].parse::<f64>().is_err()
+            {
+                return Err(ExifError::InvalidExif(format!(
+                    "Invalid exposure time fraction format: {}",
+                    value
+                )));
             }
         } else if value.parse::<f64>().is_err() {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid exposure time format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid exposure time format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -644,14 +694,16 @@ impl ExifUtils {
     fn validate_fnumber_format(value: &str) -> Result<(), ExifError> {
         if let Ok(f) = value.parse::<f64>() {
             if f <= 0.0 {
-                return Err(ExifError::InvalidExif(
-                    format!("F-number must be positive: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "F-number must be positive: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid f-number format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid f-number format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -662,9 +714,10 @@ impl ExifUtils {
                 return Err(ExifError::InvalidExif("ISO cannot be zero".to_string()));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid ISO value: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid ISO value: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -672,9 +725,10 @@ impl ExifUtils {
     fn validate_focal_length_format(value: &str) -> Result<(), ExifError> {
         let numeric_part = value.replace(" mm", "").replace("mm", "");
         if numeric_part.parse::<f64>().is_err() && !numeric_part.contains('-') {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid focal length format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid focal length format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -682,14 +736,16 @@ impl ExifUtils {
     fn validate_orientation_format(value: &str) -> Result<(), ExifError> {
         if let Ok(orientation) = value.parse::<u8>() {
             if orientation < 1 || orientation > 8 {
-                return Err(ExifError::InvalidExif(
-                    format!("Invalid orientation value: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "Invalid orientation value: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid orientation format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid orientation format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -697,14 +753,16 @@ impl ExifUtils {
     fn validate_resolution_format(value: &str) -> Result<(), ExifError> {
         if let Ok(res) = value.parse::<f64>() {
             if res <= 0.0 {
-                return Err(ExifError::InvalidExif(
-                    format!("Resolution must be positive: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "Resolution must be positive: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid resolution format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid resolution format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -712,14 +770,16 @@ impl ExifUtils {
     fn validate_resolution_unit_format(value: &str) -> Result<(), ExifError> {
         if let Ok(unit) = value.parse::<u8>() {
             if unit < 1 || unit > 3 {
-                return Err(ExifError::InvalidExif(
-                    format!("Invalid resolution unit: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "Invalid resolution unit: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid resolution unit format: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid resolution unit format: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -731,20 +791,29 @@ impl ExifUtils {
         } else if value.parse::<f64>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid GPS coordinate format: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid GPS coordinate format: {}",
+                value
+            )))
         }
     }
 
     fn validate_gps_ref_format(value: &str) -> Result<(), ExifError> {
-        if value == "North" || value == "South" || value == "East" || value == "West" ||
-           value == "N" || value == "S" || value == "E" || value == "W" {
+        if value == "North"
+            || value == "South"
+            || value == "East"
+            || value == "West"
+            || value == "N"
+            || value == "S"
+            || value == "E"
+            || value == "W"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid GPS reference: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid GPS reference: {}",
+                value
+            )))
         }
     }
 
@@ -752,9 +821,10 @@ impl ExifUtils {
         if value == "0" || value == "1" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid GPS altitude reference: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid GPS altitude reference: {}",
+                value
+            )))
         }
     }
 
@@ -762,9 +832,10 @@ impl ExifUtils {
         if value.len() == 4 && value.chars().all(|c| c.is_ascii_digit()) {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid version format: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid version format: {}",
+                value
+            )))
         }
     }
 
@@ -772,9 +843,10 @@ impl ExifUtils {
         if value == "1" || value == "65535" || value == "sRGB" || value == "Uncalibrated" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid color space: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid color space: {}",
+                value
+            )))
         }
     }
 
@@ -782,9 +854,10 @@ impl ExifUtils {
         if value.parse::<u16>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid flash value: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid flash value: {}",
+                value
+            )))
         }
     }
 
@@ -792,20 +865,29 @@ impl ExifUtils {
         if value == "0" || value == "1" || value == "Auto" || value == "Manual" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid white balance: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid white balance: {}",
+                value
+            )))
         }
     }
 
     fn validate_scene_capture_type_format(value: &str) -> Result<(), ExifError> {
-        if value == "0" || value == "1" || value == "2" || value == "3" ||
-           value == "Standard" || value == "Landscape" || value == "Portrait" || value == "Night" {
+        if value == "0"
+            || value == "1"
+            || value == "2"
+            || value == "3"
+            || value == "Standard"
+            || value == "Landscape"
+            || value == "Portrait"
+            || value == "Night"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid scene capture type: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid scene capture type: {}",
+                value
+            )))
         }
     }
 
@@ -813,9 +895,10 @@ impl ExifUtils {
         if value.parse::<u16>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid metering mode: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid metering mode: {}",
+                value
+            )))
         }
     }
 
@@ -823,9 +906,10 @@ impl ExifUtils {
         if value.parse::<u16>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid light source: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid light source: {}",
+                value
+            )))
         }
     }
 
@@ -833,52 +917,84 @@ impl ExifUtils {
         if value.parse::<u8>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid exposure program: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid exposure program: {}",
+                value
+            )))
         }
     }
 
     fn validate_exposure_mode_format(value: &str) -> Result<(), ExifError> {
-        if value == "0" || value == "1" || value == "2" || value == "Auto" || value == "Manual" || value == "Auto bracket" {
+        if value == "0"
+            || value == "1"
+            || value == "2"
+            || value == "Auto"
+            || value == "Manual"
+            || value == "Auto bracket"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid exposure mode: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid exposure mode: {}",
+                value
+            )))
         }
     }
 
     fn validate_image_adjustment_format(value: &str) -> Result<(), ExifError> {
-        if value == "0" || value == "1" || value == "2" || value == "Normal" || value == "Low" || value == "High" {
+        if value == "0"
+            || value == "1"
+            || value == "2"
+            || value == "Normal"
+            || value == "Low"
+            || value == "High"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid image adjustment value: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid image adjustment value: {}",
+                value
+            )))
         }
     }
 
     fn validate_gain_control_format(value: &str) -> Result<(), ExifError> {
-        if value == "0" || value == "1" || value == "2" || value == "3" || value == "4" ||
-           value == "None" || value == "Low gain up" || value == "High gain up" || 
-           value == "Low gain down" || value == "High gain down" {
+        if value == "0"
+            || value == "1"
+            || value == "2"
+            || value == "3"
+            || value == "4"
+            || value == "None"
+            || value == "Low gain up"
+            || value == "High gain up"
+            || value == "Low gain down"
+            || value == "High gain down"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid gain control: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid gain control: {}",
+                value
+            )))
         }
     }
 
     fn validate_subject_distance_range_format(value: &str) -> Result<(), ExifError> {
-        if value == "0" || value == "1" || value == "2" || value == "3" ||
-           value == "Unknown" || value == "Macro" || value == "Close" || value == "Distant" {
+        if value == "0"
+            || value == "1"
+            || value == "2"
+            || value == "3"
+            || value == "Unknown"
+            || value == "Macro"
+            || value == "Close"
+            || value == "Distant"
+        {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid subject distance range: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid subject distance range: {}",
+                value
+            )))
         }
     }
 
@@ -886,9 +1002,10 @@ impl ExifUtils {
         if value.parse::<u8>().is_ok() {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid sensing method: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid sensing method: {}",
+                value
+            )))
         }
     }
 
@@ -896,9 +1013,10 @@ impl ExifUtils {
         if value == "3" || value == "Digital Camera" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid file source: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid file source: {}",
+                value
+            )))
         }
     }
 
@@ -906,9 +1024,10 @@ impl ExifUtils {
         if value == "1" || value == "Directly photographed" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid scene type: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid scene type: {}",
+                value
+            )))
         }
     }
 
@@ -916,23 +1035,26 @@ impl ExifUtils {
         if value == "0" || value == "1" || value == "Normal" || value == "Custom" {
             Ok(())
         } else {
-            Err(ExifError::InvalidExif(
-                format!("Invalid custom rendered: {}", value)
-            ))
+            Err(ExifError::InvalidExif(format!(
+                "Invalid custom rendered: {}",
+                value
+            )))
         }
     }
 
     fn validate_digital_zoom_ratio_format(value: &str) -> Result<(), ExifError> {
         if let Ok(ratio) = value.parse::<f64>() {
             if ratio < 0.0 {
-                return Err(ExifError::InvalidExif(
-                    format!("Digital zoom ratio must be non-negative: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "Digital zoom ratio must be non-negative: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid digital zoom ratio: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid digital zoom ratio: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -940,14 +1062,16 @@ impl ExifUtils {
     fn validate_focal_length_35mm_format(value: &str) -> Result<(), ExifError> {
         if let Ok(focal) = value.parse::<u16>() {
             if focal == 0 {
-                return Err(ExifError::InvalidExif(
-                    format!("35mm focal length cannot be zero: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "35mm focal length cannot be zero: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid 35mm focal length: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid 35mm focal length: {}",
+                value
+            )));
         }
         Ok(())
     }
@@ -955,23 +1079,26 @@ impl ExifUtils {
     fn validate_pixel_dimension_format(value: &str) -> Result<(), ExifError> {
         if let Ok(dim) = value.parse::<u32>() {
             if dim == 0 {
-                return Err(ExifError::InvalidExif(
-                    format!("Pixel dimension cannot be zero: {}", value)
-                ));
+                return Err(ExifError::InvalidExif(format!(
+                    "Pixel dimension cannot be zero: {}",
+                    value
+                )));
             }
         } else {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid pixel dimension: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid pixel dimension: {}",
+                value
+            )));
         }
         Ok(())
     }
 
     fn validate_ascii_field_format(value: &str) -> Result<(), ExifError> {
         if value.len() > 255 {
-            return Err(ExifError::InvalidExif(
-                format!("ASCII field too long: {}", value.len())
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "ASCII field too long: {}",
+                value.len()
+            )));
         }
         Ok(())
     }
@@ -979,33 +1106,40 @@ impl ExifUtils {
     fn validate_rational_field_format(value: &str) -> Result<(), ExifError> {
         if value.contains('/') {
             let parts: Vec<&str> = value.split('/').collect();
-            if parts.len() != 2 || parts[0].parse::<f64>().is_err() || parts[1].parse::<f64>().is_err() {
-                return Err(ExifError::InvalidExif(
-                    format!("Invalid rational format: {}", value)
-                ));
+            if parts.len() != 2
+                || parts[0].parse::<f64>().is_err()
+                || parts[1].parse::<f64>().is_err()
+            {
+                return Err(ExifError::InvalidExif(format!(
+                    "Invalid rational format: {}",
+                    value
+                )));
             }
         } else if value.parse::<f64>().is_err() {
-            return Err(ExifError::InvalidExif(
-                format!("Invalid rational value: {}", value)
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Invalid rational value: {}",
+                value
+            )));
         }
         Ok(())
     }
 
     fn validate_undefined_field_format(value: &str) -> Result<(), ExifError> {
         if value.len() > 65535 {
-            return Err(ExifError::InvalidExif(
-                format!("Undefined field too long: {}", value.len())
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Undefined field too long: {}",
+                value.len()
+            )));
         }
         Ok(())
     }
 
     fn validate_generic_field_format(value: &str) -> Result<(), ExifError> {
         if value.len() > 1000 {
-            return Err(ExifError::InvalidExif(
-                format!("Field value too long: {}", value.len())
-            ));
+            return Err(ExifError::InvalidExif(format!(
+                "Field value too long: {}",
+                value.len()
+            )));
         }
         Ok(())
     }
