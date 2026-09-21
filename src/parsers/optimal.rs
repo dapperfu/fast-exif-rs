@@ -619,12 +619,24 @@ impl OptimalExifParser {
         self.stats = OptimalParserStats::default();
     }
     
-    /// Check if AVX2 is supported on x86_64
+    /// AVX2 is CPUID leaf 7, subleaf 0, EBX bit 5.
+    ///
+    /// The `7` is a CPUID function number, not a CPU count. Leaf 0 EAX is the
+    /// highest basic leaf this processor implements; do not query leaf 7 when
+    /// that maximum is below 7. `__cpuid` is `unsafe` on newer rustc, so this
+    /// stays in an `unsafe` block. `unused_unsafe` covers rustc versions that
+    /// already treat these helpers as safe.
     #[cfg(target_arch = "x86_64")]
     fn check_avx2_support() -> bool {
-        // Check if CPU supports AVX2
-        let cpuid = std::arch::x86_64::__cpuid(7);
-        (cpuid.ebx & (1 << 5)) != 0 // AVX2 bit
+        #[allow(unused_unsafe)]
+        unsafe {
+            let max_basic_leaf = std::arch::x86_64::__cpuid(0).eax;
+            if max_basic_leaf < 7 {
+                return false;
+            }
+            let leaf7 = std::arch::x86_64::__cpuid_count(7, 0);
+            (leaf7.ebx & (1 << 5)) != 0
+        }
     }
     
 }
