@@ -10,6 +10,7 @@ pub mod heif;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;
+mod nikon_mov;
 pub mod optimal;
 pub mod png;
 pub mod raw;

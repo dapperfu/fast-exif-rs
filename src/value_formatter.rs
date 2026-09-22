@@ -234,10 +234,8 @@ impl ValueFormatter {
 
     /// Format Megapixels value with exact calculation
     fn format_megapixels_value(value: &str) -> String {
-        if let Ok(_mp) = value.parse::<f64>() {
-            // Calculate exact megapixels: 5568 * 3712 / 1,000,000 = 20.668416
-            let exact_mp = 5568.0 * 3712.0 / 1_000_000.0;
-            format!("{:.6}", exact_mp)
+        if let Ok(mp) = value.parse::<f64>() {
+            format!("{:.1}", mp)
         } else {
             value.to_string()
         }
@@ -245,10 +243,8 @@ impl ValueFormatter {
 
     /// Format LightValue value with exact calculation
     fn format_light_value_value(value: &str) -> String {
-        if let Ok(_lv) = value.parse::<f64>() {
-            // Calculate exact light value: 13.240791332162
-            // This is calculated from aperture, shutter speed, and ISO
-            "13.240791332162".to_string()
+        if let Ok(lv) = value.parse::<f64>() {
+            format!("{:.1}", lv)
         } else {
             value.to_string()
         }
@@ -389,6 +385,9 @@ impl ValueFormatter {
 
     /// Format MeteringMode value to numeric
     fn format_metering_mode_value(value: &str) -> String {
+        if value.chars().any(|c| c.is_ascii_alphabetic()) {
+            return value.to_string();
+        }
         match value.to_lowercase().as_str() {
             "unknown" => "0".to_string(),
             "average" => "1".to_string(),
@@ -463,14 +462,19 @@ impl ValueFormatter {
     fn format_exposure_compensation_value(value: &str) -> String {
         // ExposureCompensation is often stored as a fraction (e.g., 918 = 0 EV)
         if let Ok(num) = value.parse::<f64>() {
-            // Convert from fraction to EV value
-            // 918 typically represents 0 EV (no compensation)
-            if num == 918.0 {
+            // 918 is a raw encoding of 0 EV. Values already in stops (0, -0.3)
+            // stay as written. Larger raw codes convert as (value - 1000) / 1000.
+            if num == 918.0 || num == 0.0 {
                 "0".to_string()
+            } else if num.abs() < 20.0 {
+                if num.fract() == 0.0 {
+                    format!("{num:.0}")
+                } else {
+                    format!("{num:.1}")
+                }
             } else {
-                // Convert fraction to EV: (value - 1000) / 1000
                 let ev = (num - 1000.0) / 1000.0;
-                format!("{:.1}", ev)
+                format!("{ev:.1}")
             }
         } else {
             value.to_string()
@@ -494,18 +498,10 @@ impl ValueFormatter {
 
     /// Format AutoFocus value to numeric
     fn format_auto_focus_value(value: &str) -> String {
-        match value.to_lowercase().as_str() {
-            "off" => "1".to_string(),
-            "on" => "0".to_string(),
-            "manual" => "1".to_string(),
-            "automatic" => "0".to_string(),
-            _ => {
-                if let Ok(num) = value.parse::<u32>() {
-                    num.to_string()
-                } else {
-                    value.to_string()
-                }
-            }
+        if let Ok(num) = value.parse::<u32>() {
+            num.to_string()
+        } else {
+            value.to_string()
         }
     }
 
@@ -535,15 +531,7 @@ impl ValueFormatter {
     /// Format ShutterSpeed value to decimal format
     fn format_shutter_speed_value(value: &str) -> String {
         if value.contains('/') {
-            let parts: Vec<&str> = value.split('/').collect();
-            if parts.len() == 2 {
-                if let (Ok(numerator), Ok(denominator)) =
-                    (parts[0].parse::<f64>(), parts[1].parse::<f64>())
-                {
-                    let decimal = numerator / denominator;
-                    return format!("{:.7}", decimal);
-                }
-            }
+            return value.to_string();
         }
         value.to_string()
     }
@@ -580,16 +568,10 @@ impl ValueFormatter {
 
     /// Format ExposureTime value to decimal format
     fn format_exposure_time_value(value: &str) -> String {
+        // Keep ExifTool's reduced shutter fraction (1/125). Decimalizing it
+        // hides the value photographers compare against `exiftool -s`.
         if value.contains('/') {
-            let parts: Vec<&str> = value.split('/').collect();
-            if parts.len() == 2 {
-                if let (Ok(numerator), Ok(denominator)) =
-                    (parts[0].parse::<f64>(), parts[1].parse::<f64>())
-                {
-                    let decimal = numerator / denominator;
-                    return format!("{:.7}", decimal);
-                }
-            }
+            return value.to_string();
         }
         value.to_string()
     }

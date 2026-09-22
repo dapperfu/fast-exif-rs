@@ -626,15 +626,25 @@ impl ComputedFields {
             metadata.insert("MakerNotes:ModifyDate".to_string(), md.clone());
         }
 
-        // Add Track and Media date fields for video files (like exiftool)
+        // Fill track/media dates from CreateDate only when the container did
+        // not already record them. Nikon NCTG CreateDate is camera-local time;
+        // QuickTime track dates stay on the movie timescale.
         if let Some(create_date) = metadata.get("CreateDate").cloned() {
-            metadata.insert("TrackCreateDate".to_string(), create_date.clone());
-            metadata.insert("MediaCreateDate".to_string(), create_date);
+            metadata
+                .entry("TrackCreateDate".to_string())
+                .or_insert_with(|| create_date.clone());
+            metadata
+                .entry("MediaCreateDate".to_string())
+                .or_insert(create_date);
         }
 
         if let Some(modify_date) = metadata.get("ModifyDate").cloned() {
-            metadata.insert("TrackModifyDate".to_string(), modify_date.clone());
-            metadata.insert("MediaModifyDate".to_string(), modify_date);
+            metadata
+                .entry("TrackModifyDate".to_string())
+                .or_insert_with(|| modify_date.clone());
+            metadata
+                .entry("MediaModifyDate".to_string())
+                .or_insert(modify_date);
         }
     }
 }

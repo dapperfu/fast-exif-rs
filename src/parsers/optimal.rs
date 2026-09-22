@@ -234,9 +234,21 @@ impl OptimalExifParser {
         // Detect format from header
         let format = self.detect_format(&header)?;
 
-        // For MP4 files, always use memory mapping since they don't have traditional EXIF segments
-        if matches!(format, FileFormat::Mp4) {
-            return self.parse_with_memory_map(file, file_size);
+        // QuickTime metadata lives in `moov`, often before a huge `mdat`.
+        // Reading the file as TIFF reports "Invalid TIFF version" on Nikon
+        // MOV files, whose camera tags are in the NCTG atom.
+        if matches!(format, FileFormat::Mov | FileFormat::Mp4) {
+            self.stats.seek_count += 1;
+            let metadata = crate::parsers::video::VideoParser::parse_quicktime_file(
+                &mut file,
+                file_size as u64,
+                matches!(format, FileFormat::Mov),
+            )?;
+            self.metadata_cache = metadata;
+            self.apply_target_field_filter();
+            let processing_time = start_time.elapsed().as_micros() as u64;
+            self.stats.total_processing_time += processing_time;
+            return Ok(self.metadata_cache.clone());
         }
 
         // Determine optimal parsing strategy for other formats
@@ -557,10 +569,19 @@ impl OptimalExifParser {
             // Check for MP4 vs HEIC/MOV
             if data.len() >= 12 {
                 let brand = &data[8..12];
-                if brand == b"mp42" || brand == b"mp41" || brand == b"isom" {
+                if brand == b"mp42" || brand == b"mp41" || brand == b"isom" || brand == b"avc1" {
                     Ok(FileFormat::Mp4)
-                } else {
+                } else if brand == b"qt  " || brand == b"CAEP" {
+                    Ok(FileFormat::Mov)
+                } else if brand == b"heic"
+                    || brand == b"heix"
+                    || brand == b"mif1"
+                    || brand == b"msf1"
+                    || brand == b"hevc"
+                {
                     Ok(FileFormat::Heic)
+                } else {
+                    Ok(FileFormat::Mov)
                 }
             } else {
                 Ok(FileFormat::Heic)

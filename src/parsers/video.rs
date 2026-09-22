@@ -1,8 +1,10 @@
+use crate::parsers::nikon_mov;
 use crate::parsers::tiff::TiffParser;
 use crate::types::ExifError;
 use crate::utils::ExifUtils;
 use chrono::DateTime;
 use std::collections::HashMap;
+use std::io::{Read, Seek};
 
 /// Video format parser for MOV, MP4, and 3GP files
 pub struct VideoParser;
@@ -19,6 +21,8 @@ impl VideoParser {
         metadata.insert("FileTypeExtension".to_string(), "mov".to_string());
         metadata.insert("MIMEType".to_string(), "video/quicktime".to_string());
 
+        nikon_mov::walk_atoms(data, metadata);
+
         // Extract comprehensive MOV metadata
         Self::extract_mov_basic_metadata(data, metadata);
         Self::extract_mov_video_metadata(data, metadata);
@@ -27,9 +31,10 @@ impl VideoParser {
         Self::extract_mov_gps_metadata(data, metadata);
         Self::extract_mov_text_metadata(data, metadata);
 
-        // Look for EXIF data in MOV atoms
+        // A real EXIF atom is optional. Nikon movies keep camera tags in NCTG,
+        // and a bad TIFF header must not discard the QuickTime metadata.
         if let Some(exif_data) = Self::find_mov_exif(data) {
-            TiffParser::parse_tiff_exif(exif_data, metadata)?;
+            let _ = TiffParser::parse_tiff_exif(exif_data, metadata);
         }
 
         // Add computed fields
@@ -60,9 +65,11 @@ impl VideoParser {
         Self::extract_mp4_gps_metadata(data, metadata);
         Self::extract_mp4_text_metadata(data, metadata);
 
+        nikon_mov::walk_atoms(data, metadata);
+
         // Look for EXIF data in MP4 atoms
         if let Some(exif_data) = Self::find_mp4_exif(data) {
-            TiffParser::parse_tiff_exif(exif_data, metadata)?;
+            let _ = TiffParser::parse_tiff_exif(exif_data, metadata);
         }
 
         // Add computed fields
@@ -96,6 +103,32 @@ impl VideoParser {
         Ok(())
     }
 
+    /// Parse a QuickTime file from disk without reading the media payload.
+    pub fn parse_quicktime_file<R: Read + Seek>(
+        file: &mut R,
+        file_len: u64,
+        is_mov: bool,
+    ) -> Result<HashMap<String, String>, ExifError> {
+        let mut metadata = HashMap::new();
+        if is_mov {
+            metadata.insert("Format".to_string(), "MOV".to_string());
+            metadata.insert("FileType".to_string(), "MOV".to_string());
+            metadata.insert("FileTypeExtension".to_string(), "mov".to_string());
+            metadata.insert("MIMEType".to_string(), "video/quicktime".to_string());
+        } else {
+            metadata.insert("Format".to_string(), "MP4".to_string());
+            metadata.insert("FileType".to_string(), "MP4".to_string());
+            metadata.insert("FileTypeExtension".to_string(), "mp4".to_string());
+            metadata.insert("MIMEType".to_string(), "video/mp4".to_string());
+        }
+        if let Some((offset, size)) = nikon_mov::scan_file(file, file_len, &mut metadata)? {
+            metadata.insert("MediaDataOffset".to_string(), offset.to_string());
+            metadata.insert("MediaDataSize".to_string(), size.to_string());
+        }
+        Self::add_computed_fields(&mut metadata);
+        Ok(metadata)
+    }
+
     /// Find EXIF data in MOV atoms
     fn find_mov_exif(data: &[u8]) -> Option<&[u8]> {
         // Look for EXIF data in MOV atoms
@@ -110,8 +143,8 @@ impl VideoParser {
             let atom_type = &data[pos + 4..pos + 8];
 
             match atom_type {
-                b"udta" => {
-                    // User data atom - may contain EXIF
+                b"udta" | b"moov" | b"trak" => {
+                    // User data / movie atom - may contain EXIF
                     if let Some(exif_data) =
                         Self::find_exif_in_atom(data, pos + 8, size as usize - 8)
                     {
@@ -149,8 +182,8 @@ impl VideoParser {
             let atom_type = &data[pos + 4..pos + 8];
 
             match atom_type {
-                b"udta" => {
-                    // User data atom - may contain EXIF
+                b"udta" | b"moov" | b"trak" => {
+                    // User data / movie atom - may contain EXIF
                     if let Some(exif_data) =
                         Self::find_exif_in_atom(data, pos + 8, size as usize - 8)
                     {
@@ -201,7 +234,7 @@ impl VideoParser {
                         return Some(&data[pos + 8..pos + size as usize]);
                     }
                 }
-                b"udta" | b"meta" | b"ilst" => {
+                b"udta" | b"meta" | b"ilst" | b"moov" | b"trak" => {
                     // Recursively search in sub-atoms
                     if let Some(exif_data) =
                         Self::find_exif_in_atom(data, pos + 8, size as usize - 8)
@@ -257,14 +290,6 @@ impl VideoParser {
             }
 
             pos += size as usize;
-        }
-
-        // Set default values
-        if !metadata.contains_key("Make") {
-            metadata.insert("Make".to_string(), "Unknown".to_string());
-        }
-        if !metadata.contains_key("Model") {
-            metadata.insert("Model".to_string(), "Unknown".to_string());
         }
     }
 
@@ -1038,10 +1063,12 @@ impl VideoParser {
             }
         }
 
-        metadata.insert(
-            "ExifByteOrder".to_string(),
-            "Little-endian (Intel, II)".to_string(),
-        );
+        if !metadata.contains_key("ExifByteOrder") {
+            metadata.insert(
+                "ExifByteOrder".to_string(),
+                "Little-endian (Intel, II)".to_string(),
+            );
+        }
 
         // Computed image dimensions
         if let (Some(width), Some(height)) = (
@@ -1075,13 +1102,21 @@ impl VideoParser {
 
         // Add Track and Media date fields for video files (like exiftool)
         if let Some(create_date) = metadata.get("CreateDate").cloned() {
-            metadata.insert("TrackCreateDate".to_string(), create_date.clone());
-            metadata.insert("MediaCreateDate".to_string(), create_date);
+            metadata
+                .entry("TrackCreateDate".to_string())
+                .or_insert_with(|| create_date.clone());
+            metadata
+                .entry("MediaCreateDate".to_string())
+                .or_insert(create_date);
         }
 
         if let Some(modify_date) = metadata.get("ModifyDate").cloned() {
-            metadata.insert("TrackModifyDate".to_string(), modify_date.clone());
-            metadata.insert("MediaModifyDate".to_string(), modify_date);
+            metadata
+                .entry("TrackModifyDate".to_string())
+                .or_insert_with(|| modify_date.clone());
+            metadata
+                .entry("MediaModifyDate".to_string())
+                .or_insert(modify_date);
         }
     }
 }
