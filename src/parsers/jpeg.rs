@@ -321,41 +321,175 @@ impl JpegParser {
         None
     }
 
-    /// Find JPEG EXIF segment in data
+    /// TIFF payload of the Exif APP1 that actually carries image metadata.
+    ///
+    /// A JPEG may contain more than one Exif APP1. Nikon files, and files that
+    /// had a short APP1 prepended, often start with a stub directory whose
+    /// string offsets are out of range (ExifTool: "Bad offset for IFD0 Artist").
+    /// The camera tags, including DateTimeOriginal, live in a later APP1.
+    /// Walking every marker and keeping the directory that contains a real
+    /// Exif IFD matches what ExifTool keeps.
     pub fn find_jpeg_exif_segment(data: &[u8]) -> Option<&[u8]> {
-        // Look for APP1 segment (0xFFE1) containing EXIF
-        let mut pos = 2;
+        let (start, len) = Self::best_exif_tiff_range(data)?;
+        data.get(start..start + len)
+    }
 
-        while pos < data.len().saturating_sub(6) {
-            if data[pos] == 0xFF && data[pos + 1] == 0xE1 {
-                // Read segment length (big-endian)
-                let length = ((data[pos + 2] as u16) << 8) | (data[pos + 3] as u16);
-                let segment_end = pos + 2 + length as usize;
-
-                if segment_end > data.len() {
-                    break;
-                }
-
-                // Look for "Exif" identifier anywhere in the segment
-                let segment_start = pos + 4;
-                for exif_start in segment_start..segment_end.saturating_sub(4) {
-                    if &data[exif_start..exif_start + 4] == b"Exif" {
-                        // Found EXIF identifier, return the data after it
-                        let exif_data_start = exif_start + 4;
-                        if exif_data_start < segment_end {
-                            return Some(&data[exif_data_start..segment_end]);
-                        }
-                    }
-                }
-
-                // Move to next segment
-                pos = segment_end;
-            } else {
-                pos += 1;
+    /// File offset and length of the preferred Exif TIFF payload.
+    pub(crate) fn best_exif_tiff_range(data: &[u8]) -> Option<(usize, usize)> {
+        let mut best: Option<(i64, usize, usize)> = None;
+        for (start, len) in Self::exif_tiff_ranges(data) {
+            let Some(tiff) = data.get(start..start + len) else {
+                continue;
+            };
+            let score = Self::tiff_exif_score(tiff);
+            let replace = match best {
+                None => true,
+                Some((best_score, _, _)) => score >= best_score,
+            };
+            if replace {
+                best = Some((score, start, len));
             }
         }
+        best.map(|(_, start, len)| (start, len))
+    }
 
-        None
+    /// Every well-formed Exif APP1 TIFF payload, in file order.
+    fn exif_tiff_ranges(data: &[u8]) -> Vec<(usize, usize)> {
+        let mut ranges = Vec::new();
+        if data.len() < 4 || data[0] != 0xFF || data[1] != 0xD8 {
+            return ranges;
+        }
+
+        let mut pos = 2usize;
+        while pos + 4 <= data.len() {
+            if data[pos] != 0xFF {
+                break;
+            }
+            pos += 1;
+            while pos < data.len() && data[pos] == 0xFF {
+                pos += 1;
+            }
+            if pos >= data.len() {
+                break;
+            }
+            let marker = data[pos];
+            pos += 1;
+
+            // SOS starts entropy-coded data; EOI ends the image. RST/TEM/SOI
+            // have no length field.
+            if marker == 0xDA || marker == 0xD9 {
+                break;
+            }
+            if marker == 0x01 || (0xD0..=0xD8).contains(&marker) {
+                continue;
+            }
+            if pos + 2 > data.len() {
+                break;
+            }
+            let seglen = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
+            if seglen < 2 {
+                break;
+            }
+            let segment_end = pos + seglen;
+            if segment_end > data.len() {
+                break;
+            }
+
+            // Length includes the two length bytes. Payload follows them.
+            if marker == 0xE1 && seglen >= 8 {
+                let payload = &data[pos + 2..segment_end];
+                if payload.len() >= 8
+                    && payload.starts_with(b"Exif\0\0")
+                    && Self::looks_like_tiff(&payload[6..])
+                {
+                    ranges.push((pos + 2 + 6, payload.len() - 6));
+                }
+            }
+            pos = segment_end;
+        }
+        ranges
+    }
+
+    fn looks_like_tiff(tiff: &[u8]) -> bool {
+        if tiff.len() < 8 {
+            return false;
+        }
+        let le = tiff.starts_with(b"II");
+        let be = tiff.starts_with(b"MM");
+        if !le && !be {
+            return false;
+        }
+        let version = if le {
+            u16::from_le_bytes([tiff[2], tiff[3]])
+        } else {
+            u16::from_be_bytes([tiff[2], tiff[3]])
+        };
+        version == 42
+    }
+
+    /// Prefer a directory that contains an in-range Exif IFD pointer and
+    /// ordinary IFD0 tags. A stub whose ASCII values point outside the
+    /// segment scores below a camera APP1.
+    fn tiff_exif_score(tiff: &[u8]) -> i64 {
+        if !Self::looks_like_tiff(tiff) {
+            return i64::MIN;
+        }
+        let le = tiff.starts_with(b"II");
+        let read_u16 = |off: usize| {
+            if le {
+                u16::from_le_bytes([tiff[off], tiff[off + 1]])
+            } else {
+                u16::from_be_bytes([tiff[off], tiff[off + 1]])
+            }
+        };
+        let read_u32 = |off: usize| {
+            if le {
+                u32::from_le_bytes([tiff[off], tiff[off + 1], tiff[off + 2], tiff[off + 3]])
+            } else {
+                u32::from_be_bytes([tiff[off], tiff[off + 1], tiff[off + 2], tiff[off + 3]])
+            }
+        };
+
+        let ifd = read_u32(4) as usize;
+        if ifd + 2 > tiff.len() {
+            return 0;
+        }
+        let count = read_u16(ifd) as usize;
+        if count == 0 || count > 1000 {
+            return 0;
+        }
+
+        let mut score = count as i64 + (tiff.len() as i64) / 256;
+        for i in 0..count {
+            let entry = ifd + 2 + i * 12;
+            if entry + 12 > tiff.len() {
+                break;
+            }
+            let tag = read_u16(entry);
+            let dtype = read_u16(entry + 2);
+            let cnt = read_u32(entry + 4);
+            let val = read_u32(entry + 8);
+            let unit: u64 = match dtype {
+                1 | 2 | 6 | 7 => 1,
+                3 => 2,
+                4 | 9 => 4,
+                5 | 10 => 8,
+                _ => 1,
+            };
+            let size = unit.saturating_mul(cnt as u64);
+            let in_range = size <= 4 || (val as u64).saturating_add(size) <= tiff.len() as u64;
+            if !in_range {
+                score -= 50;
+                continue;
+            }
+            if tag == 0x8769 && (val as usize) + 2 <= tiff.len() {
+                score += 10_000;
+            }
+            if matches!(tag, 0x010F | 0x0110 | 0x0112 | 0x0132) {
+                score += 100;
+            }
+        }
+        score
     }
 
     /// Extract camera-specific metadata based on detected make
@@ -1103,5 +1237,130 @@ impl JpegParser {
 
         // Default to 1.0x (full frame) if unknown
         1.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FastExifReader;
+
+    fn put_u16(buf: &mut [u8], at: usize, v: u16) {
+        buf[at..at + 2].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_u32(buf: &mut [u8], at: usize, v: u32) {
+        buf[at..at + 4].copy_from_slice(&v.to_le_bytes());
+    }
+
+    fn put_entry(buf: &mut [u8], at: usize, tag: u16, dtype: u16, count: u32, value: u32) {
+        put_u16(buf, at, tag);
+        put_u16(buf, at + 2, dtype);
+        put_u32(buf, at + 4, count);
+        put_u32(buf, at + 8, value);
+    }
+
+    /// Leading APP1 from 20251005_110935.630.jpg: Artist and Copyright counts
+    /// are 19, but the value field holds the ASCII bytes "Jed " used as an offset.
+    fn stub_artist_tiff() -> Vec<u8> {
+        let mut tiff = vec![0u8; 38];
+        tiff[0] = b'I';
+        tiff[1] = b'I';
+        put_u16(&mut tiff, 2, 42);
+        put_u32(&mut tiff, 4, 8);
+        put_u16(&mut tiff, 8, 2);
+        let jed = u32::from_le_bytes(*b"Jed ");
+        put_entry(&mut tiff, 10, 0x013B, 2, 19, jed);
+        put_entry(&mut tiff, 22, 0x8298, 2, 19, jed);
+        tiff
+    }
+
+    fn camera_tiff() -> Vec<u8> {
+        let mut data = vec![0u8; 160];
+        data[0] = b'I';
+        data[1] = b'I';
+        put_u16(&mut data, 2, 42);
+        put_u32(&mut data, 4, 8);
+
+        let ifd0 = 8usize;
+        put_u16(&mut data, ifd0, 3);
+        put_entry(&mut data, ifd0 + 2, 0x010F, 2, 18, 50);
+        put_entry(&mut data, ifd0 + 14, 0x0132, 2, 20, 70);
+        put_entry(&mut data, ifd0 + 26, 0x8769, 4, 1, 100);
+        put_u32(&mut data, ifd0 + 38, 0);
+
+        data[50..68].copy_from_slice(b"NIKON CORPORATION\0");
+        data[70..90].copy_from_slice(b"2025:10:05 11:09:35\0");
+
+        let subsec = u32::from_le_bytes(*b"63\0\0");
+        let exif_ifd = 100usize;
+        put_u16(&mut data, exif_ifd, 3);
+        put_entry(&mut data, exif_ifd + 2, 0x9003, 2, 20, 70);
+        put_entry(&mut data, exif_ifd + 14, 0x9291, 2, 3, subsec);
+        put_entry(&mut data, exif_ifd + 26, 0x9011, 2, 7, 92);
+        put_u32(&mut data, exif_ifd + 38, 0);
+        data[92..99].copy_from_slice(b"-04:00\0");
+        data
+    }
+
+    fn app1(tiff: &[u8]) -> Vec<u8> {
+        let seglen = (2 + 6 + tiff.len()) as u16;
+        let mut segment = Vec::with_capacity(4 + 6 + tiff.len());
+        segment.extend_from_slice(&[0xFF, 0xE1]);
+        segment.extend_from_slice(&seglen.to_be_bytes());
+        segment.extend_from_slice(b"Exif\0\0");
+        segment.extend_from_slice(tiff);
+        segment
+    }
+
+    fn jpeg_with(segments: &[&[u8]]) -> Vec<u8> {
+        let mut jpeg = vec![0xFF, 0xD8];
+        for segment in segments {
+            jpeg.extend_from_slice(segment);
+        }
+        jpeg.extend_from_slice(&[0xFF, 0xD9]);
+        jpeg
+    }
+
+    #[test]
+    fn prefers_camera_exif_over_leading_bad_artist_app1() {
+        let stub = app1(&stub_artist_tiff());
+        let camera = app1(&camera_tiff());
+        let jpeg = jpeg_with(&[&stub, &camera]);
+
+        let ranges = JpegParser::exif_tiff_ranges(&jpeg);
+        assert_eq!(ranges.len(), 2, "both Exif APP1 segments are visible");
+
+        let tiff = JpegParser::find_jpeg_exif_segment(&jpeg).unwrap();
+        assert!(
+            tiff.windows(18).any(|w| w == b"NIKON CORPORATION\0"),
+            "selected segment should be the camera APP1, not the Artist stub"
+        );
+
+        let mut reader = FastExifReader::new();
+        let metadata = reader.read_bytes(&jpeg).unwrap();
+        assert_eq!(
+            metadata.get("DateTimeOriginal").map(String::as_str),
+            Some("2025:10:05 11:09:35")
+        );
+        assert_eq!(
+            metadata.get("Make").map(String::as_str),
+            Some("NIKON CORPORATION")
+        );
+        assert_eq!(
+            metadata.get("SubSecDateTimeOriginal").map(String::as_str),
+            Some("2025:10:05 11:09:35.63-04:00")
+        );
+    }
+
+    #[test]
+    fn single_exif_app1_still_reads_datetime() {
+        let jpeg = jpeg_with(&[&app1(&camera_tiff())]);
+        let mut reader = FastExifReader::new();
+        let metadata = reader.read_bytes(&jpeg).unwrap();
+        assert_eq!(
+            metadata.get("DateTimeOriginal").map(String::as_str),
+            Some("2025:10:05 11:09:35")
+        );
     }
 }

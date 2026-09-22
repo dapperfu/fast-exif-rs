@@ -1,3 +1,4 @@
+use crate::parsers::jpeg::JpegParser;
 use crate::parsers::tiff::TiffParser;
 use crate::types::{ExifError, ParseScope, ReadOptions};
 use memmap2::{Mmap, MmapOptions};
@@ -381,43 +382,26 @@ impl OptimalExifParser {
     fn locate_jpeg_exif(
         &self,
         file: &mut File,
-        _file_size: usize,
+        file_size: usize,
     ) -> Result<ExifSegmentInfo, ExifError> {
-        let mut offset = 2; // Skip SOI marker
-        let mut buffer = [0u8; 4];
-
-        // Limit search to first 1MB to avoid reading entire large files
-        let max_search = 1024 * 1024;
-
-        while offset < max_search {
-            file.seek(SeekFrom::Start(offset as u64))?;
-            file.read_exact(&mut buffer)?;
-
-            if buffer[0] != 0xFF {
-                return Err(ExifError::InvalidExif("Invalid JPEG marker".to_string()));
-            }
-
-            let marker = buffer[1];
-            let segment_size = u16::from_be_bytes([buffer[2], buffer[3]]) as usize;
-
-            if marker == 0xE1 {
-                // Check for EXIF signature
-                let mut exif_sig = [0u8; 6];
-                file.read_exact(&mut exif_sig)?;
-
-                if exif_sig == *b"Exif\0\0" {
-                    return Ok(ExifSegmentInfo {
-                        offset: offset + 4 + 6,
-                        size: segment_size - 6,
-                        format: FileFormat::Jpeg,
-                    });
-                }
-            }
-
-            offset += 2 + segment_size;
+        // APP1 is at most 64KB and sits before the entropy scan. Read the
+        // header once so a leading stub Exif segment can be skipped in favor
+        // of the later APP1 that holds DateTimeOriginal.
+        let to_read = file_size.min(1024 * 1024);
+        if to_read < 10 {
+            return Err(ExifError::InvalidExif("EXIF segment not found".to_string()));
         }
+        let mut buf = vec![0u8; to_read];
+        file.seek(SeekFrom::Start(0))?;
+        file.read_exact(&mut buf)?;
 
-        Err(ExifError::InvalidExif("EXIF segment not found".to_string()))
+        let (offset, len) = JpegParser::best_exif_tiff_range(&buf)
+            .ok_or_else(|| ExifError::InvalidExif("EXIF segment not found".to_string()))?;
+        Ok(ExifSegmentInfo {
+            offset,
+            size: len.min(self.max_exif_size),
+            format: FileFormat::Jpeg,
+        })
     }
 
     /// Locate EXIF segment in HEIC/MOV files
@@ -459,25 +443,9 @@ impl OptimalExifParser {
 
     /// Extract EXIF data from memory mapped region
     fn extract_exif_from_mapped(&self, data: &[u8]) -> Result<Vec<u8>, ExifError> {
-        // Quick scan for EXIF marker in mapped region
-        for i in 0..data.len().saturating_sub(10) {
-            if data[i] == 0xFF && data[i + 1] == 0xE1 {
-                // Found potential EXIF marker
-                if i + 10 < data.len() {
-                    let length = u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
-                    if i + 4 + length <= data.len() {
-                        let exif_segment = &data[i + 4..i + 4 + length];
-                        if exif_segment.len() >= 6 && &exif_segment[0..6] == b"Exif\0\0" {
-                            return Ok(exif_segment[6..].to_vec());
-                        }
-                    }
-                }
-            }
-        }
-
-        Err(ExifError::InvalidExif(
-            "EXIF not found in mapped region".to_string(),
-        ))
+        JpegParser::find_jpeg_exif_segment(data)
+            .map(|segment| segment.to_vec())
+            .ok_or_else(|| ExifError::InvalidExif("EXIF not found in mapped region".to_string()))
     }
 
     /// Parse EXIF data from bytes with optimizations
