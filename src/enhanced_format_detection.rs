@@ -25,11 +25,15 @@ impl EnhancedFormatDetector {
             let header = &data[4..12];
             if header == b"ftypheic"
                 || header == b"ftypheix"
+                || header == b"ftypheif"
                 || header == b"ftypmif1"
                 || header == b"ftypmsf1"
                 || header == b"ftyphevc"
+                || header == b"ftyphevx"
                 || header == b"ftypavci"
                 || header == b"ftypavcs"
+                || header == b"ftypavif"
+                || header == b"ftypavis"
                 || header == b"ftyphif1"
             // Hasselblad HIF
             {

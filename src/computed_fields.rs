@@ -194,8 +194,30 @@ impl ComputedFields {
         }
     }
 
+    fn is_heif_family(metadata: &HashMap<String, String>) -> bool {
+        for key in ["Format", "FileType", "MIMEType", "FileTypeExtension"] {
+            if let Some(value) = metadata.get(key) {
+                let lower = value.to_ascii_lowercase();
+                if lower.contains("heic")
+                    || lower.contains("heif")
+                    || lower.contains("avif")
+                    || lower == "hif"
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     /// Add additional computed fields
     fn add_additional_computed_fields(metadata: &mut HashMap<String, String>) {
+        // These defaults describe a JPEG/Nikon still. HEIC already has its own
+        // container tags; filling them in made Samsung photos look like JPEGs.
+        if Self::is_heif_family(metadata) {
+            return;
+        }
+
         // Add missing fields that exiftool provides
         if !metadata.contains_key("PhotometricInterpretation") {
             metadata.insert("PhotometricInterpretation".to_string(), "RGB".to_string());
@@ -466,6 +488,10 @@ impl ComputedFields {
 
     /// Add file system metadata
     fn add_file_metadata(metadata: &mut HashMap<String, String>) {
+        if Self::is_heif_family(metadata) {
+            return;
+        }
+
         // File:FileType - determine from existing metadata
         if metadata.contains_key("Make") {
             metadata.insert("File:FileType".to_string(), "JPEG".to_string());

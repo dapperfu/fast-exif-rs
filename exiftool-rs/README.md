@@ -74,6 +74,29 @@ cargo build --release
 ./target/release/exiftool-rs extract photo.jpg --quiet
 ```
 
+### Write JPEG tags
+
+Rewrites the EXIF segment from the tags you pass, adds an XMP packet, and sets IPTC By-line. Image data and other markers such as JFIF and ICC stay in place.
+
+```bash
+exiftool-rs write --overwrite \
+  --DateTimeOriginal="${DATETIME}" \
+  --CreateDate="${DATETIME}" \
+  --ModifyDate="${DATETIME}" \
+  --Make="LaView" \
+  --Model="LV-T9708MHS" \
+  --Artist="${CAMTAG}" \
+  --IPTC-By-line="${CAMTAG}" \
+  --XMP-dc-Creator="${CAMTAG}" \
+  --XMP-xmp-CreatorTool="shop-nvr" \
+  --XPAuthor="${CAMTAG}" \
+  --XPComment="${CAMTAG}" \
+  --file-modify-date-from-datetime-original \
+  "${FILENAME}"
+```
+
+`--set Tag=Value` accepts the same names, including `IPTC:By-line`, `XMP-dc:Creator`, `XMP-xmp:CreatorTool`, and `FileModifyDate<DateTimeOriginal`. `--output photo-out.jpg` writes a single file without replacing the input.
+
 ### List Known Tags
 
 ```bash

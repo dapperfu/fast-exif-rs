@@ -465,6 +465,17 @@ impl TiffParser {
             return Ok(());
         }
 
+        if (0x9C9B..=0x9C9F).contains(&tag_id) {
+            if let Some(text) =
+                Self::decode_xp_string(data, count, value_offset, is_little_endian, tiff_start)
+            {
+                if !text.is_empty() {
+                    metadata.insert(tag_name, text);
+                }
+            }
+            return Ok(());
+        }
+
         match data_type {
             1 => {
                 // BYTE
@@ -1166,6 +1177,42 @@ impl TiffParser {
         result
     }
 
+    /// Windows XP tags are BYTE strings of UTF-16LE, including the trailing NUL.
+    fn decode_xp_string(
+        data: &[u8],
+        count: u32,
+        value_offset: u32,
+        is_little_endian: bool,
+        tiff_start: usize,
+    ) -> Option<String> {
+        if count == 0 {
+            return None;
+        }
+        let bytes = if count <= 4 {
+            let raw = if is_little_endian {
+                value_offset.to_le_bytes()
+            } else {
+                value_offset.to_be_bytes()
+            };
+            raw[..count as usize].to_vec()
+        } else {
+            let offset = tiff_start + value_offset as usize;
+            let end = offset.checked_add(count as usize)?;
+            if end > data.len() {
+                return None;
+            }
+            data[offset..end].to_vec()
+        };
+        let mut units = Vec::with_capacity(bytes.len() / 2);
+        for chunk in bytes.chunks_exact(2) {
+            units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+        }
+        if let Some(end) = units.iter().position(|unit| *unit == 0) {
+            units.truncate(end);
+        }
+        Some(String::from_utf16_lossy(&units))
+    }
+
     /// Get human-readable tag name
     fn get_tag_name(tag_id: u16) -> String {
         match tag_id {
@@ -1187,6 +1234,11 @@ impl TiffParser {
             0x0131 => "Software".to_string(),
             0x0132 => "DateTime".to_string(),
             0x013B => "Artist".to_string(),
+            0x9C9B => "XPTitle".to_string(),
+            0x9C9C => "XPComment".to_string(),
+            0x9C9D => "XPAuthor".to_string(),
+            0x9C9E => "XPKeywords".to_string(),
+            0x9C9F => "XPSubject".to_string(),
             0x0201 => "ThumbnailOffset".to_string(),
             0x0202 => "ThumbnailLength".to_string(),
             0x4746 => "Rating".to_string(),

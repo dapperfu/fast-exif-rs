@@ -40,6 +40,8 @@ impl JpegParser {
         // Post-process problematic fields to match exiftool output
         Self::post_process_problematic_fields(metadata);
 
+        crate::jpeg_meta::read_jpeg_sidecars(data, metadata);
+
         Ok(())
     }
 

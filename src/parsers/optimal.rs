@@ -234,6 +234,15 @@ impl OptimalExifParser {
         // Detect format from header
         let format = self.detect_format(&header)?;
 
+        // HEIC `meta` (and the Exif item it points at) often sits after `mdat`.
+        // Map the whole file so `iloc` offsets resolve.
+        if matches!(format, FileFormat::Heic) {
+            let result = self.parse_with_memory_map(file, file_size);
+            let processing_time = start_time.elapsed().as_micros() as u64;
+            self.stats.total_processing_time += processing_time;
+            return result;
+        }
+
         // QuickTime metadata lives in `moov`, often before a huge `mdat`.
         // Reading the file as TIFF reports "Invalid TIFF version" on Nikon
         // MOV files, whose camera tags are in the NCTG atom.
@@ -326,6 +335,9 @@ impl OptimalExifParser {
 
         // Parse EXIF data
         self.parse_exif_data_optimized(&exif_data)?;
+        if matches!(exif_info.format, FileFormat::Jpeg) {
+            self.read_jpeg_header_sidecars(&mut file, file_size)?;
+        }
 
         Ok(self.metadata_cache.clone())
     }
@@ -346,6 +358,9 @@ impl OptimalExifParser {
         // Try to find EXIF in the mapped region
         if let Ok(exif_data) = self.extract_exif_from_mapped(&mmap) {
             self.parse_exif_data_optimized(&exif_data)?;
+            if mmap.len() >= 2 && mmap[0] == 0xFF && mmap[1] == 0xD8 {
+                crate::jpeg_meta::read_jpeg_sidecars(&mmap, &mut self.metadata_cache);
+            }
         } else {
             // EXIF not in mapped region, fall back to seeking
             drop(mmap);
@@ -354,6 +369,20 @@ impl OptimalExifParser {
 
         self.stats.total_bytes_read += map_size;
         Ok(self.metadata_cache.clone())
+    }
+
+    /// IPTC and XMP live in APP segments before the entropy scan.
+    fn read_jpeg_header_sidecars(
+        &mut self,
+        file: &mut File,
+        file_size: usize,
+    ) -> Result<(), ExifError> {
+        let to_read = file_size.min(1024 * 1024);
+        let mut buf = vec![0u8; to_read];
+        file.seek(SeekFrom::Start(0))?;
+        let read = file.read(&mut buf)?;
+        crate::jpeg_meta::read_jpeg_sidecars(&buf[..read], &mut self.metadata_cache);
+        Ok(())
     }
 
     /// Locate EXIF segment with minimal reading
@@ -575,9 +604,13 @@ impl OptimalExifParser {
                     Ok(FileFormat::Mov)
                 } else if brand == b"heic"
                     || brand == b"heix"
+                    || brand == b"heif"
                     || brand == b"mif1"
                     || brand == b"msf1"
                     || brand == b"hevc"
+                    || brand == b"hevx"
+                    || brand == b"avif"
+                    || brand == b"avis"
                 {
                     Ok(FileFormat::Heic)
                 } else {
@@ -593,13 +626,16 @@ impl OptimalExifParser {
 
     /// Parse JPEG EXIF data
     fn parse_jpeg_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
-        let payload = if let Ok(exif) = self.extract_exif_from_mapped(data) {
-            exif
-        } else {
-            data.to_vec()
-        };
         let scope = self.parse_scope();
-        TiffParser::parse_tiff_exif_scoped(&payload, &mut self.metadata_cache, &scope)?;
+        let tiff_result = if let Ok(exif) = self.extract_exif_from_mapped(data) {
+            TiffParser::parse_tiff_exif_scoped(&exif, &mut self.metadata_cache, &scope)
+        } else {
+            TiffParser::parse_tiff_exif_scoped(data, &mut self.metadata_cache, &scope)
+        };
+        crate::jpeg_meta::read_jpeg_sidecars(data, &mut self.metadata_cache);
+        if tiff_result.is_err() && !crate::jpeg_meta::has_sidecar_tags(&self.metadata_cache) {
+            return tiff_result;
+        }
         self.apply_target_field_filter();
         Ok(())
     }
@@ -612,11 +648,11 @@ impl OptimalExifParser {
         Ok(())
     }
 
-    /// Parse HEIC EXIF data
-    fn parse_heic_exif(&mut self, _data: &[u8]) -> Result<(), ExifError> {
-        // Simplified HEIC parsing
-        self.metadata_cache
-            .insert("Format".to_string(), "HEIC".to_string());
+    /// Parse HEIC EXIF data from the ISO-BMFF item that holds the TIFF blob.
+    fn parse_heic_exif(&mut self, data: &[u8]) -> Result<(), ExifError> {
+        let scope = self.parse_scope();
+        crate::parsers::HeifParser::parse_heif_exif_scoped(data, &mut self.metadata_cache, &scope)?;
+        self.apply_target_field_filter();
         Ok(())
     }
 

@@ -101,6 +101,18 @@ const TAGS: &[TagSpec] = &[
         kind: IfdKind::Ifd0,
     },
     TagSpec {
+        names: &["XPComment"],
+        tag: 0x9C9C,
+        dtype: 1,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
+        names: &["XPAuthor"],
+        tag: 0x9C9D,
+        dtype: 1,
+        kind: IfdKind::Ifd0,
+    },
+    TagSpec {
         names: &["Rating"],
         tag: 0x4746,
         dtype: 3,
@@ -935,7 +947,29 @@ fn encode_rationals(little_endian: bool, value: &str, signed: bool) -> Option<(u
     }
 }
 
+fn encode_xp_utf16(value: &str) -> Vec<u8> {
+    let mut data = Vec::with_capacity((value.encode_utf16().count() + 1) * 2);
+    for unit in value.encode_utf16() {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    data.extend_from_slice(&[0, 0]);
+    data
+}
+
+fn is_xp_tag(tag: u16) -> bool {
+    matches!(tag, 0x9C9B | 0x9C9C | 0x9C9D | 0x9C9E | 0x9C9F)
+}
+
 fn encode_tag(little_endian: bool, spec: &TagSpec, value: &str) -> Option<EncodedTag> {
+    if is_xp_tag(spec.tag) {
+        let data = encode_xp_utf16(value);
+        return Some(EncodedTag {
+            tag: spec.tag,
+            dtype: 1,
+            count: data.len() as u32,
+            data,
+        });
+    }
     match spec.dtype {
         1 => {
             let data = encode_gps_bytes(value)?;
@@ -1205,7 +1239,22 @@ pub fn encode_jpeg_app1(
     little_endian: bool,
     metadata: &HashMap<String, String>,
 ) -> Result<Vec<u8>, ExifError> {
-    let tiff = encode_tiff_exif(little_endian, metadata)?;
+    encode_jpeg_app1_opt(little_endian, metadata)?
+        .ok_or_else(|| ExifError::InvalidExif("No writable EXIF fields in metadata".to_string()))
+}
+
+/// Like [`encode_jpeg_app1`], but `Ok(None)` when the map has no TIFF tags.
+pub(crate) fn encode_jpeg_app1_opt(
+    little_endian: bool,
+    metadata: &HashMap<String, String>,
+) -> Result<Option<Vec<u8>>, ExifError> {
+    let tiff = match encode_tiff_exif(little_endian, metadata) {
+        Ok(tiff) => tiff,
+        Err(ExifError::InvalidExif(message)) if message.starts_with("No writable EXIF fields") => {
+            return Ok(None);
+        }
+        Err(err) => return Err(err),
+    };
     let payload_len = 2 + 6 + tiff.len();
     if payload_len > u16::MAX as usize {
         return Err(ExifError::InvalidExif(format!(
@@ -1220,5 +1269,5 @@ pub fn encode_jpeg_app1(
     app1.write_u16::<BigEndian>(payload_len as u16)?;
     app1.extend_from_slice(b"Exif\0\0");
     app1.extend_from_slice(&tiff);
-    Ok(app1)
+    Ok(Some(app1))
 }

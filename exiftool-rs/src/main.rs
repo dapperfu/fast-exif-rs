@@ -8,7 +8,7 @@
 
 use clap::{Parser, Subcommand};
 use colored::*;
-use fast_exif_reader::{ExifError, FastExifReader};
+use fast_exif_reader::{ExifError, FastExifReader, FastExifWriter, WriteOptions};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -16,13 +16,13 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 use walkdir::WalkDir;
 
-/// A fast EXIF metadata extraction tool written in Rust
+/// A fast EXIF metadata tool written in Rust
 #[derive(Parser)]
 #[command(name = "exiftool-rs")]
-#[command(version = "0.4.1")]
-#[command(about = "A fast EXIF metadata extraction tool")]
+#[command(version = "0.4.6")]
+#[command(about = "A fast EXIF metadata tool")]
 #[command(
-    long_about = "A high-performance EXIF metadata extraction tool that supports short tags, known parameters, and multiple output formats."
+    long_about = "A high-performance EXIF metadata tool that reads metadata and writes JPEG EXIF, IPTC, XMP, and Windows XP tags."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -103,6 +103,67 @@ enum Commands {
         #[arg(long, default_value = "0")]
         threads: usize,
     },
+    /// Write EXIF, IPTC, XMP, and Windows XP tags to JPEG files
+    Write {
+        /// Overwrite each JPEG in place (exiftool -overwrite_original)
+        #[arg(long)]
+        overwrite: bool,
+
+        /// Write one input JPEG to this path
+        #[arg(short, long)]
+        output: Option<String>,
+
+        #[arg(long = "DateTimeOriginal")]
+        date_time_original: Option<String>,
+
+        #[arg(long = "CreateDate")]
+        create_date: Option<String>,
+
+        #[arg(long = "ModifyDate")]
+        modify_date: Option<String>,
+
+        #[arg(long = "Make")]
+        make: Option<String>,
+
+        #[arg(long = "Model")]
+        model: Option<String>,
+
+        #[arg(long = "Artist")]
+        artist: Option<String>,
+
+        /// IPTC By-line (exiftool -IPTC:By-line)
+        #[arg(long = "IPTC-By-line")]
+        iptc_by_line: Option<String>,
+
+        /// XMP dc:creator (exiftool -XMP-dc:Creator)
+        #[arg(long = "XMP-dc-Creator")]
+        xmp_dc_creator: Option<String>,
+
+        /// XMP xmp:CreatorTool (exiftool -XMP-xmp:CreatorTool)
+        #[arg(long = "XMP-xmp-CreatorTool")]
+        xmp_creator_tool: Option<String>,
+
+        #[arg(long = "XPAuthor")]
+        xp_author: Option<String>,
+
+        #[arg(long = "XPComment")]
+        xp_comment: Option<String>,
+
+        /// Set the file mtime from DateTimeOriginal
+        /// (exiftool -FileModifyDate<DateTimeOriginal)
+        #[arg(long = "file-modify-date-from-datetime-original")]
+        file_modify_date_from_datetime_original: bool,
+
+        /// Repeatable Tag=Value assignment.
+        /// Namespaced tags: IPTC:By-line, XMP-dc:Creator, XMP-xmp:CreatorTool.
+        /// File mtime: --set FileModifyDate<DateTimeOriginal
+        #[arg(long = "set", value_name = "TAG=VALUE")]
+        set: Vec<String>,
+
+        /// JPEG files to update
+        #[arg(required = true)]
+        files: Vec<String>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -152,6 +213,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             benchmark_exif_extraction(
                 inputs, recursive, iterations, detailed, format, parallel, threads,
             )?;
+        }
+        Commands::Write {
+            overwrite,
+            output,
+            date_time_original,
+            create_date,
+            modify_date,
+            make,
+            model,
+            artist,
+            iptc_by_line,
+            xmp_dc_creator,
+            xmp_creator_tool,
+            xp_author,
+            xp_comment,
+            file_modify_date_from_datetime_original,
+            set,
+            files,
+        } => {
+            write_jpeg_tags(WriteRequest {
+                overwrite,
+                output,
+                date_time_original,
+                create_date,
+                modify_date,
+                make,
+                model,
+                artist,
+                iptc_by_line,
+                xmp_dc_creator,
+                xmp_creator_tool,
+                xp_author,
+                xp_comment,
+                file_modify_date_from_datetime_original,
+                set,
+                files,
+            })?;
         }
     }
 
@@ -813,6 +911,160 @@ fn output_benchmark_csv(results: &BenchmarkResults) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+struct WriteRequest {
+    overwrite: bool,
+    output: Option<String>,
+    date_time_original: Option<String>,
+    create_date: Option<String>,
+    modify_date: Option<String>,
+    make: Option<String>,
+    model: Option<String>,
+    artist: Option<String>,
+    iptc_by_line: Option<String>,
+    xmp_dc_creator: Option<String>,
+    xmp_creator_tool: Option<String>,
+    xp_author: Option<String>,
+    xp_comment: Option<String>,
+    file_modify_date_from_datetime_original: bool,
+    set: Vec<String>,
+    files: Vec<String>,
+}
+
+fn write_jpeg_tags(request: WriteRequest) -> Result<(), Box<dyn std::error::Error>> {
+    if request.overwrite && request.output.is_some() {
+        return Err("use either --overwrite or --output, not both".into());
+    }
+    if !request.overwrite && request.output.is_none() {
+        return Err(
+            "pass --overwrite to update files in place, or --output for a single file".into(),
+        );
+    }
+    if request.output.is_some() && request.files.len() != 1 {
+        return Err("--output writes one JPEG; pass a single input file".into());
+    }
+
+    let (metadata, copy_mtime) = collect_write_tags(&request)?;
+    if metadata.is_empty() && !copy_mtime {
+        return Err("no tags to write".into());
+    }
+
+    let writer = FastExifWriter::new();
+    for input in &request.files {
+        let dest = if request.overwrite {
+            input.clone()
+        } else {
+            request.output.clone().expect("output checked above")
+        };
+
+        let file_modify_date = if copy_mtime {
+            Some(resolve_file_modify_date(&metadata, input)?)
+        } else {
+            None
+        };
+
+        if metadata.is_empty() {
+            if &dest != input {
+                return Err(
+                    "changing only the file mtime updates the input in place; pass --overwrite"
+                        .into(),
+                );
+            }
+            FastExifWriter::set_file_modify_date(
+                &dest,
+                file_modify_date.as_deref().expect("mtime resolved"),
+            )?;
+        } else {
+            writer.write_exif_with_options(
+                input,
+                &dest,
+                &metadata,
+                &WriteOptions { file_modify_date },
+            )?;
+        }
+        println!("updated {dest}");
+    }
+
+    Ok(())
+}
+
+fn resolve_file_modify_date(
+    metadata: &HashMap<String, String>,
+    input: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    if let Some(value) = metadata.get("DateTimeOriginal") {
+        return Ok(value.clone());
+    }
+    let mut reader = FastExifReader::new();
+    let existing = reader.read_file(input)?;
+    existing.get("DateTimeOriginal").cloned().ok_or_else(|| {
+        format!("DateTimeOriginal was not provided and is missing from {input}").into()
+    })
+}
+
+fn collect_write_tags(
+    request: &WriteRequest,
+) -> Result<(HashMap<String, String>, bool), Box<dyn std::error::Error>> {
+    let mut metadata = HashMap::new();
+    let mut copy_mtime = request.file_modify_date_from_datetime_original;
+    for raw in &request.set {
+        if is_mtime_copy(raw) {
+            copy_mtime = true;
+            continue;
+        }
+        let (key, value) = raw
+            .split_once('=')
+            .ok_or_else(|| format!("expected Tag=Value, got {raw}"))?;
+        metadata.insert(canonicalize_write_tag(key), value.to_string());
+    }
+    insert_tag(
+        &mut metadata,
+        "DateTimeOriginal",
+        &request.date_time_original,
+    );
+    insert_tag(&mut metadata, "CreateDate", &request.create_date);
+    insert_tag(&mut metadata, "ModifyDate", &request.modify_date);
+    insert_tag(&mut metadata, "Make", &request.make);
+    insert_tag(&mut metadata, "Model", &request.model);
+    insert_tag(&mut metadata, "Artist", &request.artist);
+    insert_tag(&mut metadata, "IPTC:By-line", &request.iptc_by_line);
+    insert_tag(&mut metadata, "XMP-dc:Creator", &request.xmp_dc_creator);
+    insert_tag(
+        &mut metadata,
+        "XMP-xmp:CreatorTool",
+        &request.xmp_creator_tool,
+    );
+    insert_tag(&mut metadata, "XPAuthor", &request.xp_author);
+    insert_tag(&mut metadata, "XPComment", &request.xp_comment);
+    Ok((metadata, copy_mtime))
+}
+
+fn insert_tag(metadata: &mut HashMap<String, String>, key: &str, value: &Option<String>) {
+    if let Some(value) = value {
+        metadata.insert(key.to_string(), value.clone());
+    }
+}
+
+fn is_mtime_copy(raw: &str) -> bool {
+    let tag = raw.trim().trim_start_matches('-');
+    tag == "FileModifyDate<DateTimeOriginal"
+}
+
+fn canonicalize_write_tag(tag: &str) -> String {
+    let tag = tag.trim().trim_start_matches('-');
+    match tag {
+        "IPTC:By-line" | "IPTC:Byline" | "IPTC-By-line" | "By-line" | "Byline" => {
+            "IPTC:By-line".to_string()
+        }
+        "XMP-dc:Creator" | "XMP-dc-Creator" | "XMP:Creator" | "dc:Creator" => {
+            "XMP-dc:Creator".to_string()
+        }
+        "XMP-xmp:CreatorTool" | "XMP-xmp-CreatorTool" | "XMP:CreatorTool" | "CreatorTool" => {
+            "XMP-xmp:CreatorTool".to_string()
+        }
+        other => other.to_string(),
+    }
+}
+
 fn get_short_tag(tag: &str) -> String {
     let tags = get_known_exif_tags();
     if let Some(info) = tags.get(tag) {
@@ -940,6 +1192,78 @@ fn get_known_exif_tags() -> HashMap<String, ExifTagInfo> {
             short_name: "DateTimeDigitized".to_string(),
             description: "Date and time when image was digitized".to_string(),
             category: "DateTime".to_string(),
+        },
+    );
+
+    tags.insert(
+        "CreateDate".to_string(),
+        ExifTagInfo {
+            short_name: "CreateDate".to_string(),
+            description: "Create date (EXIF DateTimeDigitized)".to_string(),
+            category: "DateTime".to_string(),
+        },
+    );
+
+    tags.insert(
+        "ModifyDate".to_string(),
+        ExifTagInfo {
+            short_name: "ModifyDate".to_string(),
+            description: "Modify date (EXIF DateTime)".to_string(),
+            category: "DateTime".to_string(),
+        },
+    );
+
+    tags.insert(
+        "Artist".to_string(),
+        ExifTagInfo {
+            short_name: "Artist".to_string(),
+            description: "Artist".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "XPAuthor".to_string(),
+        ExifTagInfo {
+            short_name: "XPAuthor".to_string(),
+            description: "Windows XP author".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "XPComment".to_string(),
+        ExifTagInfo {
+            short_name: "XPComment".to_string(),
+            description: "Windows XP comment".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "IPTC:By-line".to_string(),
+        ExifTagInfo {
+            short_name: "By-line".to_string(),
+            description: "IPTC by-line".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "XMP-dc:Creator".to_string(),
+        ExifTagInfo {
+            short_name: "Creator".to_string(),
+            description: "XMP dc:creator".to_string(),
+            category: "Camera".to_string(),
+        },
+    );
+
+    tags.insert(
+        "XMP-xmp:CreatorTool".to_string(),
+        ExifTagInfo {
+            short_name: "CreatorTool".to_string(),
+            description: "XMP xmp:CreatorTool".to_string(),
+            category: "Camera".to_string(),
         },
     );
 

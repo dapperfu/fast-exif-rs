@@ -7,6 +7,7 @@
 
 pub mod bmp;
 pub mod heif;
+mod isobmff;
 pub mod jpeg;
 pub mod maker_notes;
 pub mod mkv;

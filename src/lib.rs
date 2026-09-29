@@ -9,6 +9,7 @@ use std::collections::HashMap;
 mod exif_copier;
 mod exif_encode;
 mod format_detection;
+mod jpeg_meta;
 pub mod parsers;
 mod types;
 mod utils;
@@ -35,7 +36,7 @@ pub use parsers::{
 };
 pub use types::{ExifError, ExifResult, ParseScope, ProcessingStats, ReadOptions};
 pub use utils::ExifUtils;
-pub use writer::ExifWriter;
+pub use writer::{ExifWriter, WriteOptions};
 
 // Re-export enhanced parsers
 pub use enhanced_format_detection::EnhancedFormatDetector;
@@ -231,6 +232,23 @@ impl FastExifWriter {
         metadata: &HashMap<String, String>,
     ) -> Result<Vec<u8>, ExifError> {
         self.writer.write_exif_to_bytes(input_data, metadata)
+    }
+
+    /// Write metadata and optionally set the output file's modification time.
+    pub fn write_exif_with_options(
+        &self,
+        input_path: &str,
+        output_path: &str,
+        metadata: &HashMap<String, String>,
+        options: &WriteOptions,
+    ) -> Result<(), ExifError> {
+        self.writer
+            .write_exif_with_options(input_path, output_path, metadata, options)
+    }
+
+    /// Set a file's mtime from an EXIF datetime string.
+    pub fn set_file_modify_date(path: &str, exif_datetime: &str) -> Result<(), ExifError> {
+        ExifWriter::set_file_modify_date(path, exif_datetime)
     }
 
     /// Copy high-priority EXIF fields from source to target image

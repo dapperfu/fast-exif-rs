@@ -2,9 +2,21 @@ use crate::format_detection::FormatDetector;
 use crate::types::ExifError;
 use crate::utils::ExifUtils;
 use byteorder::{BigEndian, WriteBytesExt};
+use chrono::{DateTime, Local, LocalResult, NaiveDateTime, TimeZone};
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+/// Extra file-level options for a metadata write.
+#[derive(Debug, Clone, Default)]
+pub struct WriteOptions {
+    /// EXIF datetime (`YYYY:MM:DD HH:MM:SS`, optional offset) stored as the file mtime.
+    ///
+    /// This is the file-system half of exiftool `-FileModifyDate<DateTimeOriginal`.
+    pub file_modify_date: Option<String>,
+}
 
 /// EXIF writer for adding/modifying EXIF metadata in images
 #[derive(Clone)]
@@ -39,16 +51,35 @@ impl ExifWriter {
         output_path: &str,
         metadata: &HashMap<String, String>,
     ) -> Result<(), ExifError> {
+        self.write_exif_with_options(input_path, output_path, metadata, &WriteOptions::default())
+    }
+
+    /// Write metadata, then optionally set the output file's modification time.
+    pub fn write_exif_with_options(
+        &self,
+        input_path: &str,
+        output_path: &str,
+        metadata: &HashMap<String, String>,
+        options: &WriteOptions,
+    ) -> Result<(), ExifError> {
         let mut input_file = File::open(input_path)?;
         let mut input_data = Vec::new();
         input_file.read_to_end(&mut input_data)?;
+        drop(input_file);
 
         let output_data = self.write_exif_to_bytes(&input_data, metadata)?;
+        write_atomic(Path::new(output_path), &output_data)?;
 
-        let mut output_file = File::create(output_path)?;
-        output_file.write_all(&output_data)?;
+        if let Some(when) = &options.file_modify_date {
+            apply_file_modify_date(output_path, when)?;
+        }
 
         Ok(())
+    }
+
+    /// Set a file's mtime from an EXIF datetime string.
+    pub fn set_file_modify_date(path: &str, exif_datetime: &str) -> Result<(), ExifError> {
+        apply_file_modify_date(path, exif_datetime)
     }
 
     /// Write EXIF metadata to a JPEG file (legacy method)
@@ -69,6 +100,12 @@ impl ExifWriter {
     ) -> Result<Vec<u8>, ExifError> {
         // Detect file format
         let format = FormatDetector::detect_format(input_data)?;
+
+        if crate::jpeg_meta::requests_jpeg_sidecar(metadata) && format != "JPEG" {
+            return Err(ExifError::UnsupportedFormat(
+                "IPTC and XMP writing is supported for JPEG".to_string(),
+            ));
+        }
 
         match format.as_str() {
             "JPEG" => self.write_jpeg_exif_to_bytes(input_data, metadata),
@@ -92,28 +129,7 @@ impl ExifWriter {
         input_data: &[u8],
         metadata: &HashMap<String, String>,
     ) -> Result<Vec<u8>, ExifError> {
-        // Validate JPEG format
-        if input_data.len() < 2 || input_data[0] != 0xFF || input_data[1] != 0xD8 {
-            return Err(ExifError::InvalidExif("Invalid JPEG format".to_string()));
-        }
-
-        // Find existing EXIF segment
-        let exif_segment = self.find_jpeg_exif_segment(input_data);
-
-        // Create new EXIF data
-        let new_exif_data = self.create_exif_segment(metadata)?;
-
-        if let Some((start, end)) = exif_segment {
-            // Replace existing EXIF segment
-            let mut result = Vec::new();
-            result.extend_from_slice(&input_data[..start]);
-            result.extend_from_slice(&new_exif_data);
-            result.extend_from_slice(&input_data[end..]);
-            Ok(result)
-        } else {
-            // Insert new EXIF segment after SOI marker
-            self.insert_jpeg_exif_segment(input_data, &new_exif_data)
-        }
+        crate::jpeg_meta::write_jpeg_metadata(input_data, self.little_endian, metadata)
     }
 
     /// Write EXIF metadata to HEIF bytes
@@ -294,73 +310,6 @@ impl ExifWriter {
         // For now, return empty metadata - this would be replaced with actual parsing
         // using the existing TiffParser or other parsers in the codebase
         Ok(metadata)
-    }
-
-    /// Find JPEG EXIF segment (APP1 marker with EXIF)
-    fn find_jpeg_exif_segment(&self, data: &[u8]) -> Option<(usize, usize)> {
-        let mut pos = 0;
-
-        while pos + 4 < data.len() {
-            if data[pos] == 0xFF && data[pos + 1] == 0xE1 {
-                // APP1 marker found
-                let segment_length = ((data[pos + 2] as u16) << 8) | (data[pos + 3] as u16);
-
-                if pos + 4 + segment_length as usize <= data.len() {
-                    let segment_data = &data[pos + 4..pos + 4 + segment_length as usize];
-
-                    // Check if this is an EXIF segment
-                    if segment_data.len() >= 6 && &segment_data[0..6] == b"Exif\0\0" {
-                        return Some((pos, pos + 4 + segment_length as usize));
-                    }
-                }
-            }
-
-            // Move to next marker
-            if data[pos] == 0xFF {
-                pos += 1;
-                if pos < data.len() && data[pos] != 0x00 {
-                    // Skip marker data
-                    if pos + 2 < data.len() {
-                        let length = ((data[pos + 1] as u16) << 8) | (data[pos + 2] as u16);
-                        pos += 2 + length as usize;
-                    } else {
-                        break;
-                    }
-                } else {
-                    pos += 1;
-                }
-            } else {
-                pos += 1;
-            }
-        }
-
-        None
-    }
-
-    /// Insert EXIF segment into JPEG data
-    fn insert_jpeg_exif_segment(
-        &self,
-        input_data: &[u8],
-        exif_data: &[u8],
-    ) -> Result<Vec<u8>, ExifError> {
-        // Find SOI marker (0xFF 0xD8)
-        let soi_pos = input_data
-            .windows(2)
-            .position(|w| w == [0xFF, 0xD8])
-            .ok_or_else(|| ExifError::InvalidExif("SOI marker not found".to_string()))?;
-
-        let mut result = Vec::new();
-
-        // Copy SOI marker
-        result.extend_from_slice(&input_data[soi_pos..soi_pos + 2]);
-
-        // Insert EXIF segment
-        result.extend_from_slice(exif_data);
-
-        // Copy rest of the data
-        result.extend_from_slice(&input_data[soi_pos + 2..]);
-
-        Ok(result)
     }
 
     /// Create EXIF segment with metadata
@@ -930,5 +879,114 @@ mod tests {
             back.get("SubSecDateTimeOriginal").unwrap(),
             "2026:05:10 15:03:55.95-05:00"
         );
+    }
+
+    #[test]
+    fn file_modify_date_follows_datetime_original() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("fast-exif-mtime-{}.jpg", std::process::id()));
+        let jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
+        fs::write(&path, jpeg).unwrap();
+
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "DateTimeOriginal".to_string(),
+            "2024:01:15 14:30:25".to_string(),
+        );
+        let options = WriteOptions {
+            file_modify_date: Some("2024:01:15 14:30:25".to_string()),
+        };
+        ExifWriter::new()
+            .write_exif_with_options(
+                path.to_str().unwrap(),
+                path.to_str().unwrap(),
+                &metadata,
+                &options,
+            )
+            .unwrap();
+
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
+        let expected = exif_datetime_to_system_time("2024:01:15 14:30:25").unwrap();
+        let delta = modified
+            .duration_since(expected)
+            .unwrap_or_else(|err| err.duration());
+        let _ = fs::remove_file(&path);
+        assert!(delta.as_secs() <= 1, "mtime delta {}s", delta.as_secs());
+    }
+}
+
+fn temp_sibling(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("exif");
+    path.with_file_name(format!("{name}.exiftool-rs-{}.tmp", std::process::id()))
+}
+
+fn write_atomic(path: &Path, data: &[u8]) -> Result<(), ExifError> {
+    let tmp = temp_sibling(path);
+    let perms = fs::metadata(path).ok().map(|meta| meta.permissions());
+    {
+        let mut file = File::create(&tmp)?;
+        if let Some(perms) = perms {
+            let _ = file.set_permissions(perms);
+        }
+        file.write_all(data)?;
+        file.sync_all()?;
+    }
+    if let Err(err) = fs::rename(&tmp, path) {
+        let _ = fs::remove_file(&tmp);
+        return Err(err.into());
+    }
+    Ok(())
+}
+
+fn apply_file_modify_date(path: &str, exif_datetime: &str) -> Result<(), ExifError> {
+    let when = exif_datetime_to_system_time(exif_datetime)?;
+    let file = File::options().write(true).open(path)?;
+    file.set_modified(when)?;
+    Ok(())
+}
+
+fn exif_datetime_to_system_time(value: &str) -> Result<SystemTime, ExifError> {
+    let value = value.trim();
+    if value.len() < 19 {
+        return Err(ExifError::InvalidExif(format!(
+            "DateTimeOriginal must look like YYYY:MM:DD HH:MM:SS, got {value}"
+        )));
+    }
+    let base = &value[..19];
+    let rest = &value[19..];
+    if let Some(offset_at) = rest.find(['+', '-']) {
+        let stamped = format!("{base}{}", &rest[offset_at..]);
+        if let Ok(dt) = DateTime::parse_from_str(&stamped, "%Y:%m:%d %H:%M:%S%:z")
+            .or_else(|_| DateTime::parse_from_str(&stamped, "%Y:%m:%d %H:%M:%S%z"))
+        {
+            return system_time_from_unix(dt.timestamp());
+        }
+    }
+    let naive = NaiveDateTime::parse_from_str(base, "%Y:%m:%d %H:%M:%S").map_err(|_| {
+        ExifError::InvalidExif(format!(
+            "DateTimeOriginal must look like YYYY:MM:DD HH:MM:SS, got {value}"
+        ))
+    })?;
+    let local = match Local.from_local_datetime(&naive) {
+        LocalResult::Single(dt) | LocalResult::Ambiguous(dt, _) => dt,
+        LocalResult::None => {
+            return Err(ExifError::InvalidExif(format!(
+                "DateTimeOriginal is not a valid local time: {value}"
+            )));
+        }
+    };
+    system_time_from_unix(local.timestamp())
+}
+
+fn system_time_from_unix(timestamp: i64) -> Result<SystemTime, ExifError> {
+    if timestamp >= 0 {
+        Ok(UNIX_EPOCH + Duration::from_secs(timestamp as u64))
+    } else {
+        UNIX_EPOCH
+            .checked_sub(Duration::from_secs((-timestamp) as u64))
+            .ok_or_else(|| ExifError::InvalidExif("file time is out of range".to_string()))
     }
 }
